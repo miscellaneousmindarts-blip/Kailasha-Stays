@@ -2,6 +2,7 @@ import { cache } from "react";
 
 import { createPublicClient } from "@/lib/supabase/public";
 import type {
+  AddonService,
   Property,
   PropertyImage,
   PropertySection,
@@ -70,6 +71,27 @@ export const getProperty = cache(
       (a, b) => a.sort_order - b.sort_order,
     );
     return property;
+  },
+);
+
+export type AddonServiceData = Pick<
+  AddonService,
+  "id" | "name" | "description" | "price" | "price_unit"
+>;
+
+/** Active add-ons available for a property: its own + the global (property_id null) ones. */
+export const getAddonsForProperty = cache(
+  async (propertyId: string): Promise<AddonServiceData[]> => {
+    const supabase = createPublicClient();
+    const { data, error } = await supabase
+      .from("addon_services")
+      .select("id, name, description, price, price_unit")
+      .eq("active", true)
+      .or(`property_id.eq.${propertyId},property_id.is.null`)
+      .order("sort_order");
+
+    if (error) throw new Error(`Could not load add-ons: ${error.message}`);
+    return (data ?? []) as AddonServiceData[];
   },
 );
 

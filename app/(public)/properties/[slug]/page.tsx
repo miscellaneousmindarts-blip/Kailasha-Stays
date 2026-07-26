@@ -4,10 +4,12 @@ import { Clock, MapPin, ShieldCheck } from "lucide-react";
 
 import { SectionList } from "@/components/blocks/section-renderer";
 import { PropertyGallery } from "@/components/property-gallery";
+import { BookingCard } from "@/components/booking/booking-card";
 import { amenity } from "@/lib/amenities";
-import { capacityLine, money } from "@/lib/format";
+import { capacityLine } from "@/lib/format";
 import { imageUrl } from "@/lib/images";
-import { getProperty, listPropertySlugs } from "@/lib/queries";
+import { getAddonsForProperty, getProperty, listPropertySlugs } from "@/lib/queries";
+import { getSiteSettings } from "@/lib/settings";
 
 export const revalidate = 300;
 
@@ -51,7 +53,11 @@ export default async function PropertyPage(
   const property = await getProperty(slug);
   if (!property) notFound();
 
-  const price = money(property.base_price, property.currency);
+  const [addons, settings] = await Promise.all([
+    getAddonsForProperty(property.id),
+    getSiteSettings(),
+  ]);
+
   const location = [property.area, property.city, property.state]
     .filter(Boolean)
     .join(", ");
@@ -66,7 +72,7 @@ export default async function PropertyPage(
     : location;
 
   return (
-    <main className="container-page py-6 md:py-10">
+    <main className="container-page py-6 pb-28 md:py-10 lg:pb-10">
       <h1 className="mb-4 text-2xl md:text-3xl">{property.title}</h1>
 
       <PropertyGallery
@@ -167,21 +173,19 @@ export default async function PropertyPage(
           </section>
         </div>
 
-        {/* booking column — the interactive card lands in Phase 2 */}
+        {/* booking column */}
         <aside className="lg:pt-2">
-          <div className="border-border shadow-raised rounded-lg border p-6 lg:sticky lg:top-24">
-            {price ? (
-              <p>
-                <span className="tabular text-xl font-semibold">{price}</span>
-                <span className="text-text-muted"> / night</span>
-              </p>
-            ) : (
-              <p className="font-medium">Ask us for the current rate</p>
-            )}
-            <p className="text-text-muted mt-4 text-sm">
-              Booking options appear here.
-            </p>
-          </div>
+          <BookingCard
+            propertyId={property.id}
+            propertyTitle={property.title}
+            maxGuests={property.max_guests}
+            basePrice={property.base_price}
+            currency={property.currency}
+            airbnbUrl={property.airbnb_url}
+            bookingComUrl={property.booking_com_url}
+            whatsappNumber={settings.whatsapp_number}
+            addons={addons}
+          />
         </aside>
       </div>
     </main>
