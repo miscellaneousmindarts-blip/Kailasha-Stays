@@ -55,10 +55,11 @@ Environment variables:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=        # server-only (API routes, never exposed)
-NEXT_PUBLIC_OWNER_WHATSAPP=91XXXXXXXXXX
 ICAL_EXPORT_SECRET=               # random string appended to export feed URLs
 NEXT_PUBLIC_SITE_URL=https://<domain>
 ```
+
+The WhatsApp number, contact phone/email and business name are **not** environment variables — they live in the `site_settings` table and are edited in Admin → Settings, so changing the number never needs a redeploy.
 
 ---
 
@@ -75,6 +76,17 @@ create table admin_users (
 -- helper used by every admin RLS policy
 create function is_admin() returns boolean language sql stable security definer as
 $$ select exists (select 1 from admin_users where user_id = auth.uid()) $$;
+
+-- ===== site settings (single row, admin-editable) =====
+create table site_settings (
+  id boolean primary key default true check (id),   -- singleton
+  business_name text not null default 'Stays in Vrindavan',
+  whatsapp_number text,        -- digits only, e.g. 919876543210; drives every wa.me link
+  contact_phone text, contact_email text, address text,
+  response_note text,          -- e.g. "We reply within an hour, 8am–9pm"
+  updated_at timestamptz default now()
+);
+-- RLS: public select (the site builds WhatsApp links from it), admin update only.
 
 -- ===== properties =====
 create table properties (
@@ -321,7 +333,7 @@ Name: {name}
 Enquiry ID: {short id}
 ```
 
-`https://wa.me/${NEXT_PUBLIC_OWNER_WHATSAPP}?text=${encodeURIComponent(msg)}`
+`https://wa.me/${settings.whatsapp_number}?text=${encodeURIComponent(msg)}` — the number comes from `site_settings` (see `lib/settings.ts`), never from an env var. If it is unset, the Book Direct button is disabled with "Direct booking is being set up — please book on Airbnb".
 
 3. Show confirmation state: “Your enquiry is sent — we'll confirm on WhatsApp shortly.” (Enquiry is saved even if they don't complete the WhatsApp step.)
 
@@ -390,7 +402,9 @@ Direct bookings are confirmed manually by the admin (from an enquiry), so before
 
 6. **Add-ons** (`/admin/addons`) — CRUD for services, global or per-property, active toggle.
 
-7. **Settings** (`/admin/settings`) — calendar sources CRUD per property (paste iCal URLs, platform select, last-sync status, Sync now), export-URL display per property, owner WhatsApp number.
+7. **Settings** (`/admin/settings`) — two groups:
+   - **Contact details** (the `site_settings` row): business name, **WhatsApp number** (digits-only international format, validated, with a "Send test message" link that opens the resulting `wa.me` URL), contact phone, contact email, address, response note. Saving takes effect immediately across the public site and guest portal — no redeploy. If the number is blank, the public site hides direct booking and shows only the platform buttons.
+   - **Calendar sources** per property (paste iCal URLs, platform select, last-sync status, Sync now) and the copyable export URL per property.
 
 ---
 

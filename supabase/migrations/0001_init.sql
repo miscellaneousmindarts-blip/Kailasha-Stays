@@ -44,6 +44,34 @@ revoke execute on function public.is_admin() from public;
 grant execute on function public.is_admin() to anon, authenticated;
 
 -- -----------------------------------------------------------------------------
+-- 1b. site settings — single row, edited by the admin in Admin → Settings.
+--     The WhatsApp number and contact details live here, never in env vars,
+--     so they can be changed without a redeploy.
+-- -----------------------------------------------------------------------------
+
+create table if not exists public.site_settings (
+  id               boolean primary key default true,
+  business_name    text not null default 'Stays in Vrindavan',
+  -- digits only, international format, e.g. 919876543210 (91 = India)
+  whatsapp_number  text check (whatsapp_number is null or whatsapp_number ~ '^[1-9][0-9]{7,14}$'),
+  contact_phone    text,
+  contact_email    text check (contact_email is null or contact_email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'),
+  address          text,
+  -- shown under the booking buttons, e.g. "We reply within an hour, 8am–9pm"
+  response_note    text,
+  updated_at       timestamptz not null default now(),
+  constraint site_settings_singleton check (id)
+);
+
+drop trigger if exists site_settings_set_updated_at on public.site_settings;
+create trigger site_settings_set_updated_at before update on public.site_settings
+  for each row execute function public.set_updated_at();
+
+-- the one and only row; edit it, never insert another
+insert into public.site_settings (id) values (true)
+  on conflict (id) do nothing;
+
+-- -----------------------------------------------------------------------------
 -- 2. properties
 -- -----------------------------------------------------------------------------
 
@@ -297,6 +325,7 @@ create index if not exists external_events_property_dates_idx
 -- =============================================================================
 
 alter table public.admin_users       enable row level security;
+alter table public.site_settings     enable row level security;
 alter table public.properties        enable row level security;
 alter table public.property_private  enable row level security;
 alter table public.property_contacts enable row level security;
@@ -315,6 +344,17 @@ alter table public.external_events   enable row level security;
 drop policy if exists admin_users_self_read on public.admin_users;
 create policy admin_users_self_read on public.admin_users
   for select to authenticated using (user_id = auth.uid());
+
+-- site_settings: readable by everyone (the public site builds WhatsApp links
+-- from it); only an admin may change it, and only by updating the single row.
+drop policy if exists site_settings_public_read on public.site_settings;
+create policy site_settings_public_read on public.site_settings
+  for select to anon, authenticated using (true);
+
+drop policy if exists site_settings_admin_update on public.site_settings;
+create policy site_settings_admin_update on public.site_settings
+  for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
 
 -- properties: public reads published rows; admins do everything.
 drop policy if exists properties_public_read on public.properties;
@@ -640,7 +680,16 @@ begin
                'uploaded_at', gd.uploaded_at)
                        order by gd.uploaded_at)
         from public.guest_documents gd where gd.booking_id = v_booking.id
-    ), '[]'::jsonb)
+    ), '[]'::jsonb),
+    'settings', (
+      select jsonb_build_object(
+        'business_name', s.business_name,
+        'whatsapp_number', s.whatsapp_number,
+        'contact_phone', s.contact_phone,
+        'contact_email', s.contact_email,
+        'response_note', s.response_note
+      ) from public.site_settings s where s.id
+    )
   ) into v_result;
 
   return v_result;

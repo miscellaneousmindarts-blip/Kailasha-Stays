@@ -24,7 +24,9 @@ export const publicEnv = {
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   ),
-  ownerWhatsapp: process.env.NEXT_PUBLIC_OWNER_WHATSAPP ?? "",
+  // NOTE: the WhatsApp number and contact details are NOT read from the
+  // environment — they live in the site_settings table so the admin can change
+  // them without a redeploy. See lib/settings.ts.
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
 };
 

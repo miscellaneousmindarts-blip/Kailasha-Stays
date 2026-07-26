@@ -16,6 +16,18 @@ export type BookingStatus = "confirmed" | "cancelled" | "completed";
 export type AddonStatus = "requested" | "confirmed" | "cancelled";
 export type CalendarPlatform = "airbnb" | "booking_com" | "other";
 
+export type SiteSettings = {
+  id: true;
+  business_name: string;
+  /** digits only, international format, e.g. "919876543210" */
+  whatsapp_number: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  address: string | null;
+  response_note: string | null;
+  updated_at: string;
+};
+
 export type Property = {
   id: string;
   slug: string;
@@ -203,6 +215,7 @@ export type Database = {
   public: {
     Tables: {
       admin_users: Table<AdminUser>;
+      site_settings: Table<SiteSettings>;
       properties: Table<Property>;
       property_private: Table<PropertyPrivate>;
       property_contacts: Table<PropertyContact>;
