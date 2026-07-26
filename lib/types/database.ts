@@ -204,12 +204,50 @@ export type AdminUser = {
   created_at: string;
 };
 
-type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
+type Relationship = {
+  foreignKeyName: string;
+  columns: string[];
+  isOneToOne: boolean;
+  referencedRelation: string;
+  referencedColumns: string[];
+};
+
+type Table<
+  Row,
+  Rels extends readonly Relationship[] = [],
+  Insert = Partial<Row>,
+  Update = Partial<Row>,
+> = {
   Row: Row;
   Insert: Insert;
   Update: Update;
-  Relationships: [];
+  Relationships: Rels;
 };
+
+/**
+ * PostgREST resolves embedded selects (`properties(*, property_images(*))`)
+ * from this metadata, so each child table must declare its FK back to its
+ * parent or the join comes back typed as an error.
+ */
+type BelongsToProperty<Name extends string> = [
+  {
+    foreignKeyName: Name;
+    columns: ["property_id"];
+    isOneToOne: false;
+    referencedRelation: "properties";
+    referencedColumns: ["id"];
+  },
+];
+
+type BelongsToBooking<Name extends string> = [
+  {
+    foreignKeyName: Name;
+    columns: ["booking_id"];
+    isOneToOne: false;
+    referencedRelation: "bookings";
+    referencedColumns: ["id"];
+  },
+];
 
 export type Database = {
   public: {
@@ -217,18 +255,59 @@ export type Database = {
       admin_users: Table<AdminUser>;
       site_settings: Table<SiteSettings>;
       properties: Table<Property>;
-      property_private: Table<PropertyPrivate>;
-      property_contacts: Table<PropertyContact>;
-      property_images: Table<PropertyImage>;
-      property_sections: Table<PropertySection>;
-      addon_services: Table<AddonService>;
-      enquiries: Table<Enquiry>;
-      bookings: Table<Booking>;
-      booking_addons: Table<BookingAddon>;
-      payments: Table<Payment>;
-      guest_documents: Table<GuestDocument>;
-      calendar_sources: Table<CalendarSource>;
-      external_events: Table<ExternalEvent>;
+      property_private: Table<
+        PropertyPrivate,
+        [
+          {
+            foreignKeyName: "property_private_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: true;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      property_contacts: Table<
+        PropertyContact,
+        BelongsToProperty<"property_contacts_property_id_fkey">
+      >;
+      property_images: Table<
+        PropertyImage,
+        BelongsToProperty<"property_images_property_id_fkey">
+      >;
+      property_sections: Table<
+        PropertySection,
+        BelongsToProperty<"property_sections_property_id_fkey">
+      >;
+      addon_services: Table<
+        AddonService,
+        BelongsToProperty<"addon_services_property_id_fkey">
+      >;
+      enquiries: Table<
+        Enquiry,
+        BelongsToProperty<"enquiries_property_id_fkey">
+      >;
+      bookings: Table<
+        Booking,
+        BelongsToProperty<"bookings_property_id_fkey">
+      >;
+      booking_addons: Table<
+        BookingAddon,
+        BelongsToBooking<"booking_addons_booking_id_fkey">
+      >;
+      payments: Table<Payment, BelongsToBooking<"payments_booking_id_fkey">>;
+      guest_documents: Table<
+        GuestDocument,
+        BelongsToBooking<"guest_documents_booking_id_fkey">
+      >;
+      calendar_sources: Table<
+        CalendarSource,
+        BelongsToProperty<"calendar_sources_property_id_fkey">
+      >;
+      external_events: Table<
+        ExternalEvent,
+        BelongsToProperty<"external_events_property_id_fkey">
+      >;
     };
     Views: Record<never, never>;
     Functions: {

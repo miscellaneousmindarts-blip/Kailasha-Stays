@@ -1,6 +1,6 @@
 import { cache } from "react";
 
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import type { SiteSettings } from "@/lib/types/database";
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -22,7 +22,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
  * from several components without extra round trips.
  */
 export const getSiteSettings = cache(async (): Promise<SiteSettings> => {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("site_settings")
     .select("*")
