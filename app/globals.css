@@ -1,26 +1,248 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+   Design tokens — PLAN.md §8.1
+   Neutral, photo-first surfaces + a single warm accent. Light theme only (v1).
+   Every colour/radius/shadow used in the app must come from a token here.
+--------------------------------------------------------------------------- */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+
+  /* project tokens */
+  --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-text: var(--foreground);
+  --color-text-muted: var(--muted-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-tint: var(--primary-tint);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-danger: var(--destructive);
+  --color-whatsapp: var(--whatsapp);
+
+  /* source colours for the admin calendar (always paired with a text label) */
+  --color-source-direct: var(--source-direct);
+  --color-source-airbnb: var(--source-airbnb);
+  --color-source-booking: var(--source-booking);
+  --color-source-blocked: var(--source-blocked);
+
+  /* shadcn semantic aliases */
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* radius scale: sm 8 / md 12 / lg 16 (photos + dialogs) */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+  --radius-4xl: 2.5rem;
+
+  /* elevation: exactly three levels */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-raised: 0 6px 16px rgba(0, 0, 0, 0.12);
+  --shadow-overlay: 0 8px 28px rgba(0, 0, 0, 0.28);
+
+  /* motion */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-soft: cubic-bezier(0.4, 0, 1, 1);
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+  --animate-rise-in: rise-in 320ms var(--ease-out-soft) both;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --surface: #ffffff;
+  --surface-subtle: #f7f7f5;
+
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
+
+  /* warm terracotta accent — primary CTAs, active states, highlights only */
+  --primary: #c2410c;
+  --primary-foreground: #ffffff;
+  --primary-hover: #9a3412;
+  --primary-tint: #fdf2ec;
+
+  --secondary: #f4f4f2;
+  --secondary-foreground: #1a1a1a;
+  --muted: #f7f7f5;
+  --muted-foreground: #6b7280;
+  --accent: #f4f4f2;
+  --accent-foreground: #1a1a1a;
+
+  --destructive: #dc2626;
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+  --whatsapp: #25d366;
+
+  --source-direct: #16a34a;
+  --source-airbnb: #e0484d;
+  --source-booking: #2563eb;
+  --source-blocked: #6b7280;
+
+  --border: #ebebe9;
+  --input: #dcdcd8;
+  --ring: #c2410c;
+
+  --chart-1: #c2410c;
+  --chart-2: #2563eb;
+  --chart-3: #16a34a;
+  --chart-4: #d97706;
+  --chart-5: #6b7280;
+
+  --radius: 1rem;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1a1a1a;
+  --sidebar-primary: #c2410c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f7f7f5;
+  --sidebar-accent-foreground: #1a1a1a;
+  --sidebar-border: #ebebe9;
+  --sidebar-ring: #c2410c;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    /* 16px base / 1.6 body — never smaller for paragraph text */
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-semibold tracking-tight;
+    line-height: 1.25;
+  }
+
+  /* pointer feedback + visible focus everywhere (a11y bar, §8.5) */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+
+  /* prices, billing tables, date cells never jitter */
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  /* press feedback: 100ms, transform only — no layout shift */
+  .pressable {
+    transition:
+      transform 150ms var(--ease-out-soft),
+      box-shadow 200ms var(--ease-out-soft),
+      background-color 150ms var(--ease-out-soft);
+  }
+
+  .pressable:active {
+    transform: scale(0.98);
+  }
+
+  .page-gutter {
+    @apply px-6 md:px-12;
+  }
+
+  .container-page {
+    @apply mx-auto w-full max-w-7xl px-6 md:px-12;
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* §8.2 — every animation collapses to a plain fade when the user asks for less motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .pressable:active {
+    transform: none;
+  }
 }
