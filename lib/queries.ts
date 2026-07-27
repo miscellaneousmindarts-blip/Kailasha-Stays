@@ -104,3 +104,15 @@ export async function listPropertySlugs(): Promise<string[]> {
     .eq("status", "published");
   return (data ?? []).map((p) => p.slug);
 }
+
+/** Slug + last-modified for the sitemap. */
+export async function listPropertiesForSitemap(): Promise<
+  { slug: string; updated_at: string }[]
+> {
+  const supabase = createPublicClient();
+  const { data } = await supabase
+    .from("properties")
+    .select("slug, updated_at")
+    .eq("status", "published");
+  return data ?? [];
+}

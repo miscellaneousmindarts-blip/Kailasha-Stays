@@ -324,3 +324,34 @@ export async function listAllCalendarSources(): Promise<CalendarSource[]> {
   if (error) throw new Error(`Could not load calendar sources: ${error.message}`);
   return data ?? [];
 }
+
+// -----------------------------------------------------------------------------
+// Sync warnings (dashboard)
+// -----------------------------------------------------------------------------
+
+export type SyncWarning = Pick<
+  CalendarSource,
+  "id" | "platform" | "last_status" | "last_error" | "last_synced_at" | "created_at"
+> & { properties: { title: string } | null };
+
+// The cron job (migration 0002) runs every 30 minutes — a source that hasn't
+// synced in this long, or never synced despite being configured a while ago,
+// means the job stalled or the feed URL is bad, not just "hasn't run yet".
+const STALE_SYNC_HOURS = 26;
+
+export async function listSyncWarnings(): Promise<SyncWarning[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("calendar_sources")
+    .select("id, platform, last_status, last_error, last_synced_at, created_at, properties(title)")
+    .order("created_at");
+  if (error) throw new Error(`Could not load calendar sources: ${error.message}`);
+
+  const staleCutoff = Date.now() - STALE_SYNC_HOURS * 60 * 60 * 1000;
+  return ((data ?? []) as unknown as SyncWarning[]).filter((s) => {
+    if (s.last_status === "error") return true;
+    const lastSynced = s.last_synced_at ? new Date(s.last_synced_at).getTime() : null;
+    if (lastSynced === null) return new Date(s.created_at).getTime() < staleCutoff;
+    return lastSynced < staleCutoff;
+  });
+}
