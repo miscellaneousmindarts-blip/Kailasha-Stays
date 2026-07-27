@@ -6,6 +6,7 @@ import type {
   Booking,
   BookingAddon,
   BookingStatus,
+  CalendarSource,
   Enquiry,
   EnquiryStatus,
   ExternalEvent,
@@ -16,6 +17,7 @@ import type {
   PropertyImage,
   PropertyPrivate,
   PropertySection,
+  SiteSettings,
 } from "@/lib/types/database";
 
 export type AdminPropertyRow = Pick<
@@ -299,4 +301,26 @@ export async function listUpcomingStays(days = 7): Promise<UpcomingStay[]> {
 
   if (error) throw new Error(`Could not load upcoming stays: ${error.message}`);
   return (data ?? []) as unknown as UpcomingStay[];
+}
+
+// -----------------------------------------------------------------------------
+// Settings
+// -----------------------------------------------------------------------------
+
+export async function getSiteSettingsAdmin(): Promise<SiteSettings> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("site_settings").select("*").maybeSingle();
+  if (error) throw new Error(`Could not load settings: ${error.message}`);
+  if (!data) throw new Error("site_settings row is missing.");
+  return data;
+}
+
+export async function listAllCalendarSources(): Promise<CalendarSource[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("calendar_sources")
+    .select("*")
+    .order("created_at");
+  if (error) throw new Error(`Could not load calendar sources: ${error.message}`);
+  return data ?? [];
 }

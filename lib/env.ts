@@ -46,4 +46,11 @@ export const serverEnv = {
     }
     return required("ICAL_EXPORT_SECRET", process.env.ICAL_EXPORT_SECRET);
   },
+  /** Authorizes the scheduled calendar-sync route (pg_cron -> pg_net -> this route). */
+  get cronSecret() {
+    if (typeof window !== "undefined") {
+      throw new Error("serverEnv.cronSecret must never be read on the client");
+    }
+    return required("CRON_SECRET", process.env.CRON_SECRET);
+  },
 };

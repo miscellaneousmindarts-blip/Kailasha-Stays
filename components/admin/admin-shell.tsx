@@ -9,10 +9,14 @@ import {
   LayoutDashboard,
   LogOut,
   Receipt,
+  Settings,
 } from "lucide-react";
 
 import { signOut } from "@/app/admin/(dashboard)/actions";
 
+// Desktop sidebar shows every section. The mobile bottom tab bar is capped at
+// 5 items (see PLAN §9 bottom-nav-limit), so Settings lives in the mobile
+// header instead of competing for a tab slot.
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/calendar", label: "Calendar", icon: CalendarDays },
@@ -20,6 +24,10 @@ const NAV = [
   { href: "/admin/enquiries", label: "Enquiries", icon: Inbox },
   { href: "/admin/listings", label: "Listings", icon: Home },
 ];
+
+const MOBILE_NAV = NAV;
+const SETTINGS_ITEM = { href: "/admin/settings", label: "Settings", icon: Settings };
+const DESKTOP_NAV = [...NAV, SETTINGS_ITEM];
 
 function isActive(pathname: string, href: string) {
   return href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
@@ -40,7 +48,7 @@ export function AdminShell({
       <aside className="border-border hidden w-64 shrink-0 flex-col border-r p-4 lg:flex">
         <p className="px-2 py-2 font-semibold">Admin</p>
         <nav className="mt-4 flex flex-col gap-1">
-          {NAV.map((item) => {
+          {DESKTOP_NAV.map((item) => {
             const active = isActive(pathname, item.href);
             const Icon = item.icon;
             return (
@@ -77,15 +85,26 @@ export function AdminShell({
         {/* mobile top bar */}
         <header className="border-border bg-background sticky top-0 z-30 flex h-14 items-center justify-between border-b px-4 lg:hidden">
           <p className="font-semibold">Admin</p>
-          <form action={signOut}>
-            <button
-              type="submit"
-              aria-label="Sign out"
-              className="hover:bg-surface-subtle pressable flex size-11 items-center justify-center rounded-full"
+          <div className="flex items-center">
+            <Link
+              href={SETTINGS_ITEM.href}
+              aria-label="Settings"
+              className={`pressable flex size-11 items-center justify-center rounded-full ${
+                isActive(pathname, SETTINGS_ITEM.href) ? "text-primary" : ""
+              }`}
             >
-              <LogOut className="size-5" aria-hidden="true" />
-            </button>
-          </form>
+              <Settings className="size-5" aria-hidden="true" />
+            </Link>
+            <form action={signOut}>
+              <button
+                type="submit"
+                aria-label="Sign out"
+                className="hover:bg-surface-subtle pressable flex size-11 items-center justify-center rounded-full"
+              >
+                <LogOut className="size-5" aria-hidden="true" />
+              </button>
+            </form>
+          </div>
         </header>
 
         <main className="flex-1 p-4 pb-24 md:p-6 lg:pb-6">{children}</main>
@@ -93,7 +112,7 @@ export function AdminShell({
 
       {/* mobile bottom tab bar */}
       <nav className="border-border bg-background fixed inset-x-0 bottom-0 z-30 flex h-16 items-stretch border-t pb-[env(safe-area-inset-bottom)] lg:hidden">
-        {NAV.map((item) => {
+        {MOBILE_NAV.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
           return (
