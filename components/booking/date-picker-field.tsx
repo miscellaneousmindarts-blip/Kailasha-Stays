@@ -13,7 +13,7 @@ import {
   type SelectedRange,
   type UnavailableRange,
 } from "@/components/booking/availability-calendar";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateShort } from "@/lib/format";
 import { nightsBetween } from "@/lib/date-utils";
 
 export function DatePickerField({
@@ -21,14 +21,29 @@ export function DatePickerField({
   value,
   onChange,
   variant = "field",
+  open: openProp,
+  onOpenChange,
+  loading = false,
 }: {
   unavailable: UnavailableRange[];
   value: SelectedRange;
   onChange: (next: SelectedRange) => void;
   /** "field": full-width bordered row (desktop card). "compact": inline text trigger (mobile bar). */
   variant?: "field" | "compact";
+  /**
+   * Optional controlled open state, so a "Book now" button elsewhere can pop
+   * the calendar. Each rendered instance must be given its OWN state — Radix
+   * portals popover content to <body> regardless of a CSS-hidden trigger, so
+   * one shared flag across the desktop/mobile instances renders both at once.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Availability still loading — passed through so no date can be picked yet. */
+  loading?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = openProp ?? uncontrolledOpen;
+  const setOpen = onOpenChange ?? setUncontrolledOpen;
   const nights =
     value.checkIn && value.checkOut
       ? nightsBetween(value.checkIn, value.checkOut)
@@ -43,8 +58,10 @@ export function DatePickerField({
             className="pressable -mx-1 flex min-h-11 flex-col items-start justify-center rounded-md px-1 text-left"
           >
             {value.checkIn && value.checkOut ? (
-              <span className="text-text-muted truncate text-sm">
-                {formatDate(value.checkIn)} – {formatDate(value.checkOut)}
+              /* short form: the bottom bar shares this row with the total, and
+                 the full weekday+year format forces both to truncate */
+              <span className="text-text-muted truncate text-sm whitespace-nowrap">
+                {formatDateShort(value.checkIn)} – {formatDateShort(value.checkOut)}
               </span>
             ) : (
               <span className="text-text-muted text-sm underline-offset-2 hover:underline">
@@ -81,12 +98,18 @@ export function DatePickerField({
       </PopoverTrigger>
       <PopoverContent
         align="start"
+        sideOffset={8}
+        // Anchored to the mobile bottom bar there's no room below, so Radix
+        // flips it upward — without padding it ends up flush against the top
+        // edge, overlapping the header.
+        collisionPadding={12}
         className="w-[92vw] max-w-[420px] p-4 sm:w-[620px] sm:max-w-[620px]"
       >
         <AvailabilityCalendar
           unavailable={unavailable}
           value={value}
           onChange={onChange}
+          loading={loading}
         />
         <div className="border-border mt-3 flex items-center justify-between border-t pt-3">
           <button

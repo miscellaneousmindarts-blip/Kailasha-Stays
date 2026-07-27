@@ -20,6 +20,8 @@ export function PropertyCard({
 
   return (
     <Link href={`/properties/${property.slug}`} className="group block">
+      {/* plain tint, not .skeleton — this is the real image's backdrop while it
+          decodes, and must not shimmer indefinitely behind a loaded photo */}
       <div className="bg-surface-subtle relative aspect-[4/3] overflow-hidden rounded-lg">
         {src ? (
           <Image
@@ -59,11 +61,11 @@ export function PropertyCard({
 export function PropertyCardSkeleton() {
   return (
     <div>
-      <div className="bg-surface-subtle animate-[--animate-shimmer] aspect-[4/3] rounded-lg" />
+      <div className="skeleton aspect-[4/3] rounded-lg" />
       <div className="mt-3 space-y-2">
-        <div className="bg-surface-subtle h-5 w-3/4 rounded-sm" />
-        <div className="bg-surface-subtle h-4 w-1/2 rounded-sm" />
-        <div className="bg-surface-subtle h-4 w-2/5 rounded-sm" />
+        <div className="skeleton h-5 w-3/4 rounded-sm" />
+        <div className="skeleton h-4 w-1/2 rounded-sm" />
+        <div className="skeleton h-4 w-2/5 rounded-sm" />
       </div>
     </div>
   );

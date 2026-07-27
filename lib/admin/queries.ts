@@ -17,6 +17,7 @@ import type {
   PropertyImage,
   PropertyPrivate,
   PropertySection,
+  RatePeriod,
   SiteSettings,
 } from "@/lib/types/database";
 
@@ -54,6 +55,7 @@ export type PropertyForEdit = Property & {
   property_sections: PropertySection[];
   property_contacts: PropertyContact[];
   property_private: PropertyPrivate | null;
+  rate_periods: RatePeriod[];
 };
 
 export async function getPropertyForEdit(
@@ -63,7 +65,7 @@ export async function getPropertyForEdit(
   const { data, error } = await supabase
     .from("properties")
     .select(
-      "*, property_images(*), property_sections(*), property_contacts(*), property_private(*)",
+      "*, property_images(*), property_sections(*), property_contacts(*), property_private(*), rate_periods(*)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -83,6 +85,9 @@ export async function getPropertyForEdit(
   );
   property.property_contacts = [...(property.property_contacts ?? [])].sort(
     (a, b) => a.sort_order - b.sort_order,
+  );
+  property.rate_periods = [...(property.rate_periods ?? [])].sort((a, b) =>
+    a.start_date.localeCompare(b.start_date),
   );
   property.property_private = Array.isArray(property.property_private)
     ? (property.property_private[0] ?? null)

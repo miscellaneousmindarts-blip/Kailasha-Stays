@@ -29,6 +29,14 @@ export function capacityLine(p: {
   ].join(" · ");
 }
 
+/** "9 Sep" — for tight rows where the weekday and year would force a truncation. */
+export function formatDateShort(value: string | Date) {
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+  }).format(typeof value === "string" ? new Date(value) : value);
+}
+
 export function formatDate(value: string | Date) {
   return new Intl.DateTimeFormat("en-IN", {
     weekday: "short",

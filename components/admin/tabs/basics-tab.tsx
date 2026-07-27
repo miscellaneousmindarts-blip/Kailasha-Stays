@@ -99,17 +99,6 @@ export function BasicsTab({ property }: { property: Property }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="base_price">Price per night</Label>
-          <Input
-            id="base_price"
-            name="base_price"
-            type="number"
-            min={0}
-            defaultValue={property.base_price ?? ""}
-            className="h-11"
-          />
-        </div>
-        <div className="space-y-2">
           <Label htmlFor="currency">Currency</Label>
           <Input
             id="currency"
@@ -117,6 +106,9 @@ export function BasicsTab({ property }: { property: Property }) {
             defaultValue={property.currency}
             className="h-11"
           />
+          <p className="text-text-muted text-xs">
+            Nightly rates live in the Pricing tab.
+          </p>
         </div>
       </div>
 

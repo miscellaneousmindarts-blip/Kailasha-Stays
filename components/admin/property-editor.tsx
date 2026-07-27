@@ -5,6 +5,7 @@ import { useState } from "react";
 import { StatusControls } from "@/components/admin/status-controls";
 import { BasicsTab } from "@/components/admin/tabs/basics-tab";
 import { DescriptionTab } from "@/components/admin/tabs/description-tab";
+import { PricingTab } from "@/components/admin/tabs/pricing-tab";
 import { PhotosTab } from "@/components/admin/tabs/photos-tab";
 import { SectionsTab } from "@/components/admin/tabs/sections-tab";
 import { LocationTab } from "@/components/admin/tabs/location-tab";
@@ -16,6 +17,7 @@ import type { PropertyForEdit } from "@/lib/admin/queries";
 
 const TABS = [
   "Basics",
+  "Pricing",
   "Description",
   "Photos",
   "Sections",
@@ -69,6 +71,7 @@ export function PropertyEditor({ property }: { property: PropertyForEdit }) {
 
       <div className="py-6">
         {tab === "Basics" ? <BasicsTab property={property} /> : null}
+        {tab === "Pricing" ? <PricingTab property={property} /> : null}
         {tab === "Description" ? <DescriptionTab property={property} /> : null}
         {tab === "Photos" ? (
           <PhotosTab propertyId={property.id} images={property.property_images} />

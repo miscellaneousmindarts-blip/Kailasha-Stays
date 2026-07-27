@@ -72,7 +72,7 @@ export default async function PropertyPage(
     : location;
 
   return (
-    <main className="container-page py-6 pb-28 md:py-10 lg:pb-10">
+    <main className="container-page py-6 pb-52 md:py-10 md:pb-52 lg:pb-10">
       <h1 className="mb-4 text-2xl md:text-3xl">{property.title}</h1>
 
       <PropertyGallery
@@ -180,6 +180,8 @@ export default async function PropertyPage(
             propertyTitle={property.title}
             maxGuests={property.max_guests}
             basePrice={property.base_price}
+            airbnbBasePrice={property.airbnb_base_price}
+            ratePeriods={property.rate_periods}
             currency={property.currency}
             airbnbUrl={property.airbnb_url}
             bookingComUrl={property.booking_com_url}

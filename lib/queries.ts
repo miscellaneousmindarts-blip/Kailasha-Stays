@@ -6,6 +6,7 @@ import type {
   Property,
   PropertyImage,
   PropertySection,
+  RatePeriod,
 } from "@/lib/types/database";
 
 export type PropertyCardData = Pick<
@@ -27,6 +28,7 @@ export type PropertyCardData = Pick<
 export type PropertyDetail = Property & {
   property_images: PropertyImage[];
   property_sections: PropertySection[];
+  rate_periods: RatePeriod[];
 };
 
 /** Published properties for the /properties grid, in the admin's chosen order. */
@@ -54,7 +56,7 @@ export const getProperty = cache(
     const supabase = createPublicClient();
     const { data, error } = await supabase
       .from("properties")
-      .select("*, property_images(*), property_sections(*)")
+      .select("*, property_images(*), property_sections(*), rate_periods(*)")
       .eq("slug", slug)
       .eq("status", "published")
       .maybeSingle();
@@ -63,6 +65,9 @@ export const getProperty = cache(
     if (!data) return null;
 
     const property = data as PropertyDetail;
+    property.rate_periods = [...(property.rate_periods ?? [])].sort((a, b) =>
+      a.start_date.localeCompare(b.start_date),
+    );
     property.property_images = [...(property.property_images ?? [])].sort(
       (a, b) =>
         Number(b.is_cover) - Number(a.is_cover) || a.sort_order - b.sort_order,

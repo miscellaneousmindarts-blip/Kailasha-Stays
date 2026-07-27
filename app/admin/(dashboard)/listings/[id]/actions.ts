@@ -62,7 +62,12 @@ const NULLABLE_TEXT_FIELDS = [
 
 // max_guests/bedrooms/beds/bathrooms are NOT NULL columns with defaults.
 const REQUIRED_NUMBER_FIELDS = ["max_guests", "bedrooms", "beds", "bathrooms"] as const;
-const NULLABLE_NUMBER_FIELDS = ["base_price", "lat", "lng"] as const;
+const NULLABLE_NUMBER_FIELDS = [
+  "base_price",
+  "airbnb_base_price",
+  "lat",
+  "lng",
+] as const;
 
 export async function updateProperty(
   propertyId: string,
@@ -521,4 +526,66 @@ export async function moveSection(
   direction: "up" | "down",
 ): Promise<ActionResult> {
   return moveInOrderedList("property_sections", propertyId, sectionId, direction);
+}
+
+// ---------------------------------------------------------------------------
+// Rate periods — per-date-range pricing for each channel
+// ---------------------------------------------------------------------------
+
+export async function addRatePeriod(
+  propertyId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const startDate = strField(formData, "start_date");
+  const endDate = strField(formData, "end_date");
+  const label = strField(formData, "label");
+  const directPrice = numField(formData, "direct_price");
+  const airbnbPrice = numField(formData, "airbnb_price");
+
+  if (!startDate || !endDate) return { error: "Pick a start and end date." };
+  if (endDate <= startDate) {
+    return { error: "The end date must be after the start date." };
+  }
+  if (directPrice === null || directPrice === undefined) {
+    return { error: "Enter a direct price for these dates." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("rate_periods").insert({
+    property_id: propertyId,
+    label: label || null,
+    start_date: startDate,
+    end_date: endDate,
+    direct_price: directPrice,
+    airbnb_price: airbnbPrice ?? null,
+  });
+
+  if (error) {
+    // 23P01 = the exclusion constraint: these dates overlap an existing period,
+    // which would make the nightly rate ambiguous.
+    if (error.code === "23P01") {
+      return {
+        error: "Those dates overlap an existing price period. Edit that one instead.",
+      };
+    }
+    return { error: error.message };
+  }
+
+  revalidateEditor(propertyId);
+  return { success: true };
+}
+
+export async function deleteRatePeriod(
+  propertyId: string,
+  ratePeriodId: string,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("rate_periods")
+    .delete()
+    .eq("id", ratePeriodId);
+  if (error) return { error: error.message };
+
+  revalidateEditor(propertyId);
+  return { success: true };
 }

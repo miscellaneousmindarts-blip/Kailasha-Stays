@@ -1,22 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ExternalLink } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ExternalLink, Tag } from "lucide-react";
 
 import { DatePickerField } from "@/components/booking/date-picker-field";
 import { GuestStepper } from "@/components/booking/guest-stepper";
 import { BookDirectDialog } from "@/components/booking/book-direct-dialog";
+import { PriceBreakdown } from "@/components/booking/price-breakdown";
 import type { UnavailableRange } from "@/components/booking/availability-calendar";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/format";
-import { nightsBetween } from "@/lib/date-utils";
+import { lowestNightlyRate, quoteStay, type Quote } from "@/lib/pricing";
 import type { AddonServiceData } from "@/lib/queries";
+import type { RatePeriod } from "@/lib/types/database";
 
 export function BookingCard({
   propertyId,
   propertyTitle,
   maxGuests,
   basePrice,
+  airbnbBasePrice,
+  ratePeriods,
   currency,
   airbnbUrl,
   bookingComUrl,
@@ -27,6 +31,8 @@ export function BookingCard({
   propertyTitle: string;
   maxGuests: number;
   basePrice: number | null;
+  airbnbBasePrice: number | null;
+  ratePeriods: RatePeriod[];
   currency: string;
   airbnbUrl: string | null;
   bookingComUrl: string | null;
@@ -34,27 +40,18 @@ export function BookingCard({
   addons: AddonServiceData[];
 }) {
   const [unavailable, setUnavailable] = useState<UnavailableRange[]>([]);
+  const [loadingAvailability, setLoadingAvailability] = useState(true);
   const [range, setRange] = useState<{
     checkIn: Date | null;
     checkOut: Date | null;
   }>({ checkIn: null, checkOut: null });
   const [guests, setGuests] = useState(Math.min(2, maxGuests));
   const [dialogOpen, setDialogOpen] = useState(false);
-  // Bumping this forces both DatePickerField instances (desktop card + mobile
-  // bar) to remount, which resets their independent internal popover state to
-  // closed. They're each uncontrolled, so this is simpler and safer than a
-  // shared "open" boolean: Radix portals a popover's content to <body>
-  // regardless of its trigger's own hidden ancestors, so sharing one open
-  // flag between the CSS-hidden desktop/mobile instances made both render
-  // their calendar content at once — this avoids that entirely.
-  const [dateFieldKey, setDateFieldKey] = useState(0);
-
-  function openBookDirect() {
-    // the booking dialog must be the only open overlay — never leave the
-    // date popover open (and focusable) behind it
-    setDateFieldKey((k) => k + 1);
-    setDialogOpen(true);
-  }
+  // Separate open state per instance: the desktop card and the mobile bar each
+  // render their own DatePickerField, and Radix portals popover content to
+  // <body> regardless of a CSS-hidden trigger — one shared flag would pop both.
+  const [desktopPicker, setDesktopPicker] = useState(false);
+  const [mobilePicker, setMobilePicker] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,107 +59,194 @@ export function BookingCard({
     supabase
       .rpc("get_unavailable_dates", { p_property_id: propertyId })
       .then(({ data, error }) => {
-        if (!cancelled && !error && data) setUnavailable(data);
+        if (cancelled) return;
+        if (!error && data) setUnavailable(data);
+        setLoadingAvailability(false);
       });
     return () => {
       cancelled = true;
     };
   }, [propertyId]);
 
-  const price = money(basePrice, currency);
+  const defaults = useMemo(
+    () => ({ base: basePrice, airbnb: airbnbBasePrice }),
+    [basePrice, airbnbBasePrice],
+  );
+
   const hasDates = Boolean(range.checkIn && range.checkOut);
-  const nights =
-    range.checkIn && range.checkOut
-      ? nightsBetween(range.checkIn, range.checkOut)
-      : null;
+
+  const quote = useMemo<Quote | null>(() => {
+    if (!range.checkIn || !range.checkOut) return null;
+    return quoteStay({
+      checkIn: range.checkIn,
+      checkOut: range.checkOut,
+      periods: ratePeriods,
+      defaults,
+    });
+  }, [range.checkIn, range.checkOut, ratePeriods, defaults]);
+
+  const fromRate = useMemo(
+    () => lowestNightlyRate(ratePeriods, defaults),
+    [ratePeriods, defaults],
+  );
+
   const canBookDirect = hasDates && Boolean(whatsappNumber);
 
-  const platformButtons = (
-    <>
-      {airbnbUrl ? (
-        <a
-          href={airbnbUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="border-border hover:bg-surface-subtle pressable flex h-12 w-full items-center justify-center gap-2 rounded-md border font-medium"
-        >
-          Book on Airbnb
-          <ExternalLink className="size-4" aria-hidden="true" />
-        </a>
-      ) : null}
-      {bookingComUrl ? (
-        <a
-          href={bookingComUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="border-border hover:bg-surface-subtle pressable flex h-12 w-full items-center justify-center gap-2 rounded-md border font-medium"
-        >
-          Book on Booking.com
-          <ExternalLink className="size-4" aria-hidden="true" />
-        </a>
-      ) : null}
-    </>
-  );
+  function openBookDirect() {
+    // The dialog must be the only overlay — never leave a calendar popover
+    // open and focusable behind it.
+    setDesktopPicker(false);
+    setMobilePicker(false);
+    setDialogOpen(true);
+  }
 
   return (
     <>
       {/* desktop card */}
       <div className="border-border shadow-raised hidden rounded-lg border p-6 lg:sticky lg:top-24 lg:block">
-        <BookingCardBody
-          price={price}
-          hasDates={hasDates}
-          nights={nights}
-          unavailable={unavailable}
-          range={range}
-          setRange={setRange}
-          guests={guests}
-          setGuests={setGuests}
-          maxGuests={maxGuests}
-          canBookDirect={canBookDirect}
-          whatsappNumber={whatsappNumber}
-          onBookDirect={openBookDirect}
-          platformButtons={platformButtons}
-          dateFieldKey={dateFieldKey}
-        />
+        <PriceHeadline quote={quote} fromRate={fromRate} currency={currency} />
+
+        <div className="mt-4 space-y-3">
+          <DatePickerField
+            unavailable={unavailable}
+            value={range}
+            onChange={setRange}
+            open={desktopPicker}
+            onOpenChange={setDesktopPicker}
+            loading={loadingAvailability}
+          />
+          <div className="border-border rounded-md border px-4 py-3">
+            <GuestStepper value={guests} max={maxGuests} onChange={setGuests} />
+          </div>
+        </div>
+
+        {quote ? (
+          <div className="mt-4">
+            <PriceBreakdown quote={quote} currency={currency} />
+          </div>
+        ) : null}
+
+        <div className="mt-4">
+          {hasDates ? (
+            <ChannelCtas
+              quote={quote}
+              currency={currency}
+              canBookDirect={canBookDirect}
+              whatsappNumber={whatsappNumber}
+              airbnbUrl={airbnbUrl}
+              bookingComUrl={bookingComUrl}
+              onBookDirect={openBookDirect}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setDesktopPicker(true)}
+              className="bg-primary text-primary-foreground hover:bg-primary-hover pressable flex h-12 w-full items-center justify-center rounded-md font-medium"
+            >
+              Book now
+            </button>
+          )}
+        </div>
+
+        {hasDates && canBookDirect ? (
+          <p className="text-text-muted mt-3 text-center text-sm">
+            No payment now — confirm on WhatsApp.
+          </p>
+        ) : !hasDates ? (
+          <p className="text-text-muted mt-3 text-center text-sm">
+            Add dates to compare prices.
+          </p>
+        ) : null}
       </div>
 
       {/* mobile bottom bar */}
       <div className="border-border bg-background fixed inset-x-0 bottom-0 z-30 border-t p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            {price ? (
-              <p className="truncate">
-                <span className="tabular font-semibold">{price}</span>
-                <span className="text-text-muted"> / night</span>
+        {hasDates && quote ? (
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="min-w-0 truncate">
+                {quote.direct.total !== null ? (
+                  <>
+                    <span
+                      key={quote.direct.total}
+                      className="tabular value-in inline-block font-semibold"
+                    >
+                      {money(quote.direct.total, currency)}
+                    </span>
+                    <span className="text-text-muted text-sm">
+                      {" "}
+                      total · {quote.nights}{" "}
+                      {quote.nights === 1 ? "night" : "nights"}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-text-muted text-sm">
+                    {quote.nights} {quote.nights === 1 ? "night" : "nights"}
+                  </span>
+                )}
               </p>
-            ) : null}
-            <DatePickerField
-              key={dateFieldKey}
-              unavailable={unavailable}
-              value={range}
-              onChange={setRange}
-              variant="compact"
+              {/* The date field is its own trigger — it anchors the calendar
+                  popover and doubles as the "change dates" affordance. */}
+              <div className="shrink-0">
+                <DatePickerField
+                  unavailable={unavailable}
+                  value={range}
+                  onChange={setRange}
+                  variant="compact"
+                  open={mobilePicker}
+                  onOpenChange={setMobilePicker}
+                  loading={loadingAvailability}
+                />
+              </div>
+            </div>
+
+            <ChannelCtas
+              quote={quote}
+              currency={currency}
+              canBookDirect={canBookDirect}
+              whatsappNumber={whatsappNumber}
+              airbnbUrl={airbnbUrl}
+              bookingComUrl={bookingComUrl}
+              onBookDirect={openBookDirect}
+              compact
             />
           </div>
-          {canBookDirect ? (
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              {fromRate !== null ? (
+                <p className="truncate">
+                  <span className="text-text-muted text-sm">from </span>
+                  <span className="tabular font-semibold">
+                    {money(fromRate, currency)}
+                  </span>
+                  <span className="text-text-muted text-sm"> / night</span>
+                </p>
+              ) : (
+                <p className="truncate text-sm font-medium">
+                  Ask us for the rate
+                </p>
+              )}
+              {/* Doubles as the popover anchor for the Book now button. */}
+              <DatePickerField
+                unavailable={unavailable}
+                value={range}
+                onChange={setRange}
+                variant="compact"
+                open={mobilePicker}
+                onOpenChange={setMobilePicker}
+                loading={loadingAvailability}
+              />
+            </div>
             <button
               type="button"
-              onClick={openBookDirect}
+              onClick={() => setMobilePicker(true)}
               className="bg-primary text-primary-foreground hover:bg-primary-hover pressable flex h-12 shrink-0 items-center rounded-md px-6 font-medium"
             >
-              Book Direct
+              Book now
             </button>
-          ) : airbnbUrl ? (
-            <a
-              href={airbnbUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-primary text-primary-foreground hover:bg-primary-hover pressable flex h-12 shrink-0 items-center rounded-md px-6 font-medium"
-            >
-              Book on Airbnb
-            </a>
-          ) : null}
-        </div>
+          </div>
+        )}
       </div>
 
       {range.checkIn && range.checkOut && whatsappNumber ? (
@@ -182,97 +266,157 @@ export function BookingCard({
   );
 }
 
-function BookingCardBody({
-  price,
-  hasDates,
-  nights,
-  unavailable,
-  range,
-  setRange,
-  guests,
-  setGuests,
-  maxGuests,
+/** Headline figure: a real total once dates exist, otherwise a "from" rate. */
+function PriceHeadline({
+  quote,
+  fromRate,
+  currency,
+}: {
+  quote: Quote | null;
+  fromRate: number | null;
+  currency: string;
+}) {
+  if (quote && quote.direct.total !== null) {
+    return (
+      <div>
+        <p>
+          {/* keyed so the figure re-runs its settle animation on every change */}
+          <span
+            key={quote.direct.total}
+            className="tabular value-in inline-block text-xl font-semibold"
+          >
+            {money(quote.direct.total, currency)}
+          </span>
+          <span className="text-text-muted"> total</span>
+        </p>
+        <p className="text-text-muted mt-1 text-sm">
+          {quote.nights} {quote.nights === 1 ? "night" : "nights"}
+          {quote.direct.perNight !== null
+            ? ` · ${money(Math.round(quote.direct.perNight), currency)} / night avg`
+            : ""}
+        </p>
+      </div>
+    );
+  }
+
+  if (fromRate !== null) {
+    return (
+      <p>
+        <span className="text-text-muted">from </span>
+        <span className="tabular text-xl font-semibold">
+          {money(fromRate, currency)}
+        </span>
+        <span className="text-text-muted"> / night</span>
+      </p>
+    );
+  }
+
+  return <p className="font-medium">Ask us for the current rate</p>;
+}
+
+/**
+ * The two priced choices, shown only once dates are known. Direct is the
+ * primary action; Airbnb sits beside it carrying its own total, so the guest
+ * can see the difference rather than take our word for it.
+ */
+function ChannelCtas({
+  quote,
+  currency,
   canBookDirect,
   whatsappNumber,
+  airbnbUrl,
+  bookingComUrl,
   onBookDirect,
-  platformButtons,
-  dateFieldKey,
+  compact = false,
 }: {
-  price: string | null;
-  hasDates: boolean;
-  nights: number | null;
-  unavailable: UnavailableRange[];
-  range: { checkIn: Date | null; checkOut: Date | null };
-  setRange: (r: { checkIn: Date | null; checkOut: Date | null }) => void;
-  guests: number;
-  setGuests: (n: number) => void;
-  maxGuests: number;
+  quote: Quote | null;
+  currency: string;
   canBookDirect: boolean;
   whatsappNumber: string | null;
+  airbnbUrl: string | null;
+  bookingComUrl: string | null;
   onBookDirect: () => void;
-  platformButtons: React.ReactNode;
-  dateFieldKey: number;
+  compact?: boolean;
 }) {
+  const directTotal = quote?.direct.total ?? null;
+  const airbnbTotal = quote?.airbnb.total ?? null;
+  const saving = quote?.savingVsAirbnb ?? null;
+
   return (
-    <>
-      <div className="mb-4">
-        {price ? (
-          <p>
-            <span className="tabular text-xl font-semibold">{price}</span>
-            <span className="text-text-muted"> / night</span>
-          </p>
-        ) : (
-          <p className="font-medium">Ask us for the current rate</p>
-        )}
-        {hasDates ? (
-          <p className="text-text-muted mt-1 text-sm">
-            {nights} {nights === 1 ? "night" : "nights"} selected
-          </p>
-        ) : null}
-      </div>
-
-      <div className="space-y-3">
-        <DatePickerField
-          key={dateFieldKey}
-          unavailable={unavailable}
-          value={range}
-          onChange={setRange}
-        />
-        <div className="border-border rounded-md border px-4 py-3">
-          <GuestStepper value={guests} max={maxGuests} onChange={setGuests} />
-        </div>
-      </div>
-
-      <div className="mt-4 space-y-2">
-        {canBookDirect ? (
-          <button
-            type="button"
-            onClick={onBookDirect}
-            className="bg-primary text-primary-foreground hover:bg-primary-hover pressable flex h-12 w-full items-center justify-center rounded-md font-medium"
-          >
-            Book Direct
-          </button>
-        ) : !whatsappNumber ? (
-          <p className="text-text-muted bg-surface-subtle rounded-md p-3 text-center text-sm">
-            Direct booking is being set up — please book on Airbnb.
-          </p>
-        ) : (
-          <button
-            type="button"
-            disabled
-            className="bg-primary text-primary-foreground pressable flex h-12 w-full items-center justify-center rounded-md font-medium opacity-40"
-          >
-            Add dates to book directly
-          </button>
-        )}
-        {platformButtons}
-      </div>
-
+    <div className="space-y-2">
       {canBookDirect ? (
-        <p className="text-text-muted mt-3 text-center text-sm">
-          No payment now — confirm on WhatsApp.
+        <button
+          type="button"
+          onClick={onBookDirect}
+          className="bg-primary text-primary-foreground hover:bg-primary-hover pressable flex h-12 w-full items-center justify-center gap-2 rounded-md px-4 font-medium"
+        >
+          <span>Book directly</span>
+          {directTotal !== null ? (
+            <>
+              <span aria-hidden="true" className="opacity-50">
+                ·
+              </span>
+              <span key={directTotal} className="tabular value-in inline-block">
+                {money(directTotal, currency)}
+              </span>
+            </>
+          ) : null}
+        </button>
+      ) : !whatsappNumber ? (
+        <p className="text-text-muted bg-surface-subtle rounded-md p-3 text-center text-sm">
+          Direct booking is being set up — please book on Airbnb.
         </p>
       ) : null}
-    </>
+
+      {saving !== null && saving > 0 ? (
+        <p
+          key={saving}
+          className="text-success value-in flex items-center justify-center gap-1.5 text-sm font-medium"
+        >
+          <Tag className="size-3.5 shrink-0" aria-hidden="true" />
+          Save {money(saving, currency)} booking direct
+        </p>
+      ) : null}
+
+      {airbnbUrl ? (
+        <a
+          href={airbnbUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="border-border hover:bg-surface-subtle pressable flex h-12 w-full items-center justify-center gap-2 rounded-md border px-4 font-medium"
+        >
+          <span>Book on Airbnb</span>
+          {airbnbTotal !== null ? (
+            <>
+              <span aria-hidden="true" className="text-text-muted">
+                ·
+              </span>
+              <span key={airbnbTotal} className="tabular value-in inline-block">
+                {money(airbnbTotal, currency)}
+              </span>
+            </>
+          ) : null}
+          <ExternalLink
+            className="text-text-muted size-4 shrink-0"
+            aria-hidden="true"
+          />
+        </a>
+      ) : null}
+
+      {bookingComUrl && !compact ? (
+        <a
+          href={bookingComUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="border-border hover:bg-surface-subtle pressable flex h-12 w-full items-center justify-center gap-2 rounded-md border px-4 font-medium"
+        >
+          Book on Booking.com
+          <ExternalLink
+            className="text-text-muted size-4 shrink-0"
+            aria-hidden="true"
+          />
+        </a>
+      ) : null}
+    </div>
   );
 }

@@ -201,6 +201,17 @@
     transform: scale(0.98);
   }
 
+  /* one shimmer for every loading placeholder — §8.2 "skeletons, not spinners" */
+  .skeleton {
+    @apply bg-surface-subtle rounded-md;
+    animation: var(--animate-shimmer);
+  }
+
+  /* numbers that change in place (totals, savings) settle rather than snap */
+  .value-in {
+    animation: value-in 220ms var(--ease-out-soft) both;
+  }
+
   .page-gutter {
     @apply px-6 md:px-12;
   }
@@ -224,6 +235,19 @@
   from {
     opacity: 0;
     transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Smaller than rise-in: for a figure being replaced in place, not an element
+   arriving. Stays transform/opacity only so a changing total never reflows. */
+@keyframes value-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
   }
   to {
     opacity: 1;

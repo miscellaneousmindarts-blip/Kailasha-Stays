@@ -34,11 +34,15 @@ export function AvailabilityCalendar({
   value,
   onChange,
   minStayNights = 1,
+  loading = false,
 }: {
   unavailable: UnavailableRange[];
   value: SelectedRange;
   onChange: (next: SelectedRange) => void;
   minStayNights?: number;
+  /** Availability still in flight — every night is held un-selectable so a
+   *  booked date can never be picked during the window before it arrives. */
+  loading?: boolean;
 }) {
   const today = startOfDay(new Date());
   const [baseMonth, setBaseMonth] = useState(() =>
@@ -75,7 +79,7 @@ export function AvailabilityCalendar({
 
   function cellInfo(day: Date) {
     const isPast = isBefore(day, today);
-    let disabled = isPast;
+    let disabled = isPast || loading;
     if (!disabled) {
       if (!selectingCheckout) {
         disabled = isNightBlocked(day);
@@ -130,13 +134,27 @@ export function AvailabilityCalendar({
         </button>
       </div>
 
-      <div className="grid gap-x-6 gap-y-6 sm:grid-cols-2">
+      <div
+        className="grid gap-x-6 gap-y-6 sm:grid-cols-2"
+        aria-busy={loading || undefined}
+      >
         {months.map((month, i) => (
           <div key={monthKey(month)} className={i === 1 ? "hidden sm:block" : ""}>
-            <MonthGrid month={month} cellInfo={cellInfo} onSelect={handleSelect} />
+            <MonthGrid
+              month={month}
+              cellInfo={cellInfo}
+              onSelect={handleSelect}
+              loading={loading}
+            />
           </div>
         ))}
       </div>
+
+      {loading ? (
+        <p className="text-text-muted mt-3 text-center text-sm" role="status">
+          Checking availability…
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -145,6 +163,7 @@ function MonthGrid({
   month,
   cellInfo,
   onSelect,
+  loading,
 }: {
   month: Date;
   cellInfo: (d: Date) => {
@@ -154,6 +173,7 @@ function MonthGrid({
     inRange: boolean;
   };
   onSelect: (d: Date) => void;
+  loading: boolean;
 }) {
   const cells = buildMonthGrid(month);
 
@@ -194,8 +214,11 @@ function MonthGrid({
                 aria-label={format(day, "EEEE, MMMM d, yyyy")}
                 className={cn(
                   "tabular relative z-10 mx-auto flex aspect-square w-full max-w-11 items-center justify-center rounded-full text-sm transition-colors",
-                  disabled &&
-                    "text-text-muted/50 pointer-events-none line-through decoration-1",
+                  // While availability loads every cell is disabled, but must
+                  // NOT read as booked — strike-through only ever means taken.
+                  disabled && !loading && "text-text-muted/50 line-through decoration-1",
+                  disabled && loading && "text-text-muted/40 skeleton !rounded-full",
+                  disabled && "pointer-events-none",
                   !disabled && !selected && "hover:bg-surface-subtle",
                   selected && "bg-primary text-primary-foreground font-medium",
                 )}

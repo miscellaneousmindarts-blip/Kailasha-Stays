@@ -41,6 +41,8 @@ export type Property = {
   beds: number;
   bathrooms: number;
   base_price: number | null;
+  /** Default Airbnb nightly rate, for the side-by-side comparison. Manually kept in sync — Airbnb has no rate API. */
+  airbnb_base_price: number | null;
   currency: string;
   amenities: string[];
   house_rules: string | null;
@@ -198,6 +200,21 @@ export type ExternalEvent = {
   synced_at: string;
 };
 
+/**
+ * A date range with its own nightly rates, overriding the property defaults.
+ * Half-open: end_date is the first night NOT covered.
+ */
+export type RatePeriod = {
+  id: string;
+  property_id: string;
+  label: string | null;
+  start_date: string;
+  end_date: string;
+  direct_price: number;
+  airbnb_price: number | null;
+  created_at: string;
+};
+
 export type AdminUser = {
   user_id: string;
   email: string | null;
@@ -307,6 +324,10 @@ export type Database = {
       external_events: Table<
         ExternalEvent,
         BelongsToProperty<"external_events_property_id_fkey">
+      >;
+      rate_periods: Table<
+        RatePeriod,
+        BelongsToProperty<"rate_periods_property_id_fkey">
       >;
     };
     Views: Record<never, never>;
