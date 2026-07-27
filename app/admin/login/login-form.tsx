@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,15 @@ export function LoginForm() {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-baseline justify-between gap-3">
+          <Label htmlFor="password">Password</Label>
+          <Link
+            href="/admin/forgot-password"
+            className="text-text-muted text-sm underline-offset-2 hover:underline"
+          >
+            Forgot?
+          </Link>
+        </div>
         <Input
           id="password"
           name="password"
