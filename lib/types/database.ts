@@ -88,6 +88,8 @@ export type PropertyImage = {
   property_id: string;
   storage_path: string;
   alt: string | null;
+  /** Short guest-visible caption ("Bedroom", "Balcony") — shown on the photo itself, unlike alt. */
+  tag: string | null;
   is_cover: boolean;
   sort_order: number;
 };

@@ -7,7 +7,26 @@ import { ChevronLeft, ChevronRight, Grid3x3, X } from "lucide-react";
 import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
 import type { PropertyImage } from "@/lib/types/database";
 
-type GalleryImage = { src: string; alt: string };
+type GalleryImage = { src: string; alt: string; tag: string | null };
+
+/**
+ * Small pill in the corner of a photo — "Bedroom", "Balcony" — so guests can
+ * tell rooms apart while scanning without opening each one. Position and
+ * size are required from the caller rather than defaulted: Tailwind class
+ * precedence depends on stylesheet order, not on where a class appears in
+ * the attribute string, so an appended override (e.g. "bottom-4" meant to
+ * beat a baked-in "bottom-2") isn't guaranteed to win.
+ */
+function TagBadge({ tag, className }: { tag: string | null; className: string }) {
+  if (!tag) return null;
+  return (
+    <span
+      className={`pointer-events-none absolute rounded-full bg-[rgba(10,10,10,0.6)] px-2 py-1 font-medium text-white backdrop-blur-sm ${className}`}
+    >
+      {tag}
+    </span>
+  );
+}
 
 /**
  * Desktop composite grid adapts to how many photos actually exist instead of
@@ -58,13 +77,14 @@ export function PropertyGallery({
   images,
   title,
 }: {
-  images: Pick<PropertyImage, "storage_path" | "alt">[];
+  images: Pick<PropertyImage, "storage_path" | "alt" | "tag">[];
   title: string;
 }) {
   const photos: GalleryImage[] = images
     .map((img) => ({
       src: imageUrl(img.storage_path) ?? "",
       alt: img.alt ?? title,
+      tag: img.tag,
     }))
     .filter((img) => img.src);
 
@@ -128,6 +148,7 @@ export function PropertyGallery({
               blurDataURL={BLUR_DATA_URL}
               className="object-cover"
             />
+            <TagBadge tag={photo.tag} className="bottom-2 left-2 text-xs" />
           </button>
         ))}
       </div>
@@ -152,6 +173,7 @@ export function PropertyGallery({
             blurDataURL={BLUR_DATA_URL}
             className="object-cover transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03]"
           />
+          <TagBadge tag={hero.tag} className="bottom-2 left-2 text-xs" />
         </button>
 
         {thumbs.map((photo, i) => (
@@ -171,6 +193,7 @@ export function PropertyGallery({
               blurDataURL={BLUR_DATA_URL}
               className="object-cover transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03]"
             />
+            <TagBadge tag={photo.tag} className="bottom-2 left-2 text-xs" />
           </button>
         ))}
 
@@ -220,6 +243,7 @@ export function PropertyGallery({
               sizes="100vw"
               className="object-contain"
             />
+            <TagBadge tag={photos[openAt].tag} className="bottom-4 left-4 text-sm" />
           </div>
 
           {photos.length > 1 ? (

@@ -277,6 +277,25 @@ export async function updateImageAlt(
   return { success: true };
 }
 
+export async function updateImageTag(
+  propertyId: string,
+  imageId: string,
+  tag: string,
+): Promise<ActionResult> {
+  const trimmed = tag.trim();
+  if (trimmed.length > 40) return { error: "Keep tags under 40 characters." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("property_images")
+    .update({ tag: trimmed || null })
+    .eq("id", imageId);
+  if (error) return { error: error.message };
+
+  revalidateEditor(propertyId);
+  return { success: true };
+}
+
 /** Swaps sort_order with the previous/next sibling — a simple, fully
  *  keyboard-accessible stand-in for drag reordering. */
 async function moveInOrderedList(
@@ -310,12 +329,40 @@ async function moveInOrderedList(
   return { success: true };
 }
 
-export async function moveImage(
+/**
+ * Persists a drag-and-drop reorder in one round trip: the client already
+ * knows the full new order, so this just writes each photo's index as its
+ * sort_order rather than walking pairwise swaps like moveInOrderedList.
+ */
+export async function reorderImages(
   propertyId: string,
-  imageId: string,
-  direction: "up" | "down",
+  orderedImageIds: string[],
 ): Promise<ActionResult> {
-  return moveInOrderedList("property_images", propertyId, imageId, direction);
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("property_images")
+    .select("id")
+    .eq("property_id", propertyId);
+
+  const validIds = new Set((existing ?? []).map((r) => r.id));
+  if (
+    orderedImageIds.length !== validIds.size ||
+    !orderedImageIds.every((id) => validIds.has(id))
+  ) {
+    return { error: "Photo list is out of date — refresh and try again." };
+  }
+
+  const { error } = await Promise.all(
+    orderedImageIds.map((id, sort_order) =>
+      supabase.from("property_images").update({ sort_order }).eq("id", id),
+    ),
+  ).then(
+    (results) => ({ error: results.find((r) => r.error)?.error?.message }),
+  );
+  if (error) return { error };
+
+  revalidateEditor(propertyId);
+  return { success: true };
 }
 
 // ---------------------------------------------------------------------------
