@@ -589,3 +589,36 @@ export async function deleteRatePeriod(
   revalidateEditor(propertyId);
   return { success: true };
 }
+
+// ---------------------------------------------------------------------------
+// Add-ons — which items from the shared catalog this property offers.
+// Presence of a row is the only state; there's nothing to toggle off vs. on
+// beyond insert/delete.
+// ---------------------------------------------------------------------------
+
+export async function setPropertyAddonEnabled(
+  propertyId: string,
+  addonServiceId: string,
+  enabled: boolean,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const { error } = enabled
+    ? await supabase
+        .from("property_addon_services")
+        .insert({ property_id: propertyId, addon_service_id: addonServiceId })
+    : await supabase
+        .from("property_addon_services")
+        .delete()
+        .eq("property_id", propertyId)
+        .eq("addon_service_id", addonServiceId);
+
+  // Re-checking a box that's already checked (a double-click, a stale UI
+  // after another tab changed it) hits the primary key — treat as success
+  // rather than surfacing a confusing conflict error.
+  if (error && error.code !== "23505") return { error: error.message };
+
+  revalidateEditor(propertyId);
+  revalidatePublicProperties();
+  return { success: true };
+}

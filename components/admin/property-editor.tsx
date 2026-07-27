@@ -6,6 +6,7 @@ import { StatusControls } from "@/components/admin/status-controls";
 import { BasicsTab } from "@/components/admin/tabs/basics-tab";
 import { DescriptionTab } from "@/components/admin/tabs/description-tab";
 import { PricingTab } from "@/components/admin/tabs/pricing-tab";
+import { AddonsTab } from "@/components/admin/tabs/addons-tab";
 import { PhotosTab } from "@/components/admin/tabs/photos-tab";
 import { SectionsTab } from "@/components/admin/tabs/sections-tab";
 import { LocationTab } from "@/components/admin/tabs/location-tab";
@@ -14,10 +15,12 @@ import { PrivateTab } from "@/components/admin/tabs/private-tab";
 import { ContactsTab } from "@/components/admin/tabs/contacts-tab";
 import { RulesTab } from "@/components/admin/tabs/rules-tab";
 import type { PropertyForEdit } from "@/lib/admin/queries";
+import type { AddonService } from "@/lib/types/database";
 
 const TABS = [
   "Basics",
   "Pricing",
+  "Add-ons",
   "Description",
   "Photos",
   "Sections",
@@ -30,7 +33,13 @@ const TABS = [
 
 type Tab = (typeof TABS)[number];
 
-export function PropertyEditor({ property }: { property: PropertyForEdit }) {
+export function PropertyEditor({
+  property,
+  addons,
+}: {
+  property: PropertyForEdit;
+  addons: (AddonService & { enabled: boolean })[];
+}) {
   const [tab, setTab] = useState<Tab>("Basics");
 
   return (
@@ -72,6 +81,9 @@ export function PropertyEditor({ property }: { property: PropertyForEdit }) {
       <div className="py-6">
         {tab === "Basics" ? <BasicsTab property={property} /> : null}
         {tab === "Pricing" ? <PricingTab property={property} /> : null}
+        {tab === "Add-ons" ? (
+          <AddonsTab propertyId={property.id} addons={addons} />
+        ) : null}
         {tab === "Description" ? <DescriptionTab property={property} /> : null}
         {tab === "Photos" ? (
           <PhotosTab propertyId={property.id} images={property.property_images} />

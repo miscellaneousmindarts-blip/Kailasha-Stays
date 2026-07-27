@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { syncCalendarSource } from "@/lib/admin/ical-sync";
+import { revalidatePublicProperties } from "@/lib/admin/revalidate";
 import type { CalendarPlatform } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
@@ -86,4 +87,108 @@ export async function syncSourceNow(
   revalidatePath("/admin/calendar");
   if (!result.success) return { error: result.error ?? "Sync failed." };
   return { success: true, imported: result.imported };
+}
+
+// ---------------------------------------------------------------------------
+// Add-on catalog — the shared list; which properties offer each item is
+// chosen on the listing itself (components/admin/tabs/addons-tab.tsx).
+// ---------------------------------------------------------------------------
+
+function revalidateAddons() {
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/listings", "layout");
+  revalidatePublicProperties();
+}
+
+export async function addAddonService(formData: FormData): Promise<ActionResult> {
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Enter a name for the add-on." };
+
+  const priceRaw = String(formData.get("price") ?? "").trim();
+  const price = priceRaw === "" ? null : Number(priceRaw);
+  if (price !== null && !Number.isFinite(price)) return { error: "Enter a valid price." };
+
+  const priceUnit = String(formData.get("price_unit") ?? "").trim();
+
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("addon_services")
+    .select("id", { count: "exact", head: true });
+
+  const { error } = await supabase.from("addon_services").insert({
+    name,
+    description: String(formData.get("description") ?? "").trim() || null,
+    price,
+    price_unit: priceUnit || "per booking",
+    sort_order: count ?? 0,
+  });
+  if (error) return { error: error.message };
+
+  revalidateAddons();
+  return { success: true };
+}
+
+export async function updateAddonService(
+  addonId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Enter a name for the add-on." };
+
+  const priceRaw = String(formData.get("price") ?? "").trim();
+  const price = priceRaw === "" ? null : Number(priceRaw);
+  if (price !== null && !Number.isFinite(price)) return { error: "Enter a valid price." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("addon_services")
+    .update({
+      name,
+      description: String(formData.get("description") ?? "").trim() || null,
+      price,
+      price_unit: String(formData.get("price_unit") ?? "").trim() || "per booking",
+      active: formData.get("active") === "on",
+    })
+    .eq("id", addonId);
+  if (error) return { error: error.message };
+
+  revalidateAddons();
+  return { success: true };
+}
+
+export async function deleteAddonService(addonId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("addon_services").delete().eq("id", addonId);
+  if (error) return { error: error.message };
+
+  revalidateAddons();
+  return { success: true };
+}
+
+export async function moveAddonService(
+  addonId: string,
+  direction: "up" | "down",
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: rows } = await supabase
+    .from("addon_services")
+    .select("id, sort_order")
+    .order("sort_order");
+
+  if (!rows) return { error: "Not found." };
+  const index = rows.findIndex((r) => r.id === addonId);
+  const swapIndex = direction === "up" ? index - 1 : index + 1;
+  if (index === -1 || swapIndex < 0 || swapIndex >= rows.length) {
+    return { success: true }; // already at an edge — nothing to do
+  }
+
+  const a = rows[index];
+  const b = rows[swapIndex];
+  await Promise.all([
+    supabase.from("addon_services").update({ sort_order: b.sort_order }).eq("id", a.id),
+    supabase.from("addon_services").update({ sort_order: a.sort_order }).eq("id", b.id),
+  ]);
+
+  revalidateAddons();
+  return { success: true };
 }

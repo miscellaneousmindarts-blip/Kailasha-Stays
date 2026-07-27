@@ -224,18 +224,26 @@ export async function getBookingForEdit(
   return booking;
 }
 
+/** Every catalog item, each flagged with whether this property currently offers it. */
 export async function listAddonsForProperty(
   propertyId: string,
-): Promise<AddonService[]> {
+): Promise<(AddonService & { enabled: boolean })[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("addon_services")
-    .select("*")
-    .eq("active", true)
-    .or(`property_id.eq.${propertyId},property_id.is.null`)
-    .order("sort_order");
-  if (error) throw new Error(`Could not load add-ons: ${error.message}`);
-  return data ?? [];
+  const [{ data: all, error: allError }, { data: enabled, error: enabledError }] =
+    await Promise.all([
+      supabase.from("addon_services").select("*").order("sort_order"),
+      supabase
+        .from("property_addon_services")
+        .select("addon_service_id")
+        .eq("property_id", propertyId),
+    ]);
+  if (allError) throw new Error(`Could not load add-ons: ${allError.message}`);
+  if (enabledError) {
+    throw new Error(`Could not load add-on selection: ${enabledError.message}`);
+  }
+
+  const enabledIds = new Set((enabled ?? []).map((r) => r.addon_service_id));
+  return (all ?? []).map((a) => ({ ...a, enabled: enabledIds.has(a.id) }));
 }
 
 // -----------------------------------------------------------------------------

@@ -1,17 +1,20 @@
 import { ContactSettingsForm } from "@/components/admin/settings/contact-settings-form";
 import { CalendarSourcesPanel } from "@/components/admin/settings/calendar-sources-panel";
+import { AddonCatalogPanel } from "@/components/admin/settings/addon-catalog-panel";
 import {
   getSiteSettingsAdmin,
+  listAllAddonServices,
   listAllCalendarSources,
   listPropertyOptions,
 } from "@/lib/admin/queries";
 import { publicEnv, serverEnv } from "@/lib/env";
 
 export default async function AdminSettingsPage() {
-  const [settings, properties, sources] = await Promise.all([
+  const [settings, properties, sources, addons] = await Promise.all([
     getSiteSettingsAdmin(),
     listPropertyOptions(),
     listAllCalendarSources(),
+    listAllAddonServices(),
   ]);
 
   return (
@@ -19,8 +22,8 @@ export default async function AdminSettingsPage() {
       <div>
         <h1 className="text-2xl font-semibold">Settings</h1>
         <p className="text-text-muted mt-1">
-          Contact details shown across the site, and calendar sync with
-          Airbnb / Booking.com.
+          Contact details shown across the site, calendar sync with Airbnb /
+          Booking.com, and the add-on catalog.
         </p>
       </div>
 
@@ -44,6 +47,11 @@ export default async function AdminSettingsPage() {
             exportKey={serverEnv.icalExportSecret}
           />
         )}
+      </section>
+
+      <section>
+        <h2 className="mb-4 text-lg font-semibold">Add-ons</h2>
+        <AddonCatalogPanel addons={addons} />
       </section>
     </div>
   );

@@ -103,15 +103,21 @@ export type PropertySection = {
   sort_order: number;
 };
 
+/** One shared catalog — which properties offer a given item lives in PropertyAddonService, not here. */
 export type AddonService = {
   id: string;
-  property_id: string | null;
   name: string;
   description: string | null;
   price: number | null;
   price_unit: string | null;
   active: boolean;
   sort_order: number;
+};
+
+/** Presence of a row means the addon is offered on that property — no separate flag to fall out of sync. */
+export type PropertyAddonService = {
+  property_id: string;
+  addon_service_id: string;
 };
 
 export type Enquiry = {
@@ -296,9 +302,25 @@ export type Database = {
         PropertySection,
         BelongsToProperty<"property_sections_property_id_fkey">
       >;
-      addon_services: Table<
-        AddonService,
-        BelongsToProperty<"addon_services_property_id_fkey">
+      addon_services: Table<AddonService>;
+      property_addon_services: Table<
+        PropertyAddonService,
+        [
+          {
+            foreignKeyName: "property_addon_services_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "property_addon_services_addon_service_id_fkey";
+            columns: ["addon_service_id"];
+            isOneToOne: false;
+            referencedRelation: "addon_services";
+            referencedColumns: ["id"];
+          },
+        ]
       >;
       enquiries: Table<
         Enquiry,

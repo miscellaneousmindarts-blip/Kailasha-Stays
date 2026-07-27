@@ -84,19 +84,23 @@ export type AddonServiceData = Pick<
   "id" | "name" | "description" | "price" | "price_unit"
 >;
 
-/** Active add-ons available for a property: its own + the global (property_id null) ones. */
+/** Active add-ons this property has been switched on for, from the shared catalog. */
 export const getAddonsForProperty = cache(
   async (propertyId: string): Promise<AddonServiceData[]> => {
     const supabase = createPublicClient();
     const { data, error } = await supabase
-      .from("addon_services")
-      .select("id, name, description, price, price_unit")
-      .eq("active", true)
-      .or(`property_id.eq.${propertyId},property_id.is.null`)
-      .order("sort_order");
+      .from("property_addon_services")
+      .select(
+        "addon_services!inner(id, name, description, price, price_unit, active, sort_order)",
+      )
+      .eq("property_id", propertyId)
+      .eq("addon_services.active", true)
+      .order("sort_order", { referencedTable: "addon_services" });
 
     if (error) throw new Error(`Could not load add-ons: ${error.message}`);
-    return (data ?? []) as AddonServiceData[];
+    return ((data ?? []) as unknown as { addon_services: AddonServiceData }[]).map(
+      (row) => row.addon_services,
+    );
   },
 );
 
