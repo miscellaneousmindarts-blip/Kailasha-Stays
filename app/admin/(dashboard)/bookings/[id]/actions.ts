@@ -14,6 +14,20 @@ function revalidateBooking(bookingId: string) {
   revalidatePath("/admin/calendar");
 }
 
+/** Short-lived signed URL for viewing a guest's uploaded ID — never a
+ *  public/permanent link, and only reachable by an authenticated admin
+ *  (storage RLS on guest-docs already requires is_admin() to read). */
+export async function getDocumentSignedUrl(
+  storagePath: string,
+): Promise<ActionResult & { url?: string }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage
+    .from("guest-docs")
+    .createSignedUrl(storagePath, 60);
+  if (error || !data) return { error: "Could not open that document." };
+  return { success: true, url: data.signedUrl };
+}
+
 export async function updateBookingDetails(
   bookingId: string,
   formData: FormData,

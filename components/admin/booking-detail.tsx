@@ -23,6 +23,7 @@ import {
   addPayment,
   deleteBookingAddon,
   deletePayment,
+  getDocumentSignedUrl,
   regeneratePortalToken,
   setBookingAddonStatus,
   setBookingStatus,
@@ -548,11 +549,14 @@ function DocumentsSection({ booking }: { booking: BookingForEdit }) {
       {booking.guest_documents.length ? (
         <ul className="border-border divide-border divide-y rounded-md border">
           {booking.guest_documents.map((d) => (
-            <li key={d.id} className="p-3 text-sm">
-              <span className="font-medium">{d.guest_name ?? "Guest"}</span>{" "}
-              <span className="text-text-muted">
-                · {d.doc_type} · uploaded {formatDate(d.uploaded_at)}
+            <li key={d.id} className="flex items-center gap-3 p-3 text-sm">
+              <span className="min-w-0 flex-1">
+                <span className="font-medium">{d.guest_name ?? "Guest"}</span>{" "}
+                <span className="text-text-muted">
+                  · {d.doc_type} · uploaded {formatDate(d.uploaded_at)}
+                </span>
               </span>
+              <ViewDocumentButton storagePath={d.storage_path} />
             </li>
           ))}
         </ul>
@@ -563,6 +567,72 @@ function DocumentsSection({ booking }: { booking: BookingForEdit }) {
         </p>
       )}
     </section>
+  );
+}
+
+function ViewDocumentButton({ storagePath }: { storagePath: string }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Fallback link shown whenever we can't be sure the auto-opened tab
+  // actually made it to the screen (a strict popup blocker, or a browser
+  // that doesn't grant window.open a handle here) — the admin can always
+  // tap this instead.
+  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
+
+  async function view() {
+    setLoading(true);
+    setError(null);
+    setFallbackUrl(null);
+    // Open the tab synchronously, inside the click handler, so browsers
+    // don't treat it as an unsolicited popup — then point it at the signed
+    // URL once the server action resolves. Opening only after the await
+    // (outside the original user-gesture window) gets silently blocked by
+    // most popup blockers. Can't pass "noopener" here: that makes
+    // window.open() return null, and we need the handle to set .location
+    // later. Sever the opener link programmatically instead, which achieves
+    // the same reverse-tabnabbing protection.
+    const tab = window.open("", "_blank");
+    if (tab) tab.opener = null;
+    const result = await getDocumentSignedUrl(storagePath);
+    setLoading(false);
+
+    if (!result.url) {
+      tab?.close();
+      setError(result.error ?? "Could not open document.");
+      return;
+    }
+    if (tab) {
+      tab.location.href = result.url;
+    }
+    // Always offer the fallback link too — window.open can be silently
+    // blocked (a browser policy, an extension, this exact click not being
+    // recognized as a genuine gesture) with no reliable way to detect it
+    // from here, so don't leave the admin with no way to view the file.
+    setFallbackUrl(result.url);
+  }
+
+  return (
+    <span className="flex shrink-0 flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={view}
+        disabled={loading}
+        className="border-border hover:bg-surface-subtle pressable flex h-9 items-center rounded-md border px-3 text-sm font-medium disabled:opacity-60"
+      >
+        {loading ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : "View"}
+      </button>
+      {error ? <span className="text-danger text-xs">{error}</span> : null}
+      {fallbackUrl ? (
+        <a
+          href={fallbackUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary text-xs underline-offset-2 hover:underline"
+        >
+          Didn&apos;t open? Tap here
+        </a>
+      ) : null}
+    </span>
   );
 }
 
