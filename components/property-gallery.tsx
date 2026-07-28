@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, Grid3x3, X } from "lucide-react";
 
@@ -25,6 +25,145 @@ function TagBadge({ tag, className }: { tag: string | null; className: string })
     >
       {tag}
     </span>
+  );
+}
+
+/**
+ * Full-screen photo viewer. The scroll position is the source of truth for
+ * which photo is showing — swiping/dragging the strip IS the navigation,
+ * not a gesture layered on top of button-driven state. Prev/Next and the
+ * keyboard just scroll to a target index and let the same onScroll handler
+ * that tracks a swipe update the counter; there's no separate "which index"
+ * state to keep in sync by hand.
+ */
+function Lightbox({
+  photos,
+  title,
+  initialIndex,
+  onClose,
+}: {
+  photos: GalleryImage[];
+  title: string;
+  initialIndex: number;
+  onClose: () => void;
+}) {
+  const [index, setIndex] = useState(initialIndex);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Jump to the opened photo before the browser paints, so there's no
+  // flash of photo 1 before landing on the one the guest actually clicked.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = initialIndex * el.clientWidth;
+    // Only ever run once, on open — re-running on every render would fight
+    // the user's own scrolling.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const scrollToIndex = useCallback((i: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+  }, []);
+
+  const step = useCallback(
+    (delta: number) => scrollToIndex((index + delta + photos.length) % photos.length),
+    [index, photos.length, scrollToIndex],
+  );
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const next = Math.min(
+      photos.length - 1,
+      Math.max(0, Math.round(el.scrollLeft / el.clientWidth)),
+    );
+    setIndex((current) => (current === next ? current : next));
+  }, [photos.length]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") step(1);
+      if (e.key === "ArrowLeft") step(-1);
+    };
+    document.addEventListener("keydown", onKey);
+
+    const { overflow } = document.body.style;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [onClose, step]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${title} — photo ${index + 1} of ${photos.length}`}
+      className="fixed inset-0 z-50 flex flex-col bg-[rgba(10,10,10,0.97)] duration-200 animate-in fade-in"
+      onClick={onClose}
+    >
+      <div className="flex h-16 shrink-0 items-center justify-between px-4 text-white">
+        <span className="tabular text-sm">
+          {index + 1} / {photos.length}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex size-11 items-center justify-center rounded-full hover:bg-[rgba(255,255,255,0.1)]"
+          aria-label="Close photos"
+        >
+          <X className="size-5" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        onClick={(e) => e.stopPropagation()}
+        className="no-scrollbar flex flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
+      >
+        {photos.map((photo, i) => (
+          <div key={i} className="relative h-full w-full shrink-0 snap-center">
+            <Image
+              src={photo.src}
+              alt={photo.alt}
+              fill
+              sizes="100vw"
+              priority={i === initialIndex}
+              className="object-contain"
+            />
+            <TagBadge tag={photo.tag} className="bottom-4 left-4 text-sm" />
+          </div>
+        ))}
+      </div>
+
+      {photos.length > 1 ? (
+        <div
+          className="flex h-20 shrink-0 items-center justify-center gap-4 text-white"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => step(-1)}
+            className="flex size-12 items-center justify-center rounded-full bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.2)]"
+            aria-label="Previous photo"
+          >
+            <ChevronLeft className="size-6" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => step(1)}
+            className="flex size-12 items-center justify-center rounded-full bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.2)]"
+            aria-label="Next photo"
+          >
+            <ChevronRight className="size-6" aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -89,35 +228,7 @@ export function PropertyGallery({
     .filter((img) => img.src);
 
   const [openAt, setOpenAt] = useState<number | null>(null);
-
-  const close = useCallback(() => setOpenAt(null), []);
-  const step = useCallback(
-    (delta: number) =>
-      setOpenAt((current) =>
-        current === null
-          ? null
-          : (current + delta + photos.length) % photos.length,
-      ),
-    [photos.length],
-  );
-
-  useEffect(() => {
-    if (openAt === null) return;
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-      if (e.key === "ArrowRight") step(1);
-      if (e.key === "ArrowLeft") step(-1);
-    };
-    document.addEventListener("keydown", onKey);
-
-    const { overflow } = document.body.style;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = overflow;
-    };
-  }, [openAt, close, step]);
+  const close = () => setOpenAt(null);
 
   if (!photos.length) return null;
 
@@ -209,67 +320,8 @@ export function PropertyGallery({
         ) : null}
       </div>
 
-      {/* lightbox */}
       {openAt !== null ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${title} — photo ${openAt + 1} of ${photos.length}`}
-          className="fixed inset-0 z-50 flex flex-col bg-[rgba(10,10,10,0.97)] duration-200 animate-in fade-in"
-          onClick={close}
-        >
-          <div className="flex h-16 shrink-0 items-center justify-between px-4 text-white">
-            <span className="tabular text-sm">
-              {openAt + 1} / {photos.length}
-            </span>
-            <button
-              type="button"
-              onClick={close}
-              className="flex size-11 items-center justify-center rounded-full hover:bg-[rgba(255,255,255,0.1)]"
-              aria-label="Close photos"
-            >
-              <X className="size-5" aria-hidden="true" />
-            </button>
-          </div>
-
-          <div
-            className="relative flex-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Image
-              src={photos[openAt].src}
-              alt={photos[openAt].alt}
-              fill
-              sizes="100vw"
-              className="object-contain"
-            />
-            <TagBadge tag={photos[openAt].tag} className="bottom-4 left-4 text-sm" />
-          </div>
-
-          {photos.length > 1 ? (
-            <div
-              className="flex h-20 shrink-0 items-center justify-center gap-4 text-white"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                onClick={() => step(-1)}
-                className="flex size-12 items-center justify-center rounded-full bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.2)]"
-                aria-label="Previous photo"
-              >
-                <ChevronLeft className="size-6" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onClick={() => step(1)}
-                className="flex size-12 items-center justify-center rounded-full bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.2)]"
-                aria-label="Next photo"
-              >
-                <ChevronRight className="size-6" aria-hidden="true" />
-              </button>
-            </div>
-          ) : null}
-        </div>
+        <Lightbox photos={photos} title={title} initialIndex={openAt} onClose={close} />
       ) : null}
     </>
   );

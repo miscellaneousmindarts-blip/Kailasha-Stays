@@ -219,6 +219,18 @@
   .container-page {
     @apply mx-auto w-full max-w-7xl px-6 md:px-12;
   }
+
+  /* scroll-snap carousels (lightbox) — the swipe/scroll gesture is the
+     visible affordance; a track at the bottom of a full-screen overlay
+     reads as a UI glitch, not a scrollbar. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @keyframes shimmer {
