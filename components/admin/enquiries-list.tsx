@@ -9,7 +9,7 @@ import { useSaveAction } from "@/components/admin/use-save-action";
 import { setEnquiryStatus } from "@/app/admin/(dashboard)/enquiries/actions";
 import { formatDate } from "@/lib/format";
 import { whatsAppLink } from "@/lib/whatsapp";
-import type { EnquiryRow } from "@/lib/admin/queries";
+import type { EnquiryRow, PropertyPricing } from "@/lib/admin/queries";
 import type { AddonServiceData } from "@/lib/queries";
 import type { EnquiryStatus } from "@/lib/types/database";
 
@@ -31,9 +31,11 @@ const STATUS_STYLES: Record<EnquiryStatus, string> = {
 export function EnquiriesList({
   enquiries,
   allAddons,
+  pricing,
 }: {
   enquiries: EnquiryRow[];
   allAddons: AddonServiceData[];
+  pricing: Record<string, PropertyPricing>;
 }) {
   const [filter, setFilter] = useState<EnquiryStatus | "all">("all");
   const [selected, setSelected] = useState<EnquiryRow | null>(null);
@@ -101,6 +103,7 @@ export function EnquiriesList({
         <EnquiryDetail
           enquiry={selected}
           addons={allAddons}
+          pricing={pricing[selected.property_id] ?? null}
           onClose={() => setSelected(null)}
         />
       ) : null}
@@ -111,10 +114,12 @@ export function EnquiriesList({
 function EnquiryDetail({
   enquiry,
   addons,
+  pricing,
   onClose,
 }: {
   enquiry: EnquiryRow;
   addons: AddonServiceData[];
+  pricing: PropertyPricing | null;
   onClose: () => void;
 }) {
   const statusAction = useSaveAction(setEnquiryStatus);
@@ -130,6 +135,7 @@ function EnquiryDetail({
         <ConvertToBookingForm
           enquiry={enquiry}
           addons={requestedAddons}
+          pricing={pricing}
           onCancel={() => setConverting(false)}
         />
       ) : (

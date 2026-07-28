@@ -15,7 +15,7 @@ import { PrivateTab } from "@/components/admin/tabs/private-tab";
 import { ContactsTab } from "@/components/admin/tabs/contacts-tab";
 import { RulesTab } from "@/components/admin/tabs/rules-tab";
 import type { PropertyForEdit } from "@/lib/admin/queries";
-import type { AddonService } from "@/lib/types/database";
+import type { AddonService, SiteSettings } from "@/lib/types/database";
 
 const TABS = [
   "Basics",
@@ -36,9 +36,11 @@ type Tab = (typeof TABS)[number];
 export function PropertyEditor({
   property,
   addons,
+  settings,
 }: {
   property: PropertyForEdit;
   addons: (AddonService & { enabled: boolean })[];
+  settings: SiteSettings;
 }) {
   const [tab, setTab] = useState<Tab>("Basics");
 
@@ -103,7 +105,9 @@ export function PropertyEditor({
         {tab === "Contacts" ? (
           <ContactsTab propertyId={property.id} contacts={property.property_contacts} />
         ) : null}
-        {tab === "Rules" ? <RulesTab property={property} /> : null}
+        {tab === "Rules" ? (
+          <RulesTab property={property} settings={settings} />
+        ) : null}
       </div>
     </div>
   );

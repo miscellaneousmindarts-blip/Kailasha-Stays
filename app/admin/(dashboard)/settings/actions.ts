@@ -49,6 +49,29 @@ export async function updateSiteSettings(formData: FormData): Promise<ActionResu
   return { success: true };
 }
 
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export async function updateStayDefaults(formData: FormData): Promise<ActionResult> {
+  const checkIn = String(formData.get("default_check_in_time") ?? "").trim();
+  const checkOut = String(formData.get("default_check_out_time") ?? "").trim();
+  if (!TIME_RE.test(checkIn) || !TIME_RE.test(checkOut)) {
+    return { error: "Enter valid times for both fields." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("site_settings")
+    .update({
+      default_check_in_time: checkIn,
+      default_check_out_time: checkOut,
+    })
+    .eq("id", true);
+
+  if (error) return { error: error.message };
+  revalidateSettings();
+  return { success: true };
+}
+
 export async function addCalendarSource(
   propertyId: string,
   formData: FormData,

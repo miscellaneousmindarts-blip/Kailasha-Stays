@@ -16,6 +16,7 @@ export type GuestBookingBundle = {
   };
   property: {
     id: string;
+    slug: string;
     title: string;
     area: string | null;
     city: string | null;

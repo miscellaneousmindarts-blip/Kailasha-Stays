@@ -33,14 +33,16 @@ export default async function GuestPortalPage(
 
   return (
     <main className="container-page max-w-2xl py-6 md:py-10">
+      {/* Priority order: confirmed (in the header) → where to go → upload ID
+          → pay → everything else. */}
       <PortalHeader bundle={bundle} />
       <GettingThereSection bundle={bundle} />
+      <DocumentsSection token={token} bundle={bundle} />
+      <BillingSection bundle={bundle} />
       <WifiSection bundle={bundle} />
       <ContactsSection bundle={bundle} />
       <AddonsSection token={token} bundle={bundle} />
-      <BillingSection bundle={bundle} />
       <SectionList sections={bundle.sections} />
-      <DocumentsSection token={token} bundle={bundle} />
       <HouseRulesFooter bundle={bundle} />
     </main>
   );

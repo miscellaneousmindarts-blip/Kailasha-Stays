@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 
-import { getPropertyForEdit, listAddonsForProperty } from "@/lib/admin/queries";
+import {
+  getPropertyForEdit,
+  getSiteSettingsAdmin,
+  listAddonsForProperty,
+} from "@/lib/admin/queries";
 import { PropertyEditor } from "@/components/admin/property-editor";
 
 export default async function EditListingPage(
@@ -9,7 +13,10 @@ export default async function EditListingPage(
   const { id } = await props.params;
   const property = await getPropertyForEdit(id);
   if (!property) notFound();
-  const addons = await listAddonsForProperty(id);
+  const [addons, settings] = await Promise.all([
+    listAddonsForProperty(id),
+    getSiteSettingsAdmin(),
+  ]);
 
-  return <PropertyEditor property={property} addons={addons} />;
+  return <PropertyEditor property={property} addons={addons} settings={settings} />;
 }

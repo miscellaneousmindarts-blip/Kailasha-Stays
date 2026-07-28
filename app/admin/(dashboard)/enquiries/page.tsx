@@ -1,10 +1,15 @@
 import { EnquiriesList } from "@/components/admin/enquiries-list";
-import { listAllAddonServices, listEnquiries } from "@/lib/admin/queries";
+import {
+  listAllAddonServices,
+  listEnquiries,
+  listPropertyPricing,
+} from "@/lib/admin/queries";
 
 export default async function AdminEnquiriesPage() {
-  const [enquiries, addons] = await Promise.all([
+  const [enquiries, addons, pricing] = await Promise.all([
     listEnquiries(),
     listAllAddonServices(),
+    listPropertyPricing(),
   ]);
 
   return (
@@ -15,7 +20,7 @@ export default async function AdminEnquiriesPage() {
       </p>
 
       <div className="mt-6">
-        <EnquiriesList enquiries={enquiries} allAddons={addons} />
+        <EnquiriesList enquiries={enquiries} allAddons={addons} pricing={pricing} />
       </div>
     </div>
   );

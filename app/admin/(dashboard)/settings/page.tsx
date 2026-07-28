@@ -1,4 +1,5 @@
 import { ContactSettingsForm } from "@/components/admin/settings/contact-settings-form";
+import { StayDefaultsForm } from "@/components/admin/settings/stay-defaults-form";
 import { CalendarSourcesPanel } from "@/components/admin/settings/calendar-sources-panel";
 import { AddonCatalogPanel } from "@/components/admin/settings/addon-catalog-panel";
 import {
@@ -30,6 +31,11 @@ export default async function AdminSettingsPage() {
       <section>
         <h2 className="mb-4 text-lg font-semibold">Contact details</h2>
         <ContactSettingsForm settings={settings} />
+      </section>
+
+      <section>
+        <h2 className="mb-4 text-lg font-semibold">Stay defaults</h2>
+        <StayDefaultsForm settings={settings} />
       </section>
 
       <section>

@@ -25,6 +25,9 @@ export type SiteSettings = {
   contact_email: string | null;
   address: string | null;
   response_note: string | null;
+  /** Fallback check-in/check-out time for any property that hasn't set its own (HH:MM). */
+  default_check_in_time: string;
+  default_check_out_time: string;
   updated_at: string;
 };
 

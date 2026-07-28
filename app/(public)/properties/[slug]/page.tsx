@@ -154,8 +154,10 @@ export default async function PropertyPage(
                   Check-in & check-out
                 </p>
                 <p className="text-text-muted mt-2 text-sm">
-                  Check-in from {property.check_in_time}, check-out by{" "}
-                  {property.check_out_time}.
+                  Check-in from{" "}
+                  {property.check_in_time ?? settings.default_check_in_time},
+                  check-out by{" "}
+                  {property.check_out_time ?? settings.default_check_out_time}.
                 </p>
               </div>
               {property.house_rules ? (

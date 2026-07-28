@@ -11,6 +11,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   contact_email: null,
   address: null,
   response_note: null,
+  default_check_in_time: "13:00",
+  default_check_out_time: "11:00",
   updated_at: new Date(0).toISOString(),
 };
 

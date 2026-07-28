@@ -368,3 +368,36 @@ export async function listSyncWarnings(): Promise<SyncWarning[]> {
     return lastSynced < staleCutoff;
   });
 }
+
+// -----------------------------------------------------------------------------
+// Pricing lookup (enquiry → booking conversion)
+// -----------------------------------------------------------------------------
+
+export type PropertyPricing = {
+  currency: string;
+  base_price: number | null;
+  airbnb_base_price: number | null;
+  rate_periods: RatePeriod[];
+};
+
+/** Every property's pricing inputs, keyed by id — small dataset, fetched
+ *  whole rather than per-enquiry so the admin's conversion form can quote a
+ *  stay instantly as soon as dates are picked. */
+export async function listPropertyPricing(): Promise<Record<string, PropertyPricing>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("properties")
+    .select("id, currency, base_price, airbnb_base_price, rate_periods(*)");
+  if (error) throw new Error(`Could not load pricing: ${error.message}`);
+
+  const byId: Record<string, PropertyPricing> = {};
+  for (const p of data ?? []) {
+    byId[p.id] = {
+      currency: p.currency,
+      base_price: p.base_price,
+      airbnb_base_price: p.airbnb_base_price,
+      rate_periods: (p.rate_periods ?? []) as RatePeriod[],
+    };
+  }
+  return byId;
+}
