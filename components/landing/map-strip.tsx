@@ -111,7 +111,7 @@ export function MapStrip({ property }: { property: LandingProperty | null }) {
           ) : null}
 
           <div>
-            <h2 className="text-[20px] font-semibold tracking-[-0.015em] md:text-[24px]">
+            <h2 className="font-display text-[22px] leading-[1.15] font-semibold md:text-[28px]">
               Where you&apos;ll be
             </h2>
             <p className="text-text-muted mt-1 text-sm">

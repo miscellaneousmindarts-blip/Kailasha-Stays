@@ -97,7 +97,7 @@ export function ShravanStrip({ year }: { year: number }) {
         <p className="text-warning text-xs font-semibold tracking-[0.14em] uppercase">
           Shravan · July–August
         </p>
-        <h2 className="text-background mt-3 max-w-2xl text-[23px] font-semibold tracking-[-0.015em] md:text-[32px]">
+        <h2 className="text-background mt-3 max-w-2xl font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
           Shravani Mela — please book early.
         </h2>
         <div className="mt-4 max-w-[640px] space-y-3 text-[rgba(253,251,247,0.82)]">
@@ -107,7 +107,7 @@ export function ShravanStrip({ year }: { year: number }) {
           </p>
           <p className="font-medium text-[rgba(253,251,247,0.95)]">
             Reserve with {pricing.advancePct}% advance, pay the balance on
-            arrival. Your written confirmation will be honoured — we do not
+            arrival. Your written confirmation will be honoured. We do not
             cancel on guests, at any price.
           </p>
         </div>

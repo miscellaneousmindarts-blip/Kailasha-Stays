@@ -18,8 +18,15 @@
  */
 
 export type LandingImage = {
-  /** Path inside the `property-images` Supabase bucket, or a full URL. */
+  /** A `/public` path, a Supabase bucket path, or a full URL. */
   path: string | null;
+  /**
+   * True while this is stock imagery. Renders a visible "Sample photo" badge
+   * so a stranger's bathroom can never quietly ship under a heading that
+   * promises "we photograph the parts other listings don't".
+   * Set false as you replace each file — see public/images/landing/README.md.
+   */
+  placeholder?: boolean;
   /** Shown in the placeholder box until `path` is filled — describes the shot to take. */
   brief: string;
   /** Written for both search and screen readers; see the photography brief in §6. */
@@ -164,42 +171,50 @@ export const landingConfig = {
    */
   images: {
     hero: {
-      path: null,
+      path: "/images/landing/hero.jpg",
+      placeholder: true,
       brief: "Temple shikhar at dawn, or your living room with a real family in it",
       alt: "Baba Baidyanath Dham temple at sunrise in Deoghar, Jharkhand",
     },
     host: {
-      path: null,
+      path: "/images/landing/host.jpg",
+      placeholder: true,
       brief: "The owner at the property entrance, daylight, looking at camera. No suit, no studio.",
       alt: "Owner of Kailasha Stays standing at the entrance of the guest house in Deoghar",
     },
     bathroom: {
-      path: null,
+      path: "/images/landing/bathroom.jpg",
+      placeholder: true,
       brief: "The bathroom with the lights on — the single most important photo on the page",
       alt: "Clean tiled bathroom with Western toilet and hot water geyser at Kailasha Stays Deoghar",
     },
     kitchen: {
-      path: null,
+      path: "/images/landing/kitchen.jpg",
+      placeholder: true,
       brief: "The induction hob and the filtered water — show exactly what's provided, nothing more",
       alt: "Induction hob and filtered drinking water provided in a Kailasha Stays apartment",
     },
     utilities: {
-      path: null,
+      path: "/images/landing/utilities.jpg",
+      placeholder: true,
       brief: "The overhead water tank and the inverter, together if possible",
       alt: "Overhead water tank and power backup inverter ensuring 24-hour water and electricity",
     },
     entrance: {
-      path: null,
+      path: "/images/landing/entrance.jpg",
+      placeholder: true,
       brief: "The apartment's own door with its lock",
       alt: "Private apartment entrance with lock at Kailasha Stays",
     },
     exterior: {
-      path: null,
+      path: "/images/landing/exterior.jpg",
+      placeholder: true,
       brief: "The building from the road, with signage visible",
       alt: "Exterior of the Kailasha Stays guest house building in Deoghar with signage",
     },
     car: {
-      path: null,
+      path: "/images/landing/car.jpg",
+      placeholder: true,
       brief: "The actual car, with the actual driver",
       alt: "Clean rental car with driver available for temple visits and airport pickup in Deoghar",
     },

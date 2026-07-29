@@ -25,14 +25,14 @@ export function HomesSection({ properties }: { properties: LandingProperty[] }) 
   return (
     <Section id="homes" band="sand">
       <Eyebrow hi="हमारे घर" en="Our homes" />
-      <h2 className="mt-3 max-w-2xl text-[23px] font-semibold tracking-[-0.015em] md:text-[32px]">
+      <h2 className="mt-3 max-w-2xl font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
         {properties.length} {properties.length === 1 ? "home" : "homes"}.
         {allTwoBed ? " Each one a full 2BHK, yours alone." : " Each one yours alone."}
       </h2>
       <p className="text-text-muted mt-3 max-w-xl">
         A whole apartment to yourselves
-        {sleepsRange ? `, sleeping ${sleepsRange}` : ""} — not a hotel room, and
-        not shared with anyone.
+        {sleepsRange ? `, sleeping ${sleepsRange}` : ""} : not a hotel room, and not
+        shared with anyone.
       </p>
 
       <div className="mt-8 grid gap-5 md:grid-cols-2">

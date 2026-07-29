@@ -2,7 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 
-import { Eyebrow, Section } from "@/components/landing/primitives";
+import { Section } from "@/components/landing/primitives";
 import { WhatsAppLink } from "@/components/landing/actions";
 import { COMPARISON_ROWS, type FaqItem } from "@/lib/landing-faq";
 import { track } from "@/lib/track";
@@ -100,8 +100,7 @@ export function Faq({
   return (
     <Section>
       <div className="mx-auto max-w-[760px]">
-        <Eyebrow hi="आपके सवाल" en="Practical answers" />
-        <h2 className="mt-3 text-[23px] font-semibold tracking-[-0.015em] md:text-[32px]">
+        <h2 className="mt-3 font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
           The things families actually ask us
         </h2>
 

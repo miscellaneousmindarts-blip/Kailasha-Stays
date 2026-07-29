@@ -1,6 +1,6 @@
 import { ArrowDown, Check, ShieldCheck } from "lucide-react";
 
-import { Eyebrow, Section } from "@/components/landing/primitives";
+import { Section } from "@/components/landing/primitives";
 import { landingConfig } from "@/lib/landing-config";
 import { money } from "@/lib/format";
 import type { LandingData, LandingProperty } from "@/lib/landing";
@@ -52,8 +52,7 @@ export function HonestPrice({
   return (
     <Section band="sand">
       <div className="border-border bg-surface shadow-card mx-auto max-w-[760px] rounded-lg border p-6 md:p-8">
-        <Eyebrow hi="साफ़ और सीधी बात" en="Plain and honest" />
-        <h2 className="mt-3 text-[23px] font-semibold tracking-[-0.015em] md:text-[32px]">
+        <h2 className="mt-3 font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
           What you pay. All of it.
         </h2>
 
@@ -62,7 +61,7 @@ export function HonestPrice({
             {ratePerNight !== null ? (
               <p className="tabular">
                 <span className="text-text-muted text-sm">From </span>
-                <span className="text-[34px] leading-[1.1] font-semibold tracking-[-0.02em] md:text-[44px]">
+                <span className="font-display text-[38px] leading-[1] font-semibold md:text-[52px]">
                   {money(ratePerNight, currency)}
                 </span>
                 <span className="text-text-muted block text-sm">
@@ -92,7 +91,7 @@ export function HonestPrice({
             </div>
 
             <p className="mt-5 text-sm leading-relaxed">
-              Festival dates cost more — that&apos;s honest.{" "}
+              Festival dates cost more. That&apos;s honest.{" "}
               <span className="text-primary font-medium">
                 We tell you the exact rate before you pay a single rupee, and it
                 never changes after.
@@ -124,7 +123,7 @@ export function HonestPrice({
                       Free cancellation up to {service.cancelDays} days before
                       check-in
                     </strong>{" "}
-                    — full refund of your advance, no questions.
+                    with a full refund of your advance, no questions.
                   </span>
                 </li>
                 <li className="flex gap-2">

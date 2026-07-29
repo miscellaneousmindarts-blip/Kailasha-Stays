@@ -16,6 +16,9 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-heading: var(--font-sans);
+  /* Opt-in display face. Applied on the landing page only — the admin is a
+     workspace and should stay in one neutral voice. */
+  --font-display: var(--font-display);
 
   /* project tokens */
   --color-surface: var(--surface);

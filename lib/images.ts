@@ -9,7 +9,10 @@ const PUBLIC_PREFIX = `${publicEnv.supabaseUrl}/storage/v1/object/public/propert
 export function imageUrl(storagePath: string | null | undefined): string | null {
   if (!storagePath) return null;
   if (storagePath.startsWith("http")) return storagePath;
-  return PUBLIC_PREFIX + storagePath.replace(/^\/+/, "");
+  // A leading slash means a file in /public — landing-page photography lives
+  // there so the owner can drop replacements in without touching Supabase.
+  if (storagePath.startsWith("/")) return storagePath;
+  return PUBLIC_PREFIX + storagePath;
 }
 
 /**

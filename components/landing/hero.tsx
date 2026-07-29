@@ -40,7 +40,7 @@ function heroCopy(variant: HeroVariant, year: number, templeTime: string | null)
     default:
       return {
         en: `A home of your own in Deoghar — ${temple} from Baba Baidyanath Dham`,
-        lede: "Whole apartments for families — the flat is yours alone. Fixed prices, written down. Airport pickup, car and pooja arranged before you arrive.",
+        lede: "Whole apartments for families. The flat is yours alone, at a fixed price, written down. Airport pickup, car and pooja arranged before you arrive.",
       };
   }
 }
@@ -104,7 +104,7 @@ export function Hero({
             <span lang="hi" className="block text-[28px] leading-[1.35] font-normal md:text-[42px]">
               आपके परिवार के लिए देवघर में एक अपना घर
             </span>
-            <span className="mt-2 block text-[24px] leading-[1.15] font-semibold tracking-[-0.02em] md:text-[38px]">
+            <span className="font-display mt-2 block text-[26px] leading-[1.1] font-semibold md:text-[42px]">
               {copy.en}
             </span>
           </h1>

@@ -1,6 +1,6 @@
 import { ArrowRight, Star } from "lucide-react";
 
-import { Eyebrow, Section } from "@/components/landing/primitives";
+import { Section } from "@/components/landing/primitives";
 import { landingConfig } from "@/lib/landing-config";
 
 function Stars({ count }: { count: number }) {
@@ -34,8 +34,7 @@ export function Proof() {
 
   return (
     <Section>
-      <Eyebrow hi="मेहमानों की राय" en="What guests say" />
-      <h2 className="mt-3 max-w-2xl text-[23px] font-semibold tracking-[-0.015em] md:text-[32px]">
+      <h2 className="mt-3 max-w-2xl font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
         {proof.familiesHosted && proof.yearStarted
           ? `${proof.familiesHosted} families have stayed here since ${proof.yearStarted}.`
           : "What families tell us afterwards."}

@@ -1,6 +1,6 @@
 import { ArrowDown, MapPin } from "lucide-react";
 
-import { Eyebrow, Section } from "@/components/landing/primitives";
+import { Section } from "@/components/landing/primitives";
 import { LandingPropertyCard } from "@/components/landing/property-card";
 import { PhoneLink, ShareButton, WhatsAppLink } from "@/components/landing/actions";
 import { landingConfig } from "@/lib/landing-config";
@@ -30,7 +30,6 @@ export function Close({
   return (
     <Section band="sand">
       <div className="text-center">
-        <Eyebrow en="Pick your home" />
         <h2
           lang="hi"
           className="mt-3 text-[28px] leading-[1.35] font-semibold md:text-[38px]"
