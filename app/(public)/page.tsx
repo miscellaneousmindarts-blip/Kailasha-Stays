@@ -12,7 +12,7 @@ import { ServicesStrip, ShravanStrip } from "@/components/landing/strips";
 import { Faq } from "@/components/landing/faq";
 import { Close } from "@/components/landing/close";
 import { StickyBar } from "@/components/landing/sticky-bar";
-import { getLandingData, lowestRate, waContext } from "@/lib/landing";
+import { getLandingData, templeDistance, travelTime, waContext } from "@/lib/landing";
 import { buildFaq } from "@/lib/landing-faq";
 import { landingJsonLd } from "@/lib/landing-schema";
 import { publicEnv } from "@/lib/env";
@@ -32,16 +32,16 @@ export const metadata: Metadata = {
     absolute: "Guest House Near Baidyanath Temple | Kailasha Stays Deoghar",
   },
   description:
-    "Clean 2BHK serviced apartments for families in Deoghar, minutes from Baba Baidyanath Dham. Fixed prices, own kitchen, free cancellation, airport pickup and pooja arranged.",
+    "Clean serviced apartments for families in Deoghar, minutes from Baba Baidyanath Dham. The whole flat is yours. Fixed prices, free cancellation, airport pickup and pooja arranged.",
   alternates: { canonical: "/" },
   robots: { index: true, follow: true },
   openGraph: {
     // This page gets forwarded on WhatsApp — the OG card is what the family
     // group actually sees, so it's a first-class design surface, not an
     // afterthought.
-    title: "Kailasha Stays — a full 2BHK for your family in Deoghar",
+    title: "Kailasha Stays — a home of your own in Deoghar",
     description:
-      "Minutes from Baba Baidyanath Dham. Own kitchen, fixed price, free cancellation.",
+      "Minutes from Baba Baidyanath Dham. The whole flat is yours, at a fixed price, with free cancellation.",
     type: "website",
     locale: "en_IN",
   },
@@ -52,18 +52,21 @@ export default async function Home(props: PageProps<"/">) {
   const srcParam = Array.isArray(params.src) ? params.src[0] : params.src;
   const variant: HeroVariant = isHeroVariant(srcParam) ? srcParam : "brand";
 
-  const { settings, properties, addons } = await getLandingData();
+  const { settings, properties, addons, distances } = await getLandingData();
   const year = new Date().getFullYear();
-  const rate = lowestRate(properties);
   const currency = properties[0]?.currency ?? "INR";
+  const temple = templeDistance(distances);
 
   const wa = settings.whatsapp_number;
   const href = (context: string, extra = "") =>
     wa ? waContext(wa, context, extra) : null;
 
-  const shareSummary = `${settings.business_name} — a full 2BHK for your family in Deoghar, minutes from Baba Baidyanath Dham. Own kitchen, fixed price, free cancellation.`;
+  const shareSummary = `${settings.business_name} — a home of your own in Deoghar, near Baba Baidyanath Dham. The whole flat is yours, at a fixed price, with free cancellation.`;
 
-  const faq = buildFaq({ sleeps: properties[0]?.sleeps ?? null });
+  const faq = buildFaq({
+    sleeps: Math.max(0, ...properties.map((p) => p.sleeps)) || null,
+    temple,
+  });
 
   const jsonLd = landingJsonLd({
     settings,
@@ -86,18 +89,12 @@ export default async function Home(props: PageProps<"/">) {
           whatsappHref={href("lp-hero")}
           phone={settings.contact_phone}
           shareSummary={shareSummary}
+          templeTime={travelTime(temple)}
         />
         <TrustRibbon />
-        <DistanceChips />
+        <DistanceChips distances={distances} />
 
-        <HomesSection
-          properties={properties}
-          waitlistHref={href(
-            "waitlist",
-            "Please add me to the list for new homes / Shravan.",
-          )}
-          year={year}
-        />
+        <HomesSection properties={properties} />
 
         <WhyApartment
           options={properties
@@ -107,7 +104,7 @@ export default async function Home(props: PageProps<"/">) {
           shareSummary={shareSummary}
         />
 
-        <HonestPrice ratePerNight={rate} currency={currency} addons={addons} />
+        <HonestPrice properties={properties} currency={currency} addons={addons} />
 
         <MeetHost
           videoCallHref={href(

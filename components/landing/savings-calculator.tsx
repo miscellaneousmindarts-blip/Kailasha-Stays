@@ -79,7 +79,7 @@ export function SavingsCalculator({
 }) {
   const [guests, setGuests] = useState(6);
   const [nights, setNights] = useState(3);
-  const { hotelRoomRate, mealCostPerPersonPerDay } = landingConfig.pricing;
+  const { hotelRoomRate } = landingConfig.pricing;
 
   // Quote the cheapest home that can ACTUALLY sleep this many people. Using
   // the lowest rate on the page regardless of capacity would compare a
@@ -100,9 +100,9 @@ export function SavingsCalculator({
   const ratePerNight = fitting?.rate ?? null;
   const ourTotal = ratePerNight !== null ? ratePerNight * nights : null;
   const rooms = Math.ceil(guests / 2);
-  const hotelRooms = hotelRoomRate * rooms * nights;
-  const hotelMeals = mealCostPerPersonPerDay * guests * nights;
-  const hotelTotal = hotelRooms + hotelMeals;
+  // Rooms only. There's no kitchen here, so a family eats out either way —
+  // counting meals as a saving would be inventing one.
+  const hotelTotal = hotelRoomRate * rooms * nights;
   const savings = ourTotal !== null ? hotelTotal - ourTotal : null;
 
   return (
@@ -137,10 +137,6 @@ export function SavingsCalculator({
                   </dt>
                   <dd className="tabular">{money(ourTotal, currency)}</dd>
                 </div>
-                <div className="flex justify-between gap-3">
-                  <dt>Meals</dt>
-                  <dd className="text-success font-medium">cook your own</dd>
-                </div>
               </dl>
               <p className="tabular mt-3 text-lg font-semibold">
                 {money(ourTotal, currency)}
@@ -163,11 +159,11 @@ export function SavingsCalculator({
                 {rooms} {rooms === 1 ? "room" : "rooms"} × {nights}{" "}
                 {nights === 1 ? "night" : "nights"}
               </dt>
-              <dd className="tabular">{money(hotelRooms, currency)}</dd>
+              <dd className="tabular">{money(hotelTotal, currency)}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt>Eating out, {guests} people</dt>
-              <dd className="tabular">{money(hotelMeals, currency)}</dd>
+              <dt>{guests} people need</dt>
+              <dd>{rooms} rooms at 2 per room</dd>
             </div>
           </dl>
           <p className="tabular text-text-muted mt-3 text-lg font-semibold">
@@ -198,6 +194,7 @@ export function SavingsCalculator({
       </div>
 
       <p className="text-text-muted mt-4 text-sm">
+        Room rates only, on both sides — meals aren&apos;t counted either way.
         Hotel figures are indicative Deoghar market rates. Your actual quote is
         always confirmed in writing before you pay.
       </p>

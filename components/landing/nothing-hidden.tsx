@@ -17,7 +17,7 @@ export function NothingHidden() {
   const { images } = landingConfig;
   const shots = [
     { image: images.bathroom, caption: "The bathroom, lights on" },
-    { image: images.kitchen, caption: "Kitchen, with utensils" },
+    { image: images.kitchen, caption: "The induction hob and water" },
     { image: images.utilities, caption: "Water tank and inverter" },
     { image: images.entrance, caption: "Your own door, your own key" },
     { image: images.exterior, caption: "The building from the road" },
@@ -31,8 +31,8 @@ export function NothingHidden() {
         We photograph the parts other listings don&apos;t.
       </h2>
       <p className="text-text-muted mt-3 max-w-xl">
-        The bathroom. The water tank. The kitchen shelf. Look properly before
-        you book — what you see is what you get.
+        The bathroom. The water tank. Exactly what&apos;s on the counter. Look
+        properly before you book — what you see is what you get.
       </p>
 
       <ul className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3">

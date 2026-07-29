@@ -3,7 +3,7 @@ import { ArrowDown, Check, ShieldCheck } from "lucide-react";
 import { Eyebrow, Section } from "@/components/landing/primitives";
 import { landingConfig } from "@/lib/landing-config";
 import { money } from "@/lib/format";
-import type { LandingData } from "@/lib/landing";
+import type { LandingData, LandingProperty } from "@/lib/landing";
 
 const INCLUDED = [
   "Electricity",
@@ -11,7 +11,7 @@ const INCLUDED = [
   "Wifi",
   "Parking",
   "Daily cleaning",
-  "Gas for cooking",
+  "Induction hob",
 ];
 
 /**
@@ -24,15 +24,30 @@ const INCLUDED = [
  * No image here. Restraint is the point.
  */
 export function HonestPrice({
-  ratePerNight,
+  properties,
   currency,
   addons,
 }: {
-  ratePerNight: number | null;
+  properties: LandingProperty[];
   currency: string;
   addons: LandingData["addons"];
 }) {
   const { service, pricing } = landingConfig;
+
+  // The headline rate and the sentence under it must describe the SAME home.
+  // Quoting the cheapest rate beside a description of the biggest flat is
+  // exactly the kind of wrong-bill impression this section exists to prevent.
+  const priced = properties.filter((p) => p.ratePerNight !== null);
+  const cheapest = priced.length
+    ? priced.reduce((a, b) => ((a.ratePerNight ?? 0) <= (b.ratePerNight ?? 0) ? a : b))
+    : null;
+  const ratePerNight = cheapest?.ratePerNight ?? null;
+  const capacities = priced.map((p) => p.sleeps);
+  const capacityLabel = capacities.length
+    ? Math.min(...capacities) === Math.max(...capacities)
+      ? `up to ${capacities[0]} guests`
+      : `homes sleeping ${Math.min(...capacities)}–${Math.max(...capacities)} guests`
+    : null;
 
   return (
     <Section band="sand">
@@ -51,7 +66,7 @@ export function HonestPrice({
                   {money(ratePerNight, currency)}
                 </span>
                 <span className="text-text-muted block text-sm">
-                  per night · full 2BHK · up to 6 guests
+                  per night{capacityLabel ? ` · ${capacityLabel}` : ""}
                 </span>
               </p>
             ) : null}

@@ -23,7 +23,7 @@ export function landingJsonLd({
   faq: FaqItem[];
   siteUrl: string;
 }) {
-  const { proof, links, distances } = landingConfig;
+  const { proof, links } = landingConfig;
   const heroImage = imageUrl(landingConfig.images.hero.path);
 
   const canShowRating =
@@ -109,25 +109,8 @@ export function landingJsonLd({
     ],
   };
 
-  // Distances are the first specification a pilgrim checks, so they belong in
-  // the graph as well as on the page.
-  const place = distances.temple
-    ? {
-        "@type": "TouristAttraction",
-        name: "Baba Baidyanath Dham",
-        address: {
-          "@type": "PostalAddress",
-          addressLocality: "Deoghar",
-          addressRegion: "Jharkhand",
-          addressCountry: "IN",
-        },
-      }
-    : null;
-
   return {
     "@context": "https://schema.org",
-    "@graph": [lodging, itemList, faqPage, organization, breadcrumb, place].filter(
-      Boolean,
-    ),
+    "@graph": [lodging, itemList, faqPage, organization, breadcrumb],
   };
 }

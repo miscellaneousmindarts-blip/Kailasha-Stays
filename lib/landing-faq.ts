@@ -18,8 +18,11 @@ export type FaqItem = {
  * rendered with a blank — a FAQ answer reading "about  from the temple" is
  * worse than no answer.
  */
-export function buildFaq(opts: { sleeps: number | null }): FaqItem[] {
-  const { service, pricing, distances } = landingConfig;
+export function buildFaq(opts: {
+  sleeps: number | null;
+  temple: { label: string; value: string } | null;
+}): FaqItem[] {
+  const { service, pricing } = landingConfig;
   const items: (FaqItem | null)[] = [
     {
       q: "What if I pay the advance and something goes wrong?",
@@ -35,29 +38,22 @@ export function buildFaq(opts: { sleeps: number | null }): FaqItem[] {
     },
     {
       q: "How does this compare to a hotel or a dharamshala?",
-      a: "A dharamshala is the cheapest option and we won't pretend otherwise. What you get here instead is the whole flat for your family, your own kitchen, two private bathrooms, a price fixed in writing, and a booking we will not cancel during Shravan.",
+      a: "A dharamshala is the cheapest option and we won't pretend otherwise. What you get here instead is the whole flat for your family, private bathrooms, a price fixed in writing, and a booking we will not cancel during Shravan.",
       comparison: true,
     },
-    distances.temple
+    opts.temple
       ? {
-          q: "How far is Kailasha Stays from Baba Baidyanath Temple?",
-          a: `${distances.temple}${distances.templeTime ? `, about ${distances.templeTime} by car` : ""}. We can drop you.`,
+          q: `How far is it from ${opts.temple.label}?`,
+          a: `${opts.temple.value}. We can drop you.`,
         }
       : null,
     {
-      q: "Do you arrange airport or Jasidih station pickup?",
-      a: [
-        "Yes.",
-        distances.airport ? `Airport ${distances.airport}.` : "",
-        distances.jasidih ? `Jasidih Junction ${distances.jasidih}.` : "",
-        "The price is fixed and told to you in advance.",
-      ]
-        .filter(Boolean)
-        .join(" "),
+      q: "Do you arrange airport or station pickup?",
+      a: "Yes. The price is fixed and told to you in advance — no haggling with a driver when you arrive.",
     },
     {
-      q: "Can we cook our own food? Is there a kitchen?",
-      a: "Yes. Full kitchen, gas, utensils, filtered water. Pure vegetarian building.",
+      q: "Can we cook our own food?",
+      a: "Not a full kitchen — we don't want to promise one we don't have. There is an induction hob for the basics: tea, coffee, warming milk or baby food. Filtered drinking water is provided, and it's a pure vegetarian building. For full meals we can point you to places nearby, or arrange home-cooked food.",
     },
     {
       q: "Can you help arrange pooja at Baidyanath Dham?",
@@ -88,7 +84,7 @@ export function buildFaq(opts: { sleeps: number | null }): FaqItem[] {
  *  the differentiator being sold. */
 export const COMPARISON_ROWS = [
   { label: "Whole family in one unit", us: "Yes", hotel: "No — 2–3 rooms", dharamshala: "Shared" },
-  { label: "Own kitchen, satvik cooking", us: "Yes", hotel: "No", dharamshala: "Limited" },
+  { label: "Induction hob for tea / baby food", us: "Yes", hotel: "No", dharamshala: "Rarely" },
   { label: "Private bathroom per family", us: "Yes — 2", hotel: "Yes", dharamshala: "Usually shared" },
   { label: "Price fixed in writing beforehand", us: "Yes", hotel: "Varies", dharamshala: "Varies" },
   { label: "Pickup & car arranged", us: "Yes", hotel: "Sometimes", dharamshala: "No" },

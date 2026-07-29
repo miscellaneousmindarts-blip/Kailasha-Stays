@@ -113,7 +113,6 @@ export function LandingPropertyCard({
               <Chip>
                 {property.bathrooms} bathroom{property.bathrooms === 1 ? "" : "s"}
               </Chip>
-              <Chip>Kitchen</Chip>
             </div>
             <p className="text-text-muted mt-2 text-sm">{amenityLine}</p>
           </>

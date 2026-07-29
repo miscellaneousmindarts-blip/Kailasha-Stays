@@ -18,9 +18,8 @@ export function isHeroVariant(value: string | undefined): value is HeroVariant {
   return value === "shravan" || value === "aiims" || value === "weekend";
 }
 
-function heroCopy(variant: HeroVariant, year: number) {
-  const { distances } = landingConfig;
-  const temple = distances.templeTime || distances.temple || "minutes";
+function heroCopy(variant: HeroVariant, year: number, templeTime: string | null) {
+  const temple = templeTime ?? "minutes";
 
   switch (variant) {
     case "shravan":
@@ -30,18 +29,18 @@ function heroCopy(variant: HeroVariant, year: number) {
       };
     case "aiims":
       return {
-        en: `A full apartment ${distances.aiims || "minutes"} from AIIMS Deoghar — with a kitchen`,
-        lede: "Weekly and monthly rates for patients and attendants. Cook your own food. Quiet, clean, ground floor available.",
+        en: `A full apartment near AIIMS Deoghar — quiet, clean, private`,
+        lede: "Weekly and monthly rates for patients and attendants. An induction hob for tea and simple food. Quiet, clean, ground floor available.",
       };
     case "weekend":
       return {
-        en: "A whole 2BHK in Deoghar for your family weekend",
+        en: "A whole apartment in Deoghar for your family weekend",
         lede: "Temple, Trikut, Tapovan and Basukinath — car and driver arranged. Fixed prices, no surprises.",
       };
     default:
       return {
         en: `A home of your own in Deoghar — ${temple} from Baba Baidyanath Dham`,
-        lede: "Full 2BHK apartments for families. Your own kitchen. Fixed prices, written down. Airport pickup, car and pooja arranged before you arrive.",
+        lede: "Whole apartments for families — the flat is yours alone. Fixed prices, written down. Airport pickup, car and pooja arranged before you arrive.",
       };
   }
 }
@@ -51,14 +50,17 @@ export function Hero({
   whatsappHref,
   phone,
   shareSummary,
+  templeTime,
 }: {
   variant: HeroVariant;
   whatsappHref: string | null;
   phone: string | null;
   shareSummary: string;
+  /** From the property's own Distances section — never a second copy in config. */
+  templeTime: string | null;
 }) {
   const { images, proof, service } = landingConfig;
-  const copy = heroCopy(variant, new Date().getFullYear());
+  const copy = heroCopy(variant, new Date().getFullYear(), templeTime);
   const src = imageUrl(images.hero.path);
   // Under ten reviews the count itself is the problem — listings below that
   // convert at roughly half the rate of those with 10–20, so we lead with a

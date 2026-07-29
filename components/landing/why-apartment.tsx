@@ -11,8 +11,8 @@ import { SavingsCalculator } from "@/components/landing/savings-calculator";
 const REASONS = [
   {
     icon: CookingPot,
-    title: "Your own kitchen",
-    body: "Cook satvik food the way your family eats. Pure vegetarian building — no onion-garlic worries during Shravan. Gas, utensils and filtered water provided.",
+    title: "Induction for the basics",
+    body: "An induction hob for tea, coffee and baby food — not a full kitchen. Pure vegetarian building, so no onion-garlic worries during Shravan. Filtered drinking water provided.",
   },
   {
     icon: UsersRound,
@@ -27,7 +27,7 @@ const REASONS = [
   {
     icon: Wallet,
     title: "Cheaper than three rooms",
-    body: "Work out your exact saving below.",
+    body: "One home instead of a corridor of them. Work out your exact saving below.",
   },
 ];
 

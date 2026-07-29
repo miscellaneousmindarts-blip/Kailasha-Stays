@@ -32,10 +32,15 @@ export type LandingProperty = {
   images: Pick<PropertyImage, "storage_path" | "alt" | "tag">[];
 };
 
+export type LandingDistance = { label: string; value: string };
+
 export type LandingData = {
   settings: SiteSettings;
   properties: LandingProperty[];
   addons: Pick<AddonService, "id" | "name" | "description" | "price" | "price_unit">[];
+  /** Aggregated from each property's own "Distances" section — one source of
+   *  truth, edited per listing rather than duplicated in config. */
+  distances: LandingDistance[];
 };
 
 /**
@@ -68,7 +73,7 @@ export async function getLandingData(): Promise<LandingData> {
     supabase
       .from("properties")
       .select(
-        "id, slug, title, max_guests, bedrooms, bathrooms, base_price, currency, amenities, property_images(storage_path, alt, tag, is_cover, sort_order)",
+        "id, slug, title, max_guests, bedrooms, bathrooms, base_price, currency, amenities, property_images(storage_path, alt, tag, is_cover, sort_order), property_sections(title, type, content, visible, audience, sort_order)",
       )
       .eq("status", "published")
       .order("sort_order")
@@ -112,7 +117,70 @@ export async function getLandingData(): Promise<LandingData> {
     settings,
     properties,
     addons: addonsResult.data ?? [],
+    distances: collectDistances(rows),
   };
+}
+
+type KeyValueSection = {
+  title: string | null;
+  type: string;
+  visible: boolean;
+  audience: string;
+  content: unknown;
+};
+
+/**
+ * Pulls the "Distances" key_value block off each published property and
+ * merges them, first occurrence winning on a repeated landmark. Distance to
+ * landmark is the first specification a pilgrim checks, and it's already
+ * maintained per listing — duplicating it into config would guarantee the two
+ * drift apart.
+ */
+function collectDistances(
+  rows: { property_sections?: KeyValueSection[] | null }[],
+): LandingDistance[] {
+  const seen = new Map<string, string>();
+
+  for (const property of rows) {
+    for (const section of property.property_sections ?? []) {
+      if (section.type !== "key_value" || !section.visible) continue;
+      if (!/distance/i.test(section.title ?? "")) continue;
+      // Guest-only sections aren't public, so they don't belong here.
+      if (section.audience === "guest") continue;
+
+      const content = section.content as { rows?: { label?: string; value?: string }[] };
+      for (const row of content?.rows ?? []) {
+        const label = row.label?.trim();
+        const value = row.value?.trim();
+        if (!label || !value || seen.has(label.toLowerCase())) continue;
+        seen.set(label.toLowerCase(), value);
+      }
+    }
+  }
+
+  return [...seen.entries()].map(([key, value]) => ({
+    // Restore the original casing by finding it again — the map key is only
+    // lowercased for de-duplication.
+    label: key.replace(/\b\w/g, (c) => c.toUpperCase()),
+    value,
+  }));
+}
+
+/** The temple row, for the hero and FAQ. Matches the landmark by name rather
+ *  than position, since each property lists its own nearest landmarks. */
+export function templeDistance(distances: LandingDistance[]): LandingDistance | null {
+  return (
+    distances.find((d) => /baidyanath|baba.*dham/i.test(d.label)) ??
+    distances.find((d) => /temple|mandir|dham/i.test(d.label)) ??
+    null
+  );
+}
+
+/** "1.4 km — 15 min walk" → "15 min walk", for sentences that want the time. */
+export function travelTime(distance: LandingDistance | null): string | null {
+  if (!distance) return null;
+  const parts = distance.value.split(/[—–-]/);
+  return (parts.length > 1 ? parts[parts.length - 1] : parts[0]).trim() || null;
 }
 
 /**

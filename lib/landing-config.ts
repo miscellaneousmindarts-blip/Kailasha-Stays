@@ -61,8 +61,6 @@ export const landingConfig = {
   pricing: {
     /** Indicative local hotel room rate, for the savings comparison. */
     hotelRoomRate: 2500,
-    /** Per person per day, eating out — the other half of the comparison. */
-    mealCostPerPersonPerDay: 500,
     /** Percent of the total taken to hold a booking. */
     advancePct: 25,
   },
@@ -159,8 +157,8 @@ export const landingConfig = {
     },
     kitchen: {
       path: null,
-      brief: "Kitchen shelf with the utensils actually provided",
-      alt: "Kitchen shelf with cooking utensils, gas cylinder and filtered drinking water",
+      brief: "The induction hob and the filtered water — show exactly what's provided, nothing more",
+      alt: "Induction hob and filtered drinking water provided in a Kailasha Stays apartment",
     },
     utilities: {
       path: null,
