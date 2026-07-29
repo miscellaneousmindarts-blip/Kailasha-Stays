@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
 import { Hero, isHeroVariant, type HeroVariant } from "@/components/landing/hero";
-import { TrustRibbon, DistanceChips } from "@/components/landing/trust-strip";
+import { TrustRibbon } from "@/components/landing/trust-strip";
+import { MapStrip } from "@/components/landing/map-strip";
 import { HomesSection } from "@/components/landing/homes-section";
 import { WhyApartment } from "@/components/landing/why-apartment";
 import { HonestPrice } from "@/components/landing/honest-price";
@@ -52,10 +53,13 @@ export default async function Home(props: PageProps<"/">) {
   const srcParam = Array.isArray(params.src) ? params.src[0] : params.src;
   const variant: HeroVariant = isHeroVariant(srcParam) ? srcParam : "brand";
 
-  const { settings, properties, addons, distances } = await getLandingData();
+  const { settings, properties, addons, primary } = await getLandingData();
   const year = new Date().getFullYear();
   const currency = properties[0]?.currency ?? "INR";
-  const temple = templeDistance(distances);
+  // The hero's travel time and the FAQ's distance answer come from the same
+  // home the map is centred on, so the page tells one consistent location
+  // story rather than mixing landmarks across cities.
+  const temple = templeDistance(primary?.distances ?? []);
 
   const wa = settings.whatsapp_number;
   const href = (context: string, extra = "") =>
@@ -92,7 +96,7 @@ export default async function Home(props: PageProps<"/">) {
           templeTime={travelTime(temple)}
         />
         <TrustRibbon />
-        <DistanceChips distances={distances} />
+        <MapStrip property={primary} />
 
         <HomesSection properties={properties} />
 

@@ -27,6 +27,12 @@ export type LandingProperty = {
   currency: string;
   distanceFromTemple: string | null;
   floor: string | null;
+  city: string | null;
+  addressLine: string | null;
+  lat: number | null;
+  lng: number | null;
+  /** This property's own "Distances" rows, in the order the admin arranged them. */
+  distances: LandingDistance[];
   amenities: string[];
   /** Already trimmed to the page's image budget — render all of them. */
   images: Pick<PropertyImage, "storage_path" | "alt" | "tag">[];
@@ -38,9 +44,14 @@ export type LandingData = {
   settings: SiteSettings;
   properties: LandingProperty[];
   addons: Pick<AddonService, "id" | "name" | "description" | "price" | "price_unit">[];
-  /** Aggregated from each property's own "Distances" section — one source of
-   *  truth, edited per listing rather than duplicated in config. */
-  distances: LandingDistance[];
+  /**
+   * The home the page's location story is told around — its map, its
+   * distances, its travel time in the hero. Homes in other cities are still
+   * listed, but a single landing page can only anchor to one place, and
+   * merging landmarks across cities produced a strip that mixed Baidyanath
+   * Dham with Vrindavan temples.
+   */
+  primary: LandingProperty | null;
 };
 
 /**
@@ -73,7 +84,7 @@ export async function getLandingData(): Promise<LandingData> {
     supabase
       .from("properties")
       .select(
-        "id, slug, title, max_guests, bedrooms, bathrooms, base_price, currency, amenities, property_images(storage_path, alt, tag, is_cover, sort_order), property_sections(title, type, content, visible, audience, sort_order)",
+        "id, slug, title, max_guests, bedrooms, bathrooms, base_price, currency, amenities, city, address_line, lat, lng, property_images(storage_path, alt, tag, is_cover, sort_order), property_sections(title, type, content, visible, audience, sort_order)",
       )
       .eq("status", "published")
       .order("sort_order")
@@ -108,16 +119,27 @@ export async function getLandingData(): Promise<LandingData> {
       currency: p.currency,
       distanceFromTemple: extras.distanceFromTemple ?? null,
       floor: extras.floor ?? null,
+      city: p.city,
+      lat: p.lat,
+      lng: p.lng,
+      addressLine: p.address_line,
+      distances: readDistances(p.property_sections),
       amenities: p.amenities ?? [],
       images,
     };
   });
 
+  const configured = landingConfig.map.propertySlug;
+  const primary =
+    (configured ? properties.find((p) => p.slug === configured) : undefined) ??
+    properties[0] ??
+    null;
+
   return {
     settings,
     properties,
     addons: addonsResult.data ?? [],
-    distances: collectDistances(rows),
+    primary,
   };
 }
 
@@ -130,40 +152,27 @@ type KeyValueSection = {
 };
 
 /**
- * Pulls the "Distances" key_value block off each published property and
- * merges them, first occurrence winning on a repeated landmark. Distance to
- * landmark is the first specification a pilgrim checks, and it's already
- * maintained per listing — duplicating it into config would guarantee the two
- * drift apart.
+ * Reads one property's "Distances" key_value block. Kept per-property rather
+ * than merged: the landmarks a guest cares about are the ones near the home
+ * they're actually looking at.
  */
-function collectDistances(
-  rows: { property_sections?: KeyValueSection[] | null }[],
-): LandingDistance[] {
-  const seen = new Map<string, string>();
+function readDistances(sections?: KeyValueSection[] | null): LandingDistance[] {
+  const out: LandingDistance[] = [];
 
-  for (const property of rows) {
-    for (const section of property.property_sections ?? []) {
-      if (section.type !== "key_value" || !section.visible) continue;
-      if (!/distance/i.test(section.title ?? "")) continue;
-      // Guest-only sections aren't public, so they don't belong here.
-      if (section.audience === "guest") continue;
+  for (const section of sections ?? []) {
+    if (section.type !== "key_value" || !section.visible) continue;
+    if (!/distance/i.test(section.title ?? "")) continue;
+    // Guest-only sections aren't public, so they don't belong here.
+    if (section.audience === "guest") continue;
 
-      const content = section.content as { rows?: { label?: string; value?: string }[] };
-      for (const row of content?.rows ?? []) {
-        const label = row.label?.trim();
-        const value = row.value?.trim();
-        if (!label || !value || seen.has(label.toLowerCase())) continue;
-        seen.set(label.toLowerCase(), value);
-      }
+    const content = section.content as { rows?: { label?: string; value?: string }[] };
+    for (const row of content?.rows ?? []) {
+      const label = row.label?.trim();
+      const value = row.value?.trim();
+      if (label && value) out.push({ label, value });
     }
   }
-
-  return [...seen.entries()].map(([key, value]) => ({
-    // Restore the original casing by finding it again — the map key is only
-    // lowercased for de-duplication.
-    label: key.replace(/\b\w/g, (c) => c.toUpperCase()),
-    value,
-  }));
+  return out;
 }
 
 /** The temple row, for the hero and FAQ. Matches the landmark by name rather

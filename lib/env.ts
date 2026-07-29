@@ -46,6 +46,18 @@ export const serverEnv = {
     }
     return required("ICAL_EXPORT_SECRET", process.env.ICAL_EXPORT_SECRET);
   },
+  /**
+   * Google Static Maps key for the landing-page map. Optional — without it
+   * the map strip falls back to a plain numbered list.
+   *
+   * This key ends up visible in the rendered <img> src, which is normal and
+   * unavoidable for Static Maps. Restrict it by HTTP referrer in the Google
+   * Cloud console; that, not secrecy, is what stops someone else billing you.
+   */
+  get googleMapsStaticKey(): string | null {
+    if (typeof window !== "undefined") return null;
+    return process.env.GOOGLE_MAPS_STATIC_KEY || null;
+  },
   /** Authorizes the scheduled calendar-sync route (pg_cron -> pg_net -> this route). */
   get cronSecret() {
     if (typeof window !== "undefined") {
