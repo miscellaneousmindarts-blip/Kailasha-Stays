@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { Metadata } from "next";
 
 import { Hero, isHeroVariant, type HeroVariant } from "@/components/landing/hero";
@@ -12,7 +13,10 @@ import { ServicesStrip, ShravanStrip } from "@/components/landing/strips";
 import { Faq } from "@/components/landing/faq";
 import { Close } from "@/components/landing/close";
 import { StickyBar } from "@/components/landing/sticky-bar";
+import { CustomSection } from "@/components/landing/custom-sections";
 import { getLandingData, templeDistance, travelTime, waContext } from "@/lib/landing";
+import { getHomepageLayout, copyFor } from "@/lib/homepage";
+import { isLayoutType } from "@/lib/homepage-blocks";
 import { buildFaq } from "@/lib/landing-faq";
 import { landingJsonLd } from "@/lib/landing-schema";
 import { publicEnv } from "@/lib/env";
@@ -52,7 +56,10 @@ export default async function Home(props: PageProps<"/">) {
   const srcParam = Array.isArray(params.src) ? params.src[0] : params.src;
   const variant: HeroVariant = isHeroVariant(srcParam) ? srcParam : "brand";
 
-  const { settings, properties, addons, primary } = await getLandingData();
+  const [{ settings, properties, addons, primary }, layout] = await Promise.all([
+    getLandingData(),
+    getHomepageLayout(),
+  ]);
   const year = new Date().getFullYear();
   const currency = properties[0]?.currency ?? "INR";
   // The hero's travel time and the FAQ's distance answer come from the same
@@ -78,6 +85,90 @@ export default async function Home(props: PageProps<"/">) {
     siteUrl: publicEnv.siteUrl,
   });
 
+  const rateOptions = properties
+    .filter((p) => p.ratePerNight !== null)
+    .map((p) => ({ rate: p.ratePerNight as number, sleeps: p.sleeps }));
+
+  /**
+   * Section order, visibility and copy now come from homepage_sections, so the
+   * owner can rearrange the page without a deploy. Each case reads its
+   * overrides through `copy`, which falls back to the registry default — the
+   * page renders identically to before until someone edits a field.
+   */
+  function builtin(key: string) {
+    const copy = copyFor(key, layout.overrides);
+    const image = (field: string) => layout.overrides[key]?.[field] ?? null;
+
+    switch (key) {
+      case "hero":
+        return (
+          <Hero
+            variant={variant}
+            whatsappHref={href("lp-hero")}
+            phone={settings.contact_phone}
+            shareSummary={shareSummary}
+            templeTime={travelTime(temple)}
+            copy={copy}
+            imageOverride={image("image")}
+          />
+        );
+      case "trust_ribbon":
+        return <TrustRibbon />;
+      case "map":
+        return <MapStrip property={primary} copy={copy} />;
+      case "homes":
+        return <HomesSection properties={properties} copy={copy} />;
+      case "why_apartment":
+        return (
+          <WhyApartment
+            options={rateOptions}
+            currency={currency}
+            shareSummary={shareSummary}
+            copy={copy}
+          />
+        );
+      case "meet_host":
+        return (
+          <MeetHost
+            videoCallHref={href(
+              "lp-videocall",
+              "Can you show me the flat on a video call?",
+            )}
+            phone={settings.contact_phone}
+            copy={copy}
+            imageOverride={image("image")}
+          />
+        );
+      case "nothing_hidden":
+        return <NothingHidden copy={copy} imageOverrides={layout.overrides[key] ?? {}} />;
+      case "proof":
+        return <Proof copy={copy} />;
+      case "services":
+        return <ServicesStrip addons={addons} currency={currency} copy={copy} />;
+      case "shravan":
+        return <ShravanStrip year={year} copy={copy} />;
+      case "faq":
+        // A resolved string: Faq is a client component, so the reader itself
+        // cannot be passed across the boundary.
+        return (
+          <Faq items={faq} whatsappHref={href("lp-faq")} heading={copy("heading")} />
+        );
+      case "close":
+        return (
+          <Close
+            properties={properties}
+            whatsappHref={href("lp-close")}
+            phone={settings.contact_phone}
+            address={settings.address}
+            shareSummary={shareSummary}
+            copy={copy}
+          />
+        );
+      default:
+        return null;
+    }
+  }
+
   return (
     <>
       <script
@@ -87,48 +178,20 @@ export default async function Home(props: PageProps<"/">) {
       />
 
       <main>
-        <Hero
-          variant={variant}
-          whatsappHref={href("lp-hero")}
-          phone={settings.contact_phone}
-          shareSummary={shareSummary}
-          templeTime={travelTime(temple)}
-        />
-        <TrustRibbon />
-        <MapStrip property={primary} />
-
-        <HomesSection properties={properties} />
-
-        <WhyApartment
-          options={properties
-            .filter((p) => p.ratePerNight !== null)
-            .map((p) => ({ rate: p.ratePerNight as number, sleeps: p.sleeps }))}
-          currency={currency}
-          shareSummary={shareSummary}
-        />
-
-        <MeetHost
-          videoCallHref={href(
-            "lp-videocall",
-            "Can you show me the flat on a video call?",
-          )}
-          phone={settings.contact_phone}
-        />
-
-        <NothingHidden />
-        <Proof />
-        <ServicesStrip addons={addons} currency={currency} />
-        <ShravanStrip year={year} />
-
-        <Faq items={faq} whatsappHref={href("lp-faq")} />
-
-        <Close
-          properties={properties}
-          whatsappHref={href("lp-close")}
-          phone={settings.contact_phone}
-          address={settings.address}
-          shareSummary={shareSummary}
-        />
+        {layout.order.map((section) =>
+          section.kind === "builtin" ? (
+            // Fragment, not a wrapper div: several of these sections are
+            // full-bleed and a stray element in between would give them
+            // something to be constrained by.
+            <Fragment key={section.id}>{builtin(section.key)}</Fragment>
+          ) : isLayoutType(section.type) ? (
+            <CustomSection
+              key={section.id}
+              type={section.type}
+              content={section.content}
+            />
+          ) : null,
+        )}
       </main>
 
       {wa ? (

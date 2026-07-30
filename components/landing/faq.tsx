@@ -93,15 +93,19 @@ function ComparisonTable() {
 export function Faq({
   items,
   whatsappHref,
+  heading,
 }: {
   items: FaqItem[];
   whatsappHref: string | null;
+  /* A resolved string, not the `copy` reader: this is a client component and a
+     function prop cannot cross the server boundary. */
+  heading: string;
 }) {
   return (
     <Section>
       <div className="mx-auto max-w-[760px]">
         <h2 className="mt-3 font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
-          The things families actually ask us
+          {heading}
         </h2>
 
         <div className="border-border mt-6 divide-y rounded-lg border">

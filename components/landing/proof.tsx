@@ -2,6 +2,7 @@ import { ArrowRight, Star } from "lucide-react";
 
 import { Section } from "@/components/landing/primitives";
 import { landingConfig } from "@/lib/landing-config";
+import type { Copy } from "@/lib/homepage";
 
 function Stars({ count }: { count: number }) {
   return (
@@ -23,7 +24,7 @@ function Stars({ count }: { count: number }) {
  * to 10 reviews, and a visibly low count converts worse than no count at all,
  * so an empty rung is dropped rather than padded.
  */
-export function Proof() {
+export function Proof({ copy }: { copy: Copy }) {
   const { proof, host } = landingConfig;
   const showRating = proof.googleRating !== null && proof.googleCount >= 10;
   const hasSummary =
@@ -35,9 +36,12 @@ export function Proof() {
   return (
     <Section>
       <h2 className="mt-3 max-w-2xl font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
-        {proof.familiesHosted && proof.yearStarted
-          ? `${proof.familiesHosted} families have stayed here since ${proof.yearStarted}.`
-          : "What families tell us afterwards."}
+        {copy(
+          "heading",
+          proof.familiesHosted && proof.yearStarted
+            ? `${proof.familiesHosted} families have stayed here since ${proof.yearStarted}.`
+            : "What families tell us afterwards.",
+        )}
       </h2>
 
       {hasSummary ? (

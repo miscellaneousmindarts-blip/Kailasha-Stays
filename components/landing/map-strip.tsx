@@ -5,6 +5,7 @@ import { landingConfig } from "@/lib/landing-config";
 import { serverEnv } from "@/lib/env";
 import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
 import type { LandingProperty } from "@/lib/landing";
+import type { Copy } from "@/lib/homepage";
 
 /**
  * Distance to landmark is the first specification a pilgrim checks, so this
@@ -90,7 +91,13 @@ function splitValue(value: string): { figure: string; mode: string | null } {
   return { figure: parts[0] ?? value, mode: parts[1] ?? null };
 }
 
-export function MapStrip({ property }: { property: LandingProperty | null }) {
+export function MapStrip({
+  property,
+  copy,
+}: {
+  property: LandingProperty | null;
+  copy: Copy;
+}) {
   if (!property) return null;
 
   const landmarks = property.distances.slice(0, landingConfig.map.maxPins);
@@ -157,11 +164,11 @@ export function MapStrip({ property }: { property: LandingProperty | null }) {
 
             <div className="absolute inset-x-0 bottom-0 p-5 md:p-6">
               <h2 className="font-display text-[26px] leading-[1.1] font-semibold text-white md:text-[34px]">
-                Where you&apos;ll be
+                {copy("heading")}
               </h2>
               <p className="mt-1.5 text-sm text-[rgba(255,255,255,0.82)]">
-                {property.city ? `${property.city} · ` : ""}every distance below
-                measured from our door
+                {property.city ? `${property.city} · ` : ""}
+                {copy("sub")}
               </p>
             </div>
 

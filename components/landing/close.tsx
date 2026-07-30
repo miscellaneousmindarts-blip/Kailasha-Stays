@@ -5,6 +5,7 @@ import { LandingPropertyCard } from "@/components/landing/property-card";
 import { PhoneLink, ShareButton, WhatsAppLink } from "@/components/landing/actions";
 import { landingConfig } from "@/lib/landing-config";
 import type { LandingProperty } from "@/lib/landing";
+import type { Copy } from "@/lib/homepage";
 
 /**
  * The person who reached the bottom is the highest-intent visitor on the
@@ -18,12 +19,14 @@ export function Close({
   phone,
   address,
   shareSummary,
+  copy,
 }: {
   properties: LandingProperty[];
   whatsappHref: string | null;
   phone: string | null;
   address: string | null;
   shareSummary: string;
+  copy: Copy;
 }) {
   const { links } = landingConfig;
 
@@ -34,14 +37,16 @@ export function Close({
           lang="hi"
           className="mt-3 text-[28px] leading-[1.35] font-semibold md:text-[38px]"
         >
-          अपना घर चुनिए।
+          {copy("headingHi")}
         </h2>
         <p className="text-text-muted mt-2 text-lg font-medium">
-          Pick your home. We&apos;ll do the rest.
+          {copy("heading", "Pick your home. We'll do the rest.")}
         </p>
         <p className="text-text-muted mx-auto mt-3 max-w-[560px]">
-          Every home has its own page with full photos, exact price and a direct
-          WhatsApp line to us.
+          {copy(
+            "body",
+            "Every home has its own page with full photos, exact price and a direct WhatsApp line to us.",
+          )}
         </p>
 
         <a

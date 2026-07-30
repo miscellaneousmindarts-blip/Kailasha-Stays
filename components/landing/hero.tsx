@@ -4,6 +4,7 @@ import { ArrowDown, Star } from "lucide-react";
 import { ShareButton, PhoneLink, WhatsAppLink } from "@/components/landing/actions";
 import { landingConfig } from "@/lib/landing-config";
 import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
+import type { Copy } from "@/lib/homepage";
 
 /**
  * Message match between the ad and the headline is a top-five CRO lever, so
@@ -51,6 +52,8 @@ export function Hero({
   phone,
   shareSummary,
   templeTime,
+  copy,
+  imageOverride,
 }: {
   variant: HeroVariant;
   whatsappHref: string | null;
@@ -58,10 +61,18 @@ export function Hero({
   shareSummary: string;
   /** From the property's own Distances section — never a second copy in config. */
   templeTime: string | null;
+  copy: Copy;
+  imageOverride: string | null;
 }) {
   const { images, proof, service } = landingConfig;
-  const copy = heroCopy(variant, new Date().getFullYear(), templeTime);
-  const src = imageUrl(images.hero.path);
+  const preset = heroCopy(variant, new Date().getFullYear(), templeTime);
+  // Ad traffic keeps its message-matched headline: overriding the H1 for a
+  // ?src= visitor would break the match the variant exists to create, which
+  // costs more than the owner's preferred wording gains.
+  const brand = variant === "brand";
+  const heading = brand ? copy("heading", preset.en) : preset.en;
+  const lede = brand ? copy("lede", preset.lede) : preset.lede;
+  const src = imageUrl(imageOverride ?? images.hero.path);
   // Under ten reviews the count itself is the problem — listings below that
   // convert at roughly half the rate of those with 10–20, so we lead with a
   // different proof entirely rather than a weak one.
@@ -97,20 +108,20 @@ export function Hero({
       <div className="container-page flex flex-col justify-center py-14 md:min-h-[88vh] md:py-24">
         <div className="max-w-[620px]">
           <p className="text-primary-tint text-xs font-semibold tracking-[0.14em] uppercase">
-            Deoghar · Jharkhand
+            {copy("eyebrow")}
           </p>
 
           <h1 className="mt-4 text-white">
             <span lang="hi" className="block text-[28px] leading-[1.35] font-normal md:text-[42px]">
-              आपके परिवार के लिए देवघर में एक अपना घर
+              {copy("headingHi")}
             </span>
             <span className="font-display mt-2 block text-[26px] leading-[1.1] font-semibold md:text-[42px]">
-              {copy.en}
+              {heading}
             </span>
           </h1>
 
           <p className="mt-5 max-w-[520px] text-[17px] leading-[1.6] text-[rgba(255,255,255,0.88)] md:text-[19px]">
-            {copy.lede}
+            {lede}
           </p>
 
           {/* Primary, and deliberately modest — the sticky bar carries the
@@ -119,8 +130,8 @@ export function Hero({
             href="#homes"
             className="bg-primary text-primary-foreground hover:bg-primary-hover pressable mt-7 inline-flex h-12 items-center gap-2 rounded-md px-6 font-medium"
           >
-            <span lang="hi">घर देखिए</span>
-            <span className="opacity-80">— View our homes</span>
+            <span lang="hi">{copy("ctaLabelHi")}</span>
+            <span className="opacity-80">— {copy("ctaLabel")}</span>
             <ArrowDown className="size-4" aria-hidden="true" />
           </a>
 

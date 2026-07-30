@@ -1,5 +1,6 @@
-import { ConfiguredImage } from "@/components/landing/primitives";
+import { ConfiguredImage, withOverride } from "@/components/landing/primitives";
 import { landingConfig } from "@/lib/landing-config";
+import type { Copy } from "@/lib/homepage";
 
 /*
  * PHOTOGRAPHY BRIEF (repeated in public/images/landing/README.md, where the
@@ -19,7 +20,14 @@ import { landingConfig } from "@/lib/landing-config";
  * photographs" is the one that gets to run full-bleed and let them fill the
  * screen.
  */
-export function NothingHidden() {
+export function NothingHidden({
+  copy,
+  imageOverrides,
+}: {
+  copy: Copy;
+  /** Keyed image1..image6, matching the six slots in the admin form. */
+  imageOverrides: Record<string, string>;
+}) {
   const { images } = landingConfig;
   const shots = [
     { image: images.bathroom, caption: "The bathroom, lights on" },
@@ -28,17 +36,22 @@ export function NothingHidden() {
     { image: images.entrance, caption: "Your own door, your own key" },
     { image: images.exterior, caption: "The building from the road" },
     { image: images.car, caption: "The car, and the driver" },
-  ];
+  ].map((shot, i) => ({
+    ...shot,
+    image: withOverride(shot.image, imageOverrides[`image${i + 1}`] ?? null),
+  }));
 
   return (
     <section className="bg-surface-subtle py-14 md:py-24">
       <div className="container-page">
         <h2 className="font-display max-w-2xl text-[26px] leading-[1.15] font-semibold md:text-[36px]">
-          We photograph the parts other listings don&apos;t.
+          {copy("heading")}
         </h2>
         <p className="text-text-muted mt-3 max-w-xl">
-          The bathroom. The water tank. Exactly what&apos;s on the counter. Look
-          properly before you book: what you see is what you get.
+          {copy(
+            "lede",
+            "The bathroom. The water tank. Exactly what's on the counter. Look properly before you book: what you see is what you get.",
+          )}
         </p>
       </div>
 

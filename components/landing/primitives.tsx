@@ -4,6 +4,16 @@ import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
 import type { LandingImage } from "@/lib/landing-config";
 
 /**
+ * Applies an admin's image override on top of a configured photo. An override
+ * is always a real photo the owner uploaded, so it clears `placeholder` — the
+ * "Sample photo" badge exists to mark stock imagery, and leaving it on a
+ * genuine photograph would undersell the one thing this page is selling.
+ */
+export function withOverride(image: LandingImage, path: string | null): LandingImage {
+  return path ? { ...image, path, placeholder: false } : image;
+}
+
+/**
  * Renders a configured photo, or — until the owner supplies one — a labelled
  * box describing the shot that belongs there. The placeholder deliberately
  * uses the same surface tint and radius as the real thing, so an unfinished
@@ -80,14 +90,20 @@ export function Section({
   children,
 }: {
   id?: string;
-  band?: "canvas" | "sand";
+  band?: "canvas" | "sand" | "ink";
   className?: string;
   children: React.ReactNode;
 }) {
+  const bands = {
+    canvas: "bg-background",
+    sand: "bg-surface-subtle",
+    ink: "bg-foreground text-background",
+  } as const;
+
   return (
     <section
       id={id}
-      className={`${band === "sand" ? "bg-surface-subtle" : "bg-background"} py-14 md:py-24 ${className ?? ""}`}
+      className={`${bands[band]} py-14 md:py-24 ${className ?? ""}`}
     >
       <div className="container-page">{children}</div>
     </section>

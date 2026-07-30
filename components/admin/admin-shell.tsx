@@ -8,6 +8,7 @@ import {
   Inbox,
   LayoutDashboard,
   LogOut,
+  Palette,
   Receipt,
   Settings,
 } from "lucide-react";
@@ -27,7 +28,11 @@ const NAV = [
 
 const MOBILE_NAV = NAV;
 const SETTINGS_ITEM = { href: "/admin/settings", label: "Settings", icon: Settings };
-const DESKTOP_NAV = [...NAV, SETTINGS_ITEM];
+// Homepage joins Settings outside the mobile tab bar for the same reason: the
+// bar is capped at 5 and Bookings/Enquiries are the tabs the owner opens daily.
+// Both are one tap away from the mobile header instead.
+const HOMEPAGE_ITEM = { href: "/admin/homepage", label: "Homepage", icon: Palette };
+const DESKTOP_NAV = [...NAV, HOMEPAGE_ITEM, SETTINGS_ITEM];
 
 function isActive(pathname: string, href: string) {
   return href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
@@ -86,6 +91,15 @@ export function AdminShell({
         <header className="border-border bg-background sticky top-0 z-30 flex h-14 items-center justify-between border-b px-4 lg:hidden">
           <p className="font-semibold">Admin</p>
           <div className="flex items-center">
+            <Link
+              href={HOMEPAGE_ITEM.href}
+              aria-label="Homepage"
+              className={`pressable flex size-11 items-center justify-center rounded-full ${
+                isActive(pathname, HOMEPAGE_ITEM.href) ? "text-primary" : ""
+              }`}
+            >
+              <Palette className="size-5" aria-hidden="true" />
+            </Link>
             <Link
               href={SETTINGS_ITEM.href}
               aria-label="Settings"

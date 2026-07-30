@@ -108,6 +108,27 @@ export type PropertySection = {
   sort_order: number;
 };
 
+/**
+ * One section of the homepage, in render order.
+ *
+ * `kind` distinguishes a section whose markup lives in components/landing/ —
+ * where `content` is a sparse map of admin overrides on top of the code
+ * defaults — from one the admin composed from a layout template, where
+ * `content` is the entire section.
+ */
+export type HomepageSection = {
+  id: string;
+  key: string;
+  kind: "builtin" | "custom";
+  type: string;
+  title: string | null;
+  content: unknown;
+  visible: boolean;
+  locked: boolean;
+  sort_order: number;
+  updated_at: string;
+};
+
 /** One shared catalog — which properties offer a given item lives in PropertyAddonService, not here. */
 export type AddonService = {
   id: string;
@@ -307,6 +328,7 @@ export type Database = {
         PropertySection,
         BelongsToProperty<"property_sections_property_id_fkey">
       >;
+      homepage_sections: Table<HomepageSection>;
       addon_services: Table<AddonService>;
       property_addon_services: Table<
         PropertyAddonService,

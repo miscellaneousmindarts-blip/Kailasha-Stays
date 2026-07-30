@@ -1,6 +1,7 @@
 import { Eyebrow, Section } from "@/components/landing/primitives";
 import { LandingPropertyCard } from "@/components/landing/property-card";
 import type { LandingProperty } from "@/lib/landing";
+import type { Copy } from "@/lib/homepage";
 
 /**
  * Position 2, deliberately. Browsing is a low-commitment action — it costs
@@ -8,7 +9,13 @@ import type { LandingProperty } from "@/lib/landing";
  * trust to earn. Everything below this section exists to convince the people
  * who *didn't* click here.
  */
-export function HomesSection({ properties }: { properties: LandingProperty[] }) {
+export function HomesSection({
+  properties,
+  copy,
+}: {
+  properties: LandingProperty[];
+  copy: Copy;
+}) {
   // Describe what's actually listed. "Each one a full 2BHK" was false the
   // moment a one-bedroom studio joined the page, and an overclaim here poisons
   // every honesty promise made further down.
@@ -24,15 +31,25 @@ export function HomesSection({ properties }: { properties: LandingProperty[] }) 
 
   return (
     <Section id="homes" band="sand">
-      <Eyebrow hi="हमारे घर" en="Our homes" />
+      <Eyebrow hi={copy("eyebrowHi")} en={copy("eyebrow")} />
+      {/* The default heading and lede count the homes and read their capacity
+          off the database, so they stay true as the portfolio changes. An
+          override trades that for the owner's own words. */}
       <h2 className="mt-3 max-w-2xl font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
-        {properties.length} {properties.length === 1 ? "home" : "homes"}.
-        {allTwoBed ? " Each one a full 2BHK, yours alone." : " Each one yours alone."}
+        {copy(
+          "heading",
+          `${properties.length} ${properties.length === 1 ? "home" : "homes"}.${
+            allTwoBed ? " Each one a full 2BHK, yours alone." : " Each one yours alone."
+          }`,
+        )}
       </h2>
       <p className="text-text-muted mt-3 max-w-xl">
-        A whole apartment to yourselves
-        {sleepsRange ? `, sleeping ${sleepsRange}` : ""} : not a hotel room, and not
-        shared with anyone.
+        {copy(
+          "lede",
+          `A whole apartment to yourselves${
+            sleepsRange ? `, sleeping ${sleepsRange}` : ""
+          } : not a hotel room, and not shared with anyone.`,
+        )}
       </p>
 
       <div className="mt-8 grid gap-5 md:grid-cols-2">

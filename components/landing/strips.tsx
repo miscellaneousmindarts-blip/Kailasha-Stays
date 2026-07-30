@@ -5,6 +5,7 @@ import { landingConfig } from "@/lib/landing-config";
 import { money } from "@/lib/format";
 import { imageUrl } from "@/lib/images";
 import type { LandingData } from "@/lib/landing";
+import type { Copy } from "@/lib/homepage";
 
 const SERVICE_ICONS = [Car, HandHeart, MapPinned];
 
@@ -20,9 +21,11 @@ const SERVICE_ICONS = [Car, HandHeart, MapPinned];
 export function ServicesStrip({
   addons,
   currency,
+  copy,
 }: {
   addons: LandingData["addons"];
   currency: string;
+  copy: Copy;
 }) {
   if (!addons.length) return null;
 
@@ -60,7 +63,7 @@ export function ServicesStrip({
           })}
         </ul>
         <p className="text-text-muted mt-4 text-center text-sm">
-          All arranged on the same WhatsApp thread as your stay.
+          {copy("note")}
         </p>
       </div>
     </div>
@@ -74,7 +77,7 @@ export function ServicesStrip({
  * market defined by dishonesty, faking scarcity would destroy the only asset
  * being built here.
  */
-export function ShravanStrip({ year }: { year: number }) {
+export function ShravanStrip({ year, copy }: { year: number; copy: Copy }) {
   const { shravan, pricing, images } = landingConfig;
   const heroSrc = imageUrl(images.hero.path);
   const showPill = shravan.freeUnits !== null && shravan.lastUpdated;
@@ -95,20 +98,18 @@ export function ShravanStrip({ year }: { year: number }) {
 
       <div className="container-page py-14 md:py-20">
         <p className="text-warning text-xs font-semibold tracking-[0.14em] uppercase">
-          Shravan · July–August
+          {copy("eyebrow")}
         </p>
         <h2 className="text-background mt-3 max-w-2xl font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
-          Shravani Mela — please book early.
+          {copy("heading")}
         </h2>
         <div className="mt-4 max-w-[640px] space-y-3 text-[rgba(253,251,247,0.82)]">
-          <p>
-            Deoghar receives over 40 lakh devotees through Shravan. Our homes
-            are usually full months ahead.
-          </p>
+          <p>{copy("body")}</p>
           <p className="font-medium text-[rgba(253,251,247,0.95)]">
-            Reserve with {pricing.advancePct}% advance, pay the balance on
-            arrival. Your written confirmation will be honoured. We do not
-            cancel on guests, at any price.
+            {copy(
+              "promise",
+              `Reserve with ${pricing.advancePct}% advance, pay the balance on arrival. Your written confirmation will be honoured. We do not cancel on guests, at any price.`,
+            )}
           </p>
         </div>
 
