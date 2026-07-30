@@ -3,6 +3,7 @@ import { ExternalLink, MapPin } from "lucide-react";
 
 import { landingConfig } from "@/lib/landing-config";
 import { serverEnv } from "@/lib/env";
+import { withOverride } from "@/components/landing/primitives";
 import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
 import type { LandingProperty } from "@/lib/landing";
 import type { Copy } from "@/lib/homepage";
@@ -94,9 +95,12 @@ function splitValue(value: string): { figure: string; mode: string | null } {
 export function MapStrip({
   property,
   copy,
+  imageOverrides,
 }: {
   property: LandingProperty | null;
   copy: Copy;
+  /** Keyed landmark1..landmark3, positional against the Distances rows. */
+  imageOverrides: Record<string, string>;
 }) {
   if (!property) return null;
 
@@ -185,44 +189,106 @@ export function MapStrip({
           {landmarks.map((l, i) => {
             const { figure, mode } = splitValue(l.value);
             // The first landmark is the temple. It carries the decision, so it
-            // gets the inverted tile instead of a third identical card.
+            // gets the wide tile rather than being the third identical card.
             const lead = i === 0;
+
+            // Positional, matching the numbered pins: landmark1 is the nearest
+            // row in the property's Distances section. An admin override wins
+            // over the configured photo.
+            const slot = `landmark${i + 1}`;
+            const configured = landingConfig.images[
+              slot as keyof typeof landingConfig.images
+            ];
+            const photo = withOverride(configured, imageOverrides[slot] ?? null);
+            const photoSrc = imageUrl(photo.path);
+
+            // With a photo the tile becomes image + scrim + white type. Without
+            // one it stays typographic, and the lead tile inverts so the grid
+            // still has a focal point.
+            const onDark = Boolean(photoSrc) || lead;
 
             return (
               <div
                 key={l.label}
-                className={`relative flex min-h-[136px] flex-col justify-end overflow-hidden rounded-xl border p-4 md:min-h-[158px] md:p-5 ${
-                  lead
+                className={`relative isolate flex min-h-[136px] flex-col justify-end overflow-hidden rounded-xl border p-4 md:min-h-[158px] md:p-5 ${
+                  photoSrc && photo.placeholder ? "pt-11 md:pt-12" : ""
+                } ${
+                  onDark
                     ? "border-foreground bg-foreground text-background"
                     : "border-border bg-surface-subtle"
                 } ${full && lead ? "col-span-2" : ""}`}
               >
-                {/* Ties the tile to its numbered pin on the map, and gives the
-                    flat surface some depth without an image. */}
+                {photoSrc ? (
+                  <>
+                    <Image
+                      src={photoSrc}
+                      alt={photo.alt}
+                      fill
+                      sizes={
+                        full && lead
+                          ? "(min-width: 768px) 50vw, 100vw"
+                          : "(min-width: 768px) 25vw, 50vw"
+                      }
+                      loading="lazy"
+                      placeholder="blur"
+                      blurDataURL={BLUR_DATA_URL}
+                      className="-z-10 object-cover"
+                    />
+                    {/* Two layers, not one. These tiles are far wider than they
+                        are tall, so a single bottom-up scrim dark enough for the
+                        figure swallows the whole photograph. Stacking a vertical
+                        and a horizontal gradient puts the darkness in the
+                        bottom-left corner where the type sits and leaves the
+                        top-right actually showing the place. */}
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 -z-10 block"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(to top, rgba(33,26,20,0.88) 0%, rgba(33,26,20,0.30) 68%, rgba(33,26,20,0.10) 100%)," +
+                          "linear-gradient(to right, rgba(33,26,20,0.72) 0%, rgba(33,26,20,0.12) 68%, rgba(33,26,20,0) 100%)",
+                      }}
+                    />
+                    {/* These tiles name real, identifiable places, so an
+                        unreplaced sample has to say so out loud. */}
+                    {photo.placeholder ? (
+                      <span className="bg-warning/95 text-warning-foreground absolute top-2 left-2 rounded-full px-2 py-0.5 text-[11px] font-medium">
+                        Sample photo
+                      </span>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {/* Ties the tile to its numbered pin on the map, and gives a
+                    photo-less tile some depth. */}
                 <span
                   aria-hidden="true"
                   className={`font-display pointer-events-none absolute -top-3 right-2 text-[86px] leading-none font-semibold md:text-[104px] ${
-                    lead ? "text-white/[0.10]" : "text-foreground/[0.07]"
+                    photoSrc
+                      ? "text-white/[0.16]"
+                      : lead
+                        ? "text-white/[0.10]"
+                        : "text-foreground/[0.07]"
                   }`}
                 >
                   {i + 1}
                 </span>
 
                 <h3
-                  className={`relative text-[15px] leading-snug font-medium ${lead ? "" : "text-foreground"}`}
+                  className={`relative text-[15px] leading-snug font-medium ${onDark ? "" : "text-foreground"}`}
                 >
                   {l.label}
                 </h3>
                 <p
                   className={`font-display tabular relative mt-1 text-[24px] leading-none font-semibold md:text-[30px] ${
-                    lead ? "text-primary-tint" : "text-foreground"
+                    onDark ? "text-primary-tint" : "text-foreground"
                   }`}
                 >
                   {figure}
                 </p>
                 {mode ? (
                   <p
-                    className={`relative mt-1.5 text-sm ${lead ? "text-[rgba(253,251,247,0.72)]" : "text-text-muted"}`}
+                    className={`relative mt-1.5 text-sm ${onDark ? "text-[rgba(253,251,247,0.78)]" : "text-text-muted"}`}
                   >
                     {mode}
                   </p>

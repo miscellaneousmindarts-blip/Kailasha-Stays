@@ -103,6 +103,13 @@ export const BUILTIN_SECTIONS: Record<string, BuiltinSection> = {
     fields: [
       t("heading", "Heading"),
       ta("sub", "Sub-line", "Appears over the map image."),
+      img(
+        "landmark1",
+        "Photo for landmark 1",
+        "Slots are positional — landmark 1 is the first row of the property's Distances section, not a named place. Reorder those rows and these photos stay where they are.",
+      ),
+      img("landmark2", "Photo for landmark 2"),
+      img("landmark3", "Photo for landmark 3"),
     ],
     defaults: {
       heading: "Where you'll be",

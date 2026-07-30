@@ -7,13 +7,18 @@ import type { AddonService, PropertyImage, SiteSettings } from "@/lib/types/data
 
 /**
  * Hard cap from the performance budget: 16 distinct images on the landing
- * page. Eight are fixed (hero, host, and the six "nothing hidden" shots), so
- * the property cards get whatever is left. The close section deliberately
- * re-renders the SAME urls as the Homes section, which costs nothing extra —
- * only distinct sources count against this.
+ * page. Eleven are fixed — hero, host, the six "nothing hidden" shots, and the
+ * three "Where you'll be" landmark tiles — so the property cards get whatever
+ * is left. The close section deliberately re-renders the SAME urls as the Homes
+ * section, and the map's fallback tile reuses the first home's cover, which
+ * costs nothing extra: only distinct sources count against this.
+ *
+ * Keep this in step with landingConfig.images. Adding a photo to a fixed
+ * section without raising this number silently pushes the page over budget,
+ * because the property cards are sized from whatever it says is left.
  */
 const MAX_LANDING_IMAGES = 16;
-const FIXED_IMAGE_COUNT = 8;
+const FIXED_IMAGE_COUNT = 11;
 const CLUSTER_SIZE = 3;
 
 export type LandingProperty = {

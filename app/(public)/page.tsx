@@ -115,7 +115,13 @@ export default async function Home(props: PageProps<"/">) {
       case "trust_ribbon":
         return <TrustRibbon />;
       case "map":
-        return <MapStrip property={primary} copy={copy} />;
+        return (
+          <MapStrip
+            property={primary}
+            copy={copy}
+            imageOverrides={layout.overrides[key] ?? {}}
+          />
+        );
       case "homes":
         return <HomesSection properties={properties} copy={copy} />;
       case "why_apartment":

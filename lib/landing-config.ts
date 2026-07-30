@@ -218,6 +218,36 @@ export const landingConfig = {
       brief: "The actual car, with the actual driver",
       alt: "Clean rental car with driver available for temple visits and airport pickup in Deoghar",
     },
+
+    /*
+     * The three "Where you'll be" tiles, in the order the property's Distances
+     * section lists them — landmark1 is the nearest. These are POSITIONAL, not
+     * matched by name: reorder the Distances rows and the photos stay put.
+     *
+     * These name real, identifiable places, which makes them the one set here
+     * where a convincing stock photo is worse than none. A South Indian gopuram
+     * under "Baidyanath Dham" reads as the temple the guest is travelling to and
+     * isn't. Shoot these three yourself — they are a short walk away — or set
+     * `path: null` and the tile falls back to type on a plain surface.
+     */
+    landmark1: {
+      path: "/images/landing/landmark1.jpg",
+      placeholder: true,
+      brief: "Baba Baidyanath Dham itself — the shikhar, from the approach the guest will walk",
+      alt: "Baba Baidyanath Dham temple in Deoghar",
+    },
+    landmark2: {
+      path: "/images/landing/landmark2.jpg",
+      placeholder: true,
+      brief: "The second landmark in your Distances list, photographed from the street",
+      alt: "Satsang Ashram in Deoghar",
+    },
+    landmark3: {
+      path: "/images/landing/landmark3.jpg",
+      placeholder: true,
+      brief: "The third landmark — for a station, the entrance with its name board",
+      alt: "Jasidih railway station platform",
+    },
   } satisfies Record<string, LandingImage>,
 } as const;
 
