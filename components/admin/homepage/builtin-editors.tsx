@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 
+import { Check, Loader2 } from "lucide-react";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SaveBar } from "@/components/admin/save-bar";
 import { MediaPicker } from "@/components/admin/homepage/media-picker";
 import { RepeatableList } from "@/components/admin/homepage/repeatable-list";
+import { useMediaLibrary } from "@/components/admin/homepage/media-library-context";
 import { builtinSchemas, type BuiltinContent, type BuiltinKey } from "@/lib/homepage-blocks";
 
 /**
@@ -419,6 +422,74 @@ export function MeetHostEditor({ content, onSave, pending, error, saved }: Edito
   );
 }
 
+/**
+ * A photo's caption is its title on the shared media-library row, not
+ * something the "nothing hidden" section owns — so editing it here writes
+ * straight to the library (same as the Photos tab's own card) rather than
+ * going through this form's own Save button. That keeps a title one fact in
+ * one place: renaming a photo here also renames it everywhere else it's
+ * used, instead of drifting into a per-section copy.
+ */
+function PhotoCaptionField({ imageId }: { imageId: string }) {
+  const { pool, updateMeta } = useMediaLibrary();
+  const image = pool.find((img) => img.id === imageId);
+  const [caption, setCaption] = useState(image?.title ?? "");
+  const [pending, setPending] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!image) return null;
+  const dirty = caption !== (image.title ?? "");
+
+  async function save() {
+    setPending(true);
+    setError(null);
+    const result = await updateMeta(image!.id, caption, image!.alt ?? "");
+    setPending(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1500);
+  }
+
+  return (
+    <div className="space-y-1">
+      <Label htmlFor={`caption-${imageId}`} className="text-xs">
+        Caption (shown under this photo)
+      </Label>
+      <div className="flex gap-2">
+        <Input
+          id={`caption-${imageId}`}
+          value={caption}
+          onChange={(e) => setCaption(e.target.value)}
+          placeholder="The bathroom, lights on"
+          className="h-9 text-sm"
+        />
+        <button
+          type="button"
+          onClick={save}
+          disabled={!dirty || pending}
+          className="border-border hover:bg-surface-subtle pressable flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium disabled:opacity-40"
+        >
+          {pending ? (
+            <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+          ) : saved ? (
+            <Check className="size-3" aria-hidden="true" />
+          ) : null}
+          {saved ? "Saved" : "Save"}
+        </button>
+      </div>
+      {error ? (
+        <p role="alert" className="text-danger text-xs">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------- nothing hidden */
 
 export function NothingHiddenEditor({ content, onSave, pending, error, saved }: EditorProps<"nothing_hidden">) {
@@ -448,8 +519,7 @@ export function NothingHiddenEditor({ content, onSave, pending, error, saved }: 
       <div>
         <p className="mb-2 text-sm font-medium">Photos — as many as you want</p>
         <p className="text-text-muted mb-2 text-xs">
-          The first photo runs larger than the rest. A photo&apos;s caption is its title, set in the media library.
-          The whole section hides itself if every photo here is removed.
+          The first photo runs larger than the rest. The whole section hides itself if every photo here is removed.
         </p>
         <RepeatableList
           items={photos}
@@ -458,11 +528,14 @@ export function NothingHiddenEditor({ content, onSave, pending, error, saved }: 
           addLabel="Add photo"
           itemLabel="photo"
           renderItem={(item, i, patch) => (
-            <MediaPicker
-              value={item.imageId || null}
-              onChange={(id) => patch({ imageId: id ?? "" })}
-              label={`Photo ${i + 1}`}
-            />
+            <div className="space-y-3">
+              <MediaPicker
+                value={item.imageId || null}
+                onChange={(id) => patch({ imageId: id ?? "" })}
+                label={`Photo ${i + 1}`}
+              />
+              {item.imageId ? <PhotoCaptionField imageId={item.imageId} /> : null}
+            </div>
           )}
         />
       </div>
