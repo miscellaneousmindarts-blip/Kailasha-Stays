@@ -7,19 +7,24 @@ import type { AddonService, PropertyImage, SiteSettings } from "@/lib/types/data
 
 /**
  * Hard cap from the performance budget: 16 distinct images on the landing
- * page. Eleven are fixed — hero, host, the six "nothing hidden" shots, and the
- * three "Where you'll be" landmark tiles — so the property cards get whatever
- * is left. The close section deliberately re-renders the SAME urls as the Homes
+ * page. The property cards get whatever is left after the homepage's own
+ * builtin sections (hero, host, map landmarks, the "nothing hidden" grid,
+ * review photos) — which is no longer a fixed constant now that every one of
+ * those is admin-editable and the photo grid takes an unbounded number of
+ * photos. getHomepageContent() counts the images it actually resolved and
+ * that count is what finalizePropertyImages() below is budgeted against.
+ *
+ * The close section deliberately re-renders the SAME urls as the Homes
  * section, and the map's fallback tile reuses the first home's cover, which
  * costs nothing extra: only distinct sources count against this.
- *
- * Keep this in step with landingConfig.images. Adding a photo to a fixed
- * section without raising this number silently pushes the page over budget,
- * because the property cards are sized from whatever it says is left.
  */
 const MAX_LANDING_IMAGES = 16;
-const FIXED_IMAGE_COUNT = 11;
 const CLUSTER_SIZE = 3;
+
+/** A property with its full, unsliced image list — before the page's shared image budget is applied. */
+type RawLandingProperty = Omit<LandingProperty, "images"> & {
+  images: Pick<PropertyImage, "storage_path" | "alt" | "tag">[];
+};
 
 export type LandingProperty = {
   id: string;
@@ -45,9 +50,10 @@ export type LandingProperty = {
 
 export type LandingDistance = { label: string; value: string };
 
-export type LandingData = {
+export type LandingBase = {
   settings: SiteSettings;
-  properties: LandingProperty[];
+  /** Full, unsliced image lists — call finalizePropertyImages() once the homepage's own image count is known. */
+  properties: RawLandingProperty[];
   addons: Pick<AddonService, "id" | "name" | "description" | "price" | "price_unit">[];
   /**
    * The home the page's location story is told around — its map, its
@@ -56,6 +62,13 @@ export type LandingData = {
    * merging landmarks across cities produced a strip that mixed Baidyanath
    * Dham with Vrindavan temples.
    */
+  primary: RawLandingProperty | null;
+};
+
+export type LandingData = {
+  settings: SiteSettings;
+  properties: LandingProperty[];
+  addons: Pick<AddonService, "id" | "name" | "description" | "price" | "price_unit">[];
   primary: LandingProperty | null;
 };
 
@@ -66,8 +79,8 @@ export type LandingData = {
  * the budget. With one or two homes — the realistic case — every card gets
  * its full cluster.
  */
-function allocateImageBudget(propertyCount: number): number[] {
-  let remaining = MAX_LANDING_IMAGES - FIXED_IMAGE_COUNT;
+function allocateImageBudget(propertyCount: number, fixedImageCount: number): number[] {
+  let remaining = MAX_LANDING_IMAGES - fixedImageCount;
   const allocation: number[] = [];
 
   for (let i = 0; i < propertyCount; i++) {
@@ -81,7 +94,13 @@ function allocateImageBudget(propertyCount: number): number[] {
   return allocation;
 }
 
-export async function getLandingData(): Promise<LandingData> {
+/**
+ * Phase 1: everything the homepage content resolver needs (settings,
+ * properties with distances, the anchor property) BEFORE the shared 16-image
+ * budget can be split — that split depends on how many images the homepage's
+ * own admin-edited sections used, which isn't known until they're resolved.
+ */
+export async function getLandingBase(): Promise<LandingBase> {
   const supabase = createPublicClient();
 
   const [settings, propertiesResult, addonsResult] = await Promise.all([
@@ -102,15 +121,11 @@ export async function getLandingData(): Promise<LandingData> {
   ]);
 
   const rows = propertiesResult.data ?? [];
-  const budget = allocateImageBudget(rows.length);
 
-  const properties: LandingProperty[] = rows.map((p, i) => {
+  const properties: RawLandingProperty[] = rows.map((p) => {
     const extras = landingConfig.propertyExtras[p.slug] ?? {};
     const images = [...(p.property_images ?? [])]
-      .sort(
-        (a, b) => Number(b.is_cover) - Number(a.is_cover) || a.sort_order - b.sort_order,
-      )
-      .slice(0, budget[i])
+      .sort((a, b) => Number(b.is_cover) - Number(a.is_cover) || a.sort_order - b.sort_order)
       .map(({ storage_path, alt, tag }) => ({ storage_path, alt, tag }));
 
     return {
@@ -146,6 +161,23 @@ export async function getLandingData(): Promise<LandingData> {
     addons: addonsResult.data ?? [],
     primary,
   };
+}
+
+/**
+ * Phase 2: slice every property's image list down to its share of what's left
+ * of the 16-image budget after `fixedImageCount` homepage-library images.
+ */
+export function finalizePropertyImages(base: LandingBase, fixedImageCount: number): LandingData {
+  const budget = allocateImageBudget(base.properties.length, fixedImageCount);
+
+  const properties: LandingProperty[] = base.properties.map((p, i) => ({
+    ...p,
+    images: p.images.slice(0, budget[i]),
+  }));
+
+  const primary = base.primary ? (properties.find((p) => p.id === base.primary!.id) ?? null) : null;
+
+  return { settings: base.settings, properties, addons: base.addons, primary };
 }
 
 type KeyValueSection = {

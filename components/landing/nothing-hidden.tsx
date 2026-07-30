@@ -1,17 +1,5 @@
-import { ConfiguredImage, withOverride } from "@/components/landing/primitives";
-import { landingConfig } from "@/lib/landing-config";
-import type { Copy } from "@/lib/homepage";
-
-/*
- * PHOTOGRAPHY BRIEF (repeated in public/images/landing/README.md, where the
- * files live): daylight only, no filters that alter wall colour, no
- * wide-angle distortion, no stock imagery, and never publish a photo more
- * flattering than the room actually is.
- *
- * Priority: bathroom → kitchen counter → living room with people → made
- * bedroom → entrance and lock → exterior with signage → car with driver →
- * water tank and inverter.
- */
+import { Photo } from "@/components/landing/primitives";
+import type { ResolvedNothingHidden } from "@/lib/homepage";
 
 /**
  * The one section that breaks the page grid. Everything else on this page sits
@@ -19,61 +7,47 @@ import type { Copy } from "@/lib/homepage";
  * machine-assembled — so the section whose entire argument is "look at the
  * photographs" is the one that gets to run full-bleed and let them fill the
  * screen.
+ *
+ * The photo count is unbounded — the admin can upload as many as they want —
+ * so the grid has to work for any N, not just the original fixed six.
+ * resolveNothingHidden() in lib/homepage.ts already hides the whole section
+ * when zero photos resolve, so `resolved === null` is the only gate here.
  */
-export function NothingHidden({
-  copy,
-  imageOverrides,
-}: {
-  copy: Copy;
-  /** Keyed image1..image6, matching the six slots in the admin form. */
-  imageOverrides: Record<string, string>;
-}) {
-  const { images } = landingConfig;
-  const shots = [
-    { image: images.bathroom, caption: "The bathroom, lights on" },
-    { image: images.kitchen, caption: "The induction hob and water" },
-    { image: images.utilities, caption: "Water tank and inverter" },
-    { image: images.entrance, caption: "Your own door, your own key" },
-    { image: images.exterior, caption: "The building from the road" },
-    { image: images.car, caption: "The car, and the driver" },
-  ].map((shot, i) => ({
-    ...shot,
-    image: withOverride(shot.image, imageOverrides[`image${i + 1}`] ?? null),
-  }));
+export function NothingHidden({ resolved }: { resolved: ResolvedNothingHidden | null }) {
+  if (!resolved) return null;
 
   return (
     <section className="bg-surface-subtle py-14 md:py-24">
       <div className="container-page">
         <h2 className="font-display max-w-2xl text-[26px] leading-[1.15] font-semibold md:text-[36px]">
-          {copy("heading")}
+          {resolved.heading}
         </h2>
-        <p className="text-text-muted mt-3 max-w-xl">
-          {copy(
-            "lede",
-            "The bathroom. The water tank. Exactly what's on the counter. Look properly before you book: what you see is what you get.",
-          )}
-        </p>
+        {resolved.lede ? (
+          <p className="text-text-muted mt-3 max-w-xl">{resolved.lede}</p>
+        ) : null}
       </div>
 
       {/* Full-bleed, edge to edge — the only place on the page that escapes
           the container. */}
       <ul className="mt-8 grid grid-cols-2 gap-1 md:mt-12 md:grid-cols-3">
-        {shots.map(({ image, caption }, i) => (
-          <li key={caption} className="relative">
-            <ConfiguredImage
+        {resolved.photos.map(({ image }, i) => (
+          <li key={i} className="relative">
+            <Photo
               image={image}
               aspect={i === 0 ? "aspect-square md:aspect-[3/2]" : "aspect-square"}
               sizes="(max-width: 768px) 50vw, 33vw"
               rounded={false}
             />
-            <p className="text-text-muted px-3 py-2 text-sm">{caption}</p>
+            {image.title ? (
+              <p className="text-text-muted px-3 py-2 text-sm">{image.title}</p>
+            ) : null}
           </li>
         ))}
       </ul>
 
       <div className="container-page mt-10">
         <p className="text-text-muted text-sm">
-          Full photo sets are on each home&apos;s page.{" "}
+          {resolved.footNote}{" "}
           <a
             href="#homes"
             className="text-primary font-medium underline-offset-2 hover:underline"

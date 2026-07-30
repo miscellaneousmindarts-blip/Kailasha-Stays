@@ -3,10 +3,9 @@ import { ExternalLink, MapPin } from "lucide-react";
 
 import { landingConfig } from "@/lib/landing-config";
 import { serverEnv } from "@/lib/env";
-import { withOverride } from "@/components/landing/primitives";
 import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
 import type { LandingProperty } from "@/lib/landing";
-import type { Copy } from "@/lib/homepage";
+import type { ResolvedMap } from "@/lib/homepage";
 
 /**
  * Distance to landmark is the first specification a pilgrim checks, so this
@@ -15,8 +14,8 @@ import type { Copy } from "@/lib/homepage";
  * Laid out as a bento: one large anchor tile carrying the map and the heading,
  * then the landmarks as their own tiles. The asymmetry is doing real work — the
  * first landmark is the temple, which is the entire reason the family is
- * searching, so it gets the one dark tile on the page's light band and reads
- * first. The remaining two recede.
+ * searching, so it gets the wide tile and reads first. The remaining two
+ * recede.
  *
  * A STATIC map image, not an embedded interactive one, for three reasons
  * that all matter more on a phone on mobile data than the interactivity
@@ -94,13 +93,10 @@ function splitValue(value: string): { figure: string; mode: string | null } {
 
 export function MapStrip({
   property,
-  copy,
-  imageOverrides,
+  resolved,
 }: {
   property: LandingProperty | null;
-  copy: Copy;
-  /** Keyed landmark1..landmark3, positional against the Distances rows. */
-  imageOverrides: Record<string, string>;
+  resolved: ResolvedMap;
 }) {
   if (!property) return null;
 
@@ -135,7 +131,8 @@ export function MapStrip({
             aria-label={`Open ${property.title} in Google Maps`}
           >
             {mapUrl ? (
-              <>{/* Plain <img>: an external, already-optimised PNG, so
+              <>
+                {/* Plain <img>: an external, already-optimised PNG, so
                     next/image would proxy it for no benefit. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -168,12 +165,14 @@ export function MapStrip({
 
             <div className="absolute inset-x-0 bottom-0 p-5 md:p-6">
               <h2 className="font-display text-[26px] leading-[1.1] font-semibold text-white md:text-[34px]">
-                {copy("heading")}
+                {resolved.heading}
               </h2>
-              <p className="mt-1.5 text-sm text-[rgba(255,255,255,0.82)]">
-                {property.city ? `${property.city} · ` : ""}
-                {copy("sub")}
-              </p>
+              {resolved.sub ? (
+                <p className="mt-1.5 text-sm text-[rgba(255,255,255,0.82)]">
+                  {property.city ? `${property.city} · ` : ""}
+                  {resolved.sub}
+                </p>
+              ) : null}
             </div>
 
             <span className="bg-surface/95 text-foreground shadow-card absolute top-4 right-4 flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium backdrop-blur-sm">
@@ -191,37 +190,28 @@ export function MapStrip({
             // The first landmark is the temple. It carries the decision, so it
             // gets the wide tile rather than being the third identical card.
             const lead = i === 0;
-
-            // Positional, matching the numbered pins: landmark1 is the nearest
-            // row in the property's Distances section. An admin override wins
-            // over the configured photo.
-            const slot = `landmark${i + 1}`;
-            const configured = landingConfig.images[
-              slot as keyof typeof landingConfig.images
-            ];
-            const photo = withOverride(configured, imageOverrides[slot] ?? null);
-            const photoSrc = imageUrl(photo.path);
+            const photo = resolved.landmarkImages[i] ?? null;
 
             // With a photo the tile becomes image + scrim + white type. Without
             // one it stays typographic, and the lead tile inverts so the grid
             // still has a focal point.
-            const onDark = Boolean(photoSrc) || lead;
+            const onDark = Boolean(photo) || lead;
 
             return (
               <div
                 key={l.label}
                 className={`relative isolate flex min-h-[136px] flex-col justify-end overflow-hidden rounded-xl border p-4 md:min-h-[158px] md:p-5 ${
-                  photoSrc && photo.placeholder ? "pt-11 md:pt-12" : ""
+                  photo?.isPlaceholder ? "pt-11 md:pt-12" : ""
                 } ${
                   onDark
                     ? "border-foreground bg-foreground text-background"
                     : "border-border bg-surface-subtle"
                 } ${full && lead ? "col-span-2" : ""}`}
               >
-                {photoSrc ? (
+                {photo ? (
                   <>
                     <Image
-                      src={photoSrc}
+                      src={photo.url}
                       alt={photo.alt}
                       fill
                       sizes={
@@ -251,7 +241,7 @@ export function MapStrip({
                     />
                     {/* These tiles name real, identifiable places, so an
                         unreplaced sample has to say so out loud. */}
-                    {photo.placeholder ? (
+                    {photo.isPlaceholder ? (
                       <span className="bg-warning/95 text-warning-foreground absolute top-2 left-2 rounded-full px-2 py-0.5 text-[11px] font-medium">
                         Sample photo
                       </span>
@@ -264,7 +254,7 @@ export function MapStrip({
                 <span
                   aria-hidden="true"
                   className={`font-display pointer-events-none absolute -top-3 right-2 text-[86px] leading-none font-semibold md:text-[104px] ${
-                    photoSrc
+                    photo
                       ? "text-white/[0.16]"
                       : lead
                         ? "text-white/[0.10]"

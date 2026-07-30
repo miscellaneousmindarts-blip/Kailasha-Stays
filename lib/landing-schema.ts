@@ -1,7 +1,5 @@
-import { landingConfig } from "@/lib/landing-config";
-import { imageUrl } from "@/lib/images";
 import type { LandingProperty } from "@/lib/landing";
-import type { FaqItem } from "@/lib/landing-faq";
+import type { ResolvedFaqItem, ResolvedImage } from "@/lib/homepage";
 import type { SiteSettings } from "@/lib/types/database";
 
 /**
@@ -17,24 +15,29 @@ export function landingJsonLd({
   properties,
   faq,
   siteUrl,
+  heroImage,
+  googleRating,
+  googleCount,
+  reviewsDisplayed,
 }: {
   settings: SiteSettings;
   properties: LandingProperty[];
-  faq: FaqItem[];
+  faq: ResolvedFaqItem[];
   siteUrl: string;
+  heroImage: ResolvedImage | null;
+  googleRating: number | null;
+  googleCount: number;
+  /** How many reviews are actually shown on the page — an unbacked rating is not claimed. */
+  reviewsDisplayed: number;
 }) {
-  const { proof, links } = landingConfig;
-  const heroImage = imageUrl(landingConfig.images.hero.path);
-
-  const canShowRating =
-    proof.googleRating !== null && proof.reviews.length > 0 && proof.googleCount > 0;
+  const canShowRating = googleRating !== null && reviewsDisplayed > 0 && googleCount > 0;
 
   const lodging: Record<string, unknown> = {
     "@type": "LodgingBusiness",
     "@id": `${siteUrl}/#business`,
     name: settings.business_name,
     url: siteUrl,
-    ...(heroImage ? { image: heroImage } : {}),
+    ...(heroImage ? { image: heroImage.url } : {}),
     ...(settings.contact_phone ? { telephone: settings.contact_phone } : {}),
     priceRange: "₹₹",
     checkinTime: settings.default_check_in_time,
@@ -46,9 +49,12 @@ export function landingJsonLd({
       addressRegion: "Jharkhand",
       addressCountry: "IN",
     },
-    ...(links.mapsUrl ? { hasMap: links.mapsUrl } : {}),
+    ...(settings.maps_url ? { hasMap: settings.maps_url } : {}),
     amenityFeature: [
-      "Kitchen",
+      // Not "Kitchen" — there is no full kitchen, only an induction hob, and
+      // the FAQ says so explicitly. Structured data claiming otherwise would
+      // contradict the page's own honesty rules.
+      "Induction hob",
       "Air conditioning",
       "Hot water 24x7",
       "Power backup",
@@ -59,8 +65,8 @@ export function landingJsonLd({
       ? {
           aggregateRating: {
             "@type": "AggregateRating",
-            ratingValue: proof.googleRating,
-            reviewCount: proof.googleCount,
+            ratingValue: googleRating,
+            reviewCount: googleCount,
           },
         }
       : {}),
@@ -90,9 +96,9 @@ export function landingJsonLd({
     "@id": `${siteUrl}/#organization`,
     name: settings.business_name,
     url: siteUrl,
-    ...(heroImage ? { logo: heroImage } : {}),
-    ...(links.instagram || links.facebook
-      ? { sameAs: [links.instagram, links.facebook].filter(Boolean) }
+    ...(heroImage ? { logo: heroImage.url } : {}),
+    ...(settings.instagram_url || settings.facebook_url
+      ? { sameAs: [settings.instagram_url, settings.facebook_url].filter(Boolean) }
       : {}),
   };
 

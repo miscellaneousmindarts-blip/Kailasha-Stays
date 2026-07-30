@@ -2,23 +2,26 @@ import Image from "next/image";
 import { ArrowRight, Check } from "lucide-react";
 
 import { Section } from "@/components/landing/primitives";
-import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
+import { BLUR_DATA_URL } from "@/lib/images";
 import { layoutSchemas, type LayoutType } from "@/lib/homepage-blocks";
+import { resolveHomepageImage, type ResolvedImage } from "@/lib/homepage";
+import type { HomepageImage } from "@/lib/types/database";
 
 /**
  * Renderers for admin-composed sections.
  *
- * Content arrives already validated by getHomepageLayout, but each renderer
+ * Content arrives already validated by getHomepageContent, but each renderer
  * parses again so it can work from typed data instead of `unknown` casts. A
  * second parse of a small object is free next to the network round-trips this
- * page already makes.
+ * page already makes. Image ids are resolved here, at render time, against
+ * the shared media-library map rather than upstream — five different content
+ * shapes with images nested at different depths made a generic per-type
+ * resolver simpler than five bespoke ones.
  *
  * These stay inside the page's existing type scale and token set on purpose.
  * An admin adding a section should get something that looks like it belongs,
  * not a visitor from a different design system.
  */
-
-type ImageRef = { storage_path: string; alt?: string | null } | null | undefined;
 
 function Figure({
   image,
@@ -26,17 +29,16 @@ function Figure({
   sizes,
   priority = false,
 }: {
-  image: ImageRef;
+  image: ResolvedImage | null;
   className?: string;
   sizes: string;
   priority?: boolean;
 }) {
-  const src = imageUrl(image?.storage_path ?? null);
-  if (!src) return null;
+  if (!image) return null;
   return (
     <Image
-      src={src}
-      alt={image?.alt ?? ""}
+      src={image.url}
+      alt={image.alt}
       fill
       sizes={sizes}
       loading={priority ? undefined : "lazy"}
@@ -69,16 +71,16 @@ function Prose({ text, tone = "muted" }: { text?: string | null; tone?: "muted" 
   );
 }
 
-function SplitSection({ content }: { content: unknown }) {
+function SplitSection({ content, images }: { content: unknown; images: Map<string, HomepageImage> }) {
   const parsed = layoutSchemas.split.safeParse(content);
   if (!parsed.success) return null;
-  const { band, heading, body, bullets, image, imageSide } = parsed.data;
-  const hasImage = Boolean(imageUrl(image?.storage_path ?? null));
+  const { band, heading, body, bullets, imageId, imageSide } = parsed.data;
+  const image = resolveHomepageImage(imageId, images);
 
   return (
     <Section band={band}>
-      <div className={`grid items-center gap-8 ${hasImage ? "md:grid-cols-2 md:gap-12" : ""}`}>
-        {hasImage ? (
+      <div className={`grid items-center gap-8 ${image ? "md:grid-cols-2 md:gap-12" : ""}`}>
+        {image ? (
           <div
             className={`bg-surface-subtle relative aspect-[4/3] overflow-hidden rounded-xl ${
               imageSide === "right" ? "md:order-2" : ""
@@ -88,7 +90,7 @@ function SplitSection({ content }: { content: unknown }) {
           </div>
         ) : null}
 
-        <div className={hasImage ? "" : "max-w-2xl"}>
+        <div className={image ? "" : "max-w-2xl"}>
           <h2 className="font-display text-[26px] leading-[1.15] font-semibold md:text-[34px]">
             {heading}
           </h2>
@@ -110,18 +112,15 @@ function SplitSection({ content }: { content: unknown }) {
   );
 }
 
-function FeatureBandSection({ content }: { content: unknown }) {
+function FeatureBandSection({ content, images }: { content: unknown; images: Map<string, HomepageImage> }) {
   const parsed = layoutSchemas.feature_band.safeParse(content);
   if (!parsed.success) return null;
-  const { heading, body, image, ctaLabel, ctaHref } = parsed.data;
+  const { heading, body, imageId, ctaLabel, ctaHref } = parsed.data;
+  const image = resolveHomepageImage(imageId, images);
 
   return (
     <section className="bg-foreground relative isolate overflow-hidden">
-      <Figure
-        image={image}
-        sizes="100vw"
-        className="-z-10 opacity-[0.42]"
-      />
+      <Figure image={image} sizes="100vw" className="-z-10 opacity-[0.42]" />
       {/* Fixed scrim regardless of the photo, so the copy's contrast never
           depends on which image the admin picked. */}
       <span
@@ -149,7 +148,7 @@ function FeatureBandSection({ content }: { content: unknown }) {
   );
 }
 
-function BentoSection({ content }: { content: unknown }) {
+function BentoSection({ content, images }: { content: unknown; images: Map<string, HomepageImage> }) {
   const parsed = layoutSchemas.bento.safeParse(content);
   if (!parsed.success) return null;
   const { band, heading, tiles } = parsed.data;
@@ -164,8 +163,8 @@ function BentoSection({ content }: { content: unknown }) {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {tiles.map((tile, i) => {
-          const hasImage = Boolean(imageUrl(tile.image?.storage_path ?? null));
-          const dark = tile.tone === "dark" || hasImage;
+          const image = resolveHomepageImage(tile.imageId, images);
+          const dark = tile.tone === "dark" || Boolean(image);
 
           return (
             <div
@@ -178,9 +177,9 @@ function BentoSection({ content }: { content: unknown }) {
                   : "border-border bg-surface-subtle"
               }`}
             >
-              {hasImage ? (
+              {image ? (
                 <>
-                  <Figure image={tile.image} sizes="(min-width: 768px) 50vw, 100vw" className="-z-10" />
+                  <Figure image={image} sizes="(min-width: 768px) 50vw, 100vw" className="-z-10" />
                   <span
                     aria-hidden="true"
                     className="absolute inset-0 -z-10 block bg-[linear-gradient(to_top,rgba(33,26,20,0.90)_0%,rgba(33,26,20,0.45)_60%,rgba(33,26,20,0.15)_100%)]"
@@ -267,17 +266,19 @@ function QuoteSection({ content }: { content: unknown }) {
 export function CustomSection({
   type,
   content,
+  images,
 }: {
   type: LayoutType;
   content: unknown;
+  images: Map<string, HomepageImage>;
 }) {
   switch (type) {
     case "split":
-      return <SplitSection content={content} />;
+      return <SplitSection content={content} images={images} />;
     case "feature_band":
-      return <FeatureBandSection content={content} />;
+      return <FeatureBandSection content={content} images={images} />;
     case "bento":
-      return <BentoSection content={content} />;
+      return <BentoSection content={content} images={images} />;
     case "stat_row":
       return <StatRowSection content={content} />;
     case "quote":

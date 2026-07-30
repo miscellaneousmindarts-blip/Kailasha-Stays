@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { ArrowDown, MessageCircle, Phone } from "lucide-react";
 
-import { landingConfig } from "@/lib/landing-config";
 import { track } from "@/lib/track";
 
 /**
@@ -20,9 +19,17 @@ import { track } from "@/lib/track";
 export function StickyBar({
   whatsappHref,
   phone,
+  replyMinutes,
+  hoursStart,
+  hoursStartHour,
+  hoursEndHour,
 }: {
   whatsappHref: string;
   phone: string | null;
+  replyMinutes: number;
+  hoursStart: string;
+  hoursStartHour: number;
+  hoursEndHour: number;
 }) {
   const [visible, setVisible] = useState(false);
   const [pastHomes, setPastHomes] = useState(false);
@@ -33,15 +40,12 @@ export function StickyBar({
   useEffect(() => {
     const readClock = () => {
       const hour = new Date().getHours();
-      setIsOpen(
-        hour >= landingConfig.service.hoursStartHour &&
-          hour < landingConfig.service.hoursEndHour,
-      );
+      setIsOpen(hour >= hoursStartHour && hour < hoursEndHour);
     };
     readClock();
     const timer = window.setInterval(readClock, 60_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [hoursStartHour, hoursEndHour]);
 
   useEffect(() => {
     const hero = document.getElementById("hero");
@@ -97,8 +101,8 @@ export function StickyBar({
             {isOpen === null
               ? null
               : isOpen
-                ? `Open · replies in ~${landingConfig.service.replyMinutes} min`
-                : `We reply by ${landingConfig.service.hoursStart}`}
+                ? `Open · replies in ~${replyMinutes} min`
+                : `We reply by ${hoursStart}`}
           </span>
         </p>
 

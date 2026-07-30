@@ -4,7 +4,6 @@ import { useState } from "react";
 import { ArrowDown, Minus, Plus } from "lucide-react";
 
 import { ShareButton } from "@/components/landing/actions";
-import { landingConfig } from "@/lib/landing-config";
 import { money } from "@/lib/format";
 import { track } from "@/lib/track";
 
@@ -71,15 +70,17 @@ export function SavingsCalculator({
   options,
   currency,
   shareSummary,
+  hotelRoomRate,
 }: {
   /** Every published home's rate and capacity. */
   options: { rate: number; sleeps: number }[];
   currency: string;
   shareSummary: string;
+  /** Indicative local hotel room rate, from site_settings. */
+  hotelRoomRate: number;
 }) {
   const [guests, setGuests] = useState(6);
   const [nights, setNights] = useState(3);
-  const { hotelRoomRate } = landingConfig.pricing;
 
   // Quote the cheapest home that can ACTUALLY sleep this many people. Using
   // the lowest rate on the page regardless of capacity would compare a

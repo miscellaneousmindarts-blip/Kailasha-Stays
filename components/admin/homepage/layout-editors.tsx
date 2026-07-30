@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SaveBar } from "@/components/admin/save-bar";
-import { ImagePicker, type ImageChoice } from "@/components/admin/homepage/image-picker";
+import { MediaPicker } from "@/components/admin/homepage/media-picker";
 import type { LayoutType } from "@/lib/homepage-blocks";
 
 /**
@@ -21,7 +21,6 @@ import type { LayoutType } from "@/lib/homepage-blocks";
 
 type EditorProps = {
   content: Record<string, unknown>;
-  pool: ImageChoice[];
   onSave: (content: unknown) => void;
   pending: boolean;
   error: string | null;
@@ -68,6 +67,11 @@ function BandSelect({
 function str(content: Record<string, unknown>, key: string, fallback = ""): string {
   const v = content[key];
   return typeof v === "string" ? v : fallback;
+}
+
+function idOrNull(content: Record<string, unknown>, key: string): string | null {
+  const v = content[key];
+  return typeof v === "string" ? v : null;
 }
 
 /** A repeating list of short strings, e.g. the bullets on a split section. */
@@ -121,19 +125,15 @@ function StringList({
 
 /* ------------------------------------------------------------------ split */
 
-function SplitEditor({ content, pool, onSave, pending, error, saved }: EditorProps) {
+function SplitEditor({ content, onSave, pending, error, saved }: EditorProps) {
   const [band, setBand] = useState(str(content, "band", "canvas"));
   const [heading, setHeading] = useState(str(content, "heading"));
   const [body, setBody] = useState(str(content, "body"));
   const [bullets, setBullets] = useState<string[]>(
     Array.isArray(content.bullets) ? (content.bullets as string[]) : [],
   );
-  const [image, setImage] = useState<string | null>(
-    (content.image as { storage_path?: string } | null)?.storage_path ?? null,
-  );
+  const [imageId, setImageId] = useState<string | null>(idOrNull(content, "imageId"));
   const [imageSide, setImageSide] = useState(str(content, "imageSide", "left"));
-
-  const alt = pool.find((p) => p.storage_path === image)?.alt ?? null;
 
   return (
     <form
@@ -144,7 +144,7 @@ function SplitEditor({ content, pool, onSave, pending, error, saved }: EditorPro
           heading,
           body: body || null,
           bullets: bullets.filter((b) => b.trim()),
-          image: image ? { storage_path: image, alt } : null,
+          imageId,
           imageSide,
         });
       }}
@@ -181,10 +181,9 @@ function SplitEditor({ content, pool, onSave, pending, error, saved }: EditorPro
         placeholder="One short point"
       />
 
-      <ImagePicker
-        pool={pool}
-        value={image}
-        onChange={setImage}
+      <MediaPicker
+        value={imageId}
+        onChange={setImageId}
         label="Photo (optional)"
         emptyLabel="No photo — the section runs full width as text."
       />
@@ -212,16 +211,12 @@ function SplitEditor({ content, pool, onSave, pending, error, saved }: EditorPro
 
 /* ----------------------------------------------------------- feature band */
 
-function FeatureBandEditor({ content, pool, onSave, pending, error, saved }: EditorProps) {
+function FeatureBandEditor({ content, onSave, pending, error, saved }: EditorProps) {
   const [heading, setHeading] = useState(str(content, "heading"));
   const [body, setBody] = useState(str(content, "body"));
-  const [image, setImage] = useState<string | null>(
-    (content.image as { storage_path?: string } | null)?.storage_path ?? null,
-  );
+  const [imageId, setImageId] = useState<string | null>(idOrNull(content, "imageId"));
   const [ctaLabel, setCtaLabel] = useState(str(content, "ctaLabel"));
   const [ctaHref, setCtaHref] = useState(str(content, "ctaHref"));
-
-  const alt = pool.find((p) => p.storage_path === image)?.alt ?? null;
 
   return (
     <form
@@ -230,7 +225,7 @@ function FeatureBandEditor({ content, pool, onSave, pending, error, saved }: Edi
         onSave({
           heading,
           body: body || null,
-          image: image ? { storage_path: image, alt } : null,
+          imageId,
           ctaLabel: ctaLabel || null,
           ctaHref: ctaHref || null,
         });
@@ -253,10 +248,9 @@ function FeatureBandEditor({ content, pool, onSave, pending, error, saved }: Edi
         <Textarea id="fb-body" value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
       </div>
 
-      <ImagePicker
-        pool={pool}
-        value={image}
-        onChange={setImage}
+      <MediaPicker
+        value={imageId}
+        onChange={setImageId}
         label="Background photo"
         hint="The photo sits behind a dark overlay, so pick one that reads well when dimmed."
       />
@@ -296,7 +290,7 @@ function FeatureBandEditor({ content, pool, onSave, pending, error, saved }: Edi
 type Tile = {
   heading: string;
   body: string;
-  image: string | null;
+  imageId: string | null;
   wide: boolean;
   tone: "light" | "dark";
 };
@@ -308,15 +302,14 @@ function readTiles(content: Record<string, unknown>): Tile[] {
     return {
       heading: typeof tile.heading === "string" ? tile.heading : "",
       body: typeof tile.body === "string" ? tile.body : "",
-      image:
-        (tile.image as { storage_path?: string } | null)?.storage_path ?? null,
+      imageId: typeof tile.imageId === "string" ? tile.imageId : null,
       wide: tile.wide === true,
       tone: tile.tone === "dark" ? "dark" : "light",
     };
   });
 }
 
-function BentoEditor({ content, pool, onSave, pending, error, saved }: EditorProps) {
+function BentoEditor({ content, onSave, pending, error, saved }: EditorProps) {
   const [band, setBand] = useState(str(content, "band", "canvas"));
   const [heading, setHeading] = useState(str(content, "heading"));
   const [tiles, setTiles] = useState<Tile[]>(readTiles(content));
@@ -335,12 +328,7 @@ function BentoEditor({ content, pool, onSave, pending, error, saved }: EditorPro
           tiles: tiles.map((t) => ({
             heading: t.heading,
             body: t.body || null,
-            image: t.image
-              ? {
-                  storage_path: t.image,
-                  alt: pool.find((p) => p.storage_path === t.image)?.alt ?? null,
-                }
-              : null,
+            imageId: t.imageId,
             wide: t.wide,
             tone: t.tone,
           })),
@@ -395,10 +383,9 @@ function BentoEditor({ content, pool, onSave, pending, error, saved }: EditorPro
               rows={2}
             />
 
-            <ImagePicker
-              pool={pool}
-              value={tile.image}
-              onChange={(path) => patch(i, { image: path })}
+            <MediaPicker
+              value={tile.imageId}
+              onChange={(id) => patch(i, { imageId: id })}
               label="Tile photo (optional)"
               emptyLabel="No photo — the tile is text on a flat surface."
             />
@@ -432,7 +419,7 @@ function BentoEditor({ content, pool, onSave, pending, error, saved }: EditorPro
             onClick={() =>
               setTiles((prev) => [
                 ...prev,
-                { heading: "", body: "", image: null, wide: false, tone: "light" },
+                { heading: "", body: "", imageId: null, wide: false, tone: "light" },
               ])
             }
             className="border-border hover:bg-surface-subtle pressable flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium"

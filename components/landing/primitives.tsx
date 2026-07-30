@@ -1,33 +1,26 @@
 import Image from "next/image";
 
-import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
-import type { LandingImage } from "@/lib/landing-config";
+import { BLUR_DATA_URL } from "@/lib/images";
+import type { ResolvedImage } from "@/lib/homepage";
 
 /**
- * Applies an admin's image override on top of a configured photo. An override
- * is always a real photo the owner uploaded, so it clears `placeholder` — the
- * "Sample photo" badge exists to mark stock imagery, and leaving it on a
- * genuine photograph would undersell the one thing this page is selling.
+ * Renders a photo picked in the admin media library, or — until one is
+ * chosen — a labelled box describing the shot that belongs there. The
+ * placeholder deliberately uses the same surface tint and radius as the real
+ * thing, so an unfinished page still reads as intentional rather than broken.
  */
-export function withOverride(image: LandingImage, path: string | null): LandingImage {
-  return path ? { ...image, path, placeholder: false } : image;
-}
-
-/**
- * Renders a configured photo, or — until the owner supplies one — a labelled
- * box describing the shot that belongs there. The placeholder deliberately
- * uses the same surface tint and radius as the real thing, so an unfinished
- * page still reads as intentional rather than broken.
- */
-export function ConfiguredImage({
+export function Photo({
   image,
+  brief,
   className,
   sizes,
   priority,
   aspect = "aspect-[4/3]",
   rounded = true,
 }: {
-  image: LandingImage;
+  image: ResolvedImage | null;
+  /** Shown in the placeholder box when no photo has been chosen yet. */
+  brief?: string;
   className?: string;
   sizes: string;
   priority?: boolean;
@@ -35,17 +28,16 @@ export function ConfiguredImage({
   /** Off for full-bleed grids, where rounded corners read as floating tiles. */
   rounded?: boolean;
 }) {
-  const src = imageUrl(image.path);
   const radius = rounded ? "rounded-md" : "";
 
-  if (!src) {
+  if (!image) {
     return (
       <div
         className={`bg-surface-subtle border-border text-text-muted flex items-center justify-center border border-dashed p-4 text-center text-sm ${radius} ${aspect} ${className ?? ""}`}
       >
         <span>
           <span className="block font-medium">Photo needed</span>
-          {image.brief}
+          {brief}
         </span>
       </div>
     );
@@ -56,7 +48,7 @@ export function ConfiguredImage({
       className={`bg-surface-subtle relative overflow-hidden ${radius} ${aspect} ${className ?? ""}`}
     >
       <Image
-        src={src}
+        src={image.url}
         alt={image.alt}
         fill
         sizes={sizes}
@@ -68,9 +60,8 @@ export function ConfiguredImage({
       />
       {/* Deliberately visible, including in production. This page argues "we
           photograph the parts other listings don't" — a stock bathroom
-          shipping quietly under that heading would undo the whole thing.
-          Clear the flag in landing-config as each real photo lands. */}
-      {image.placeholder ? (
+          shipping quietly under that heading would undo the whole thing. */}
+      {image.isPlaceholder ? (
         <span className="bg-warning/95 text-warning-foreground absolute top-2 left-2 rounded-full px-2 py-0.5 text-[11px] font-medium">
           Sample photo
         </span>
@@ -81,7 +72,7 @@ export function ConfiguredImage({
 
 /**
  * Section shell. Bands alternate background → surface-subtle → background
- * only; `night` is reserved for the single dark Shravan strip.
+ * only; `ink` is reserved for the single dark Shravan strip.
  */
 export function Section({
   id,
@@ -118,6 +109,7 @@ export function Eyebrow({
   hi?: string;
   en: string;
 }) {
+  if (!hi && !en) return null;
   return (
     <p className="text-primary text-xs font-semibold tracking-[0.14em] uppercase">
       {hi ? (
@@ -125,7 +117,7 @@ export function Eyebrow({
           <span lang="hi" className="tracking-normal normal-case">
             {hi}
           </span>
-          <span aria-hidden="true"> · </span>
+          {en ? <span aria-hidden="true"> · </span> : null}
         </>
       ) : null}
       {en}

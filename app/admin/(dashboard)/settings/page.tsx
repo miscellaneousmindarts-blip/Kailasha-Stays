@@ -1,5 +1,6 @@
 import { ContactSettingsForm } from "@/components/admin/settings/contact-settings-form";
 import { StayDefaultsForm } from "@/components/admin/settings/stay-defaults-form";
+import { HostAndPromisesForm } from "@/components/admin/settings/host-and-promises-form";
 import { CalendarSourcesPanel } from "@/components/admin/settings/calendar-sources-panel";
 import { AddonCatalogPanel } from "@/components/admin/settings/addon-catalog-panel";
 import {
@@ -36,6 +37,16 @@ export default async function AdminSettingsPage() {
       <section>
         <h2 className="mb-4 text-lg font-semibold">Stay defaults</h2>
         <StayDefaultsForm settings={settings} />
+      </section>
+
+      <section>
+        <h2 className="mb-4 text-lg font-semibold">Host & booking promises</h2>
+        <p className="text-text-muted mt-1 mb-4 max-w-xl text-sm">
+          Quoted across the homepage — the trust ribbon, the FAQ, the Shravan
+          notice — so a change here updates every mention at once instead of
+          five sections separately.
+        </p>
+        <HostAndPromisesForm settings={settings} />
       </section>
 
       <section>

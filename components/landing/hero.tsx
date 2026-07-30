@@ -1,17 +1,19 @@
 import Image from "next/image";
-import { ArrowDown, Star } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 
 import { ShareButton, PhoneLink, WhatsAppLink } from "@/components/landing/actions";
-import { landingConfig } from "@/lib/landing-config";
-import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
-import type { Copy } from "@/lib/homepage";
+import { BLUR_DATA_URL } from "@/lib/images";
+import type { ResolvedHero } from "@/lib/homepage";
 
 /**
  * Message match between the ad and the headline is a top-five CRO lever, so
- * the H1 and lede swap on `?src=`. Rendered on the server rather than
- * swapped on the client — the H1 is above the fold, and a client-side swap
- * would either flash the wrong copy or push the largest text past first
- * paint.
+ * the H1 and lede swap on `?src=`. Rendered on the server rather than swapped
+ * on the client — the H1 is above the fold, and a client-side swap would
+ * either flash the wrong copy or push the largest text past first paint.
+ *
+ * The variant copy itself is resolved server-side in lib/homepage.ts (tokens
+ * substituted, empty variants dropped) — this component only picks which
+ * already-resolved copy to show.
  */
 export type HeroVariant = "brand" | "shravan" | "aiims" | "weekend";
 
@@ -19,71 +21,33 @@ export function isHeroVariant(value: string | undefined): value is HeroVariant {
   return value === "shravan" || value === "aiims" || value === "weekend";
 }
 
-function heroCopy(variant: HeroVariant, year: number, templeTime: string | null) {
-  const temple = templeTime ?? "minutes";
-
-  switch (variant) {
-    case "shravan":
-      return {
-        en: `Shravani Mela ${year} — a clean home for your family, ${temple} from the temple`,
-        lede: "Book early. We hold your flat with a small advance and we do not cancel on guests.",
-      };
-    case "aiims":
-      return {
-        en: `A full apartment near AIIMS Deoghar — quiet, clean, private`,
-        lede: "Weekly and monthly rates for patients and attendants. An induction hob for tea and simple food. Quiet, clean, ground floor available.",
-      };
-    case "weekend":
-      return {
-        en: "A whole apartment in Deoghar for your family weekend",
-        lede: "Temple, Trikut, Tapovan and Basukinath — car and driver arranged. Fixed prices, no surprises.",
-      };
-    default:
-      return {
-        en: `A home of your own in Deoghar — ${temple} from Baba Baidyanath Dham`,
-        lede: "Whole apartments for families. The flat is yours alone, at a fixed price, written down. Airport pickup, car and pooja arranged before you arrive.",
-      };
-  }
-}
-
 export function Hero({
   variant,
   whatsappHref,
   phone,
   shareSummary,
-  templeTime,
-  copy,
-  imageOverride,
+  resolved,
 }: {
   variant: HeroVariant;
   whatsappHref: string | null;
   phone: string | null;
   shareSummary: string;
-  /** From the property's own Distances section — never a second copy in config. */
-  templeTime: string | null;
-  copy: Copy;
-  imageOverride: string | null;
+  resolved: ResolvedHero;
 }) {
-  const { images, proof, service } = landingConfig;
-  const preset = heroCopy(variant, new Date().getFullYear(), templeTime);
-  // Ad traffic keeps its message-matched headline: overriding the H1 for a
-  // ?src= visitor would break the match the variant exists to create, which
-  // costs more than the owner's preferred wording gains.
-  const brand = variant === "brand";
-  const heading = brand ? copy("heading", preset.en) : preset.en;
-  const lede = brand ? copy("lede", preset.lede) : preset.lede;
-  const src = imageUrl(imageOverride ?? images.hero.path);
-  // Under ten reviews the count itself is the problem — listings below that
-  // convert at roughly half the rate of those with 10–20, so we lead with a
-  // different proof entirely rather than a weak one.
-  const showRating = proof.googleRating !== null && proof.googleCount >= 10;
+  // Ad traffic keeps its message-matched headline: falling back to the brand
+  // copy for a ?src= visitor would break the match the variant exists to
+  // create. Falls back to brand copy if that variant was deleted or its
+  // tokens didn't resolve — the H1 must never be blank.
+  const matched = variant !== "brand" ? resolved.variants.find((v) => v.src === variant) : null;
+  const heading = matched?.heading ?? resolved.heading;
+  const lede = matched?.lede ?? resolved.lede;
 
   return (
     <section id="hero" className="relative isolate">
-      {src ? (
+      {resolved.image ? (
         <Image
-          src={src}
-          alt={images.hero.alt}
+          src={resolved.image.url}
+          alt={resolved.image.alt}
           fill
           sizes="100vw"
           priority
@@ -107,22 +71,28 @@ export function Hero({
           the fold, and the proof row is the whole point of the hero. */}
       <div className="container-page flex flex-col justify-center py-14 md:min-h-[88vh] md:py-24">
         <div className="max-w-[620px]">
-          <p className="text-primary-tint text-xs font-semibold tracking-[0.14em] uppercase">
-            {copy("eyebrow")}
-          </p>
+          {resolved.eyebrow ? (
+            <p className="text-primary-tint text-xs font-semibold tracking-[0.14em] uppercase">
+              {resolved.eyebrow}
+            </p>
+          ) : null}
 
           <h1 className="mt-4 text-white">
-            <span lang="hi" className="block text-[28px] leading-[1.35] font-normal md:text-[42px]">
-              {copy("headingHi")}
-            </span>
+            {resolved.headingHi ? (
+              <span lang="hi" className="block text-[28px] leading-[1.35] font-normal md:text-[42px]">
+                {resolved.headingHi}
+              </span>
+            ) : null}
             <span className="font-display mt-2 block text-[26px] leading-[1.1] font-semibold md:text-[42px]">
               {heading}
             </span>
           </h1>
 
-          <p className="mt-5 max-w-[520px] text-[17px] leading-[1.6] text-[rgba(255,255,255,0.88)] md:text-[19px]">
-            {lede}
-          </p>
+          {lede ? (
+            <p className="mt-5 max-w-[520px] text-[17px] leading-[1.6] text-[rgba(255,255,255,0.88)] md:text-[19px]">
+              {lede}
+            </p>
+          ) : null}
 
           {/* Primary, and deliberately modest — the sticky bar carries the
               placement lift, and a second loud CTA here would split intent. */}
@@ -130,8 +100,11 @@ export function Hero({
             href="#homes"
             className="bg-primary text-primary-foreground hover:bg-primary-hover pressable mt-7 inline-flex h-12 items-center gap-2 rounded-md px-6 font-medium"
           >
-            <span lang="hi">{copy("ctaLabelHi")}</span>
-            <span className="opacity-80">— {copy("ctaLabel")}</span>
+            {resolved.ctaLabelHi ? <span lang="hi">{resolved.ctaLabelHi}</span> : null}
+            <span className="opacity-80">
+              {resolved.ctaLabelHi ? "— " : ""}
+              {resolved.ctaLabel}
+            </span>
             <ArrowDown className="size-4" aria-hidden="true" />
           </a>
 
@@ -146,19 +119,13 @@ export function Hero({
             <ShareButton location="hero" summary={shareSummary} />
           </div>
 
-          <ul className="mt-7 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[rgba(255,255,255,0.85)]">
-            {showRating ? (
-              <li className="flex items-center gap-1.5">
-                <Star className="text-warning size-4 fill-current" aria-hidden="true" />
-                {proof.googleRating} ({proof.googleCount} Google reviews)
-              </li>
-            ) : proof.familiesHosted ? (
-              <li>{proof.familiesHosted} families hosted</li>
-            ) : null}
-            <li>Verified host</li>
-            <li>Free cancellation</li>
-            <li>Replies in ~{service.replyMinutes} min</li>
-          </ul>
+          {resolved.chips.length ? (
+            <ul className="mt-7 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[rgba(255,255,255,0.85)]">
+              {resolved.chips.map((chip) => (
+                <li key={chip}>{chip}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       </div>
     </section>

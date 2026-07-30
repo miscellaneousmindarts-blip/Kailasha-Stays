@@ -72,6 +72,80 @@ export async function updateStayDefaults(formData: FormData): Promise<ActionResu
   return { success: true };
 }
 
+/** "08:00" -> "8am", "21:00" -> "9pm", "13:30" -> "1:30pm". */
+function formatHour12(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  const period = h < 12 ? "am" : "pm";
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return m === 0 ? `${hour12}${period}` : `${hour12}:${String(m).padStart(2, "0")}${period}`;
+}
+
+/**
+ * The homepage quotes these facts in several sections at once (the trust
+ * ribbon's cancellation line, the hero's response-time chip, the FAQ, the
+ * Shravan advance-payment line) via {tokens} — see
+ * docs/homepage-builder-v2-plan.md §2 — so they live here once rather than
+ * inside any single section, and can't drift between sections the way a
+ * hardcoded number copy-pasted into each one could.
+ *
+ * Reply hours are entered as two <input type="time"> fields rather than as a
+ * display string ("8am") AND a separate 24-hour number: deriving both from
+ * one value closes off the drift the old two-representation config invited —
+ * the sticky bar's "open now" pip promises a response time, so it must never
+ * disagree with the hours shown next to it.
+ */
+export async function updateHostAndPromises(formData: FormData): Promise<ActionResult> {
+  const hoursStart = String(formData.get("hours_start_24") ?? "").trim();
+  const hoursEnd = String(formData.get("hours_end_24") ?? "").trim();
+  if (!TIME_RE.test(hoursStart) || !TIME_RE.test(hoursEnd)) {
+    return { error: "Enter valid reply hours." };
+  }
+
+  const replyMinutes = Number(formData.get("reply_minutes"));
+  if (!Number.isInteger(replyMinutes) || replyMinutes <= 0 || replyMinutes > 1440) {
+    return { error: "Reply time must be a whole number of minutes." };
+  }
+
+  const cancelDays = Number(formData.get("cancel_days"));
+  if (!Number.isInteger(cancelDays) || cancelDays < 0 || cancelDays > 90) {
+    return { error: "Cancellation window must be 0–90 days." };
+  }
+
+  const advancePct = Number(formData.get("advance_pct"));
+  if (!Number.isInteger(advancePct) || advancePct < 0 || advancePct > 100) {
+    return { error: "Advance must be a percentage between 0 and 100." };
+  }
+
+  const hotelRoomRate = Number(formData.get("hotel_room_rate"));
+  if (!Number.isFinite(hotelRoomRate) || hotelRoomRate < 0) {
+    return { error: "Enter a valid hotel room rate." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("site_settings")
+    .update({
+      host_name: String(formData.get("host_name") ?? "").trim() || null,
+      host_years: String(formData.get("host_years") ?? "").trim() || null,
+      reply_minutes: replyMinutes,
+      hours_start: formatHour12(hoursStart),
+      hours_end: formatHour12(hoursEnd),
+      hours_start_hour: Number(hoursStart.split(":")[0]),
+      hours_end_hour: Number(hoursEnd.split(":")[0]),
+      cancel_days: cancelDays,
+      advance_pct: advancePct,
+      hotel_room_rate: hotelRoomRate,
+      maps_url: String(formData.get("maps_url") ?? "").trim() || null,
+      instagram_url: String(formData.get("instagram_url") ?? "").trim() || null,
+      facebook_url: String(formData.get("facebook_url") ?? "").trim() || null,
+    })
+    .eq("id", true);
+
+  if (error) return { error: error.message };
+  revalidateSettings();
+  return { success: true };
+}
+
 export async function addCalendarSource(
   propertyId: string,
   formData: FormData,

@@ -4,15 +4,19 @@ import { ChevronDown } from "lucide-react";
 
 import { Section } from "@/components/landing/primitives";
 import { WhatsAppLink } from "@/components/landing/actions";
-import { COMPARISON_ROWS, type FaqItem } from "@/lib/landing-faq";
+import type { ResolvedFaq } from "@/lib/homepage";
 import { track } from "@/lib/track";
+
+type ComparisonRow = ResolvedFaq["comparisonRows"][number];
 
 /**
  * Native <details> rather than a hand-rolled accordion: multiple rows open
  * simultaneously for free, and it's keyboard- and screen-reader-complete
  * without any ARIA of our own to get wrong.
  */
-function ComparisonTable() {
+function ComparisonTable({ rows }: { rows: ComparisonRow[] }) {
+  if (!rows.length) return null;
+
   return (
     <>
       {/* Table on md+, stacked cards on mobile — a 4-column table at 375px is
@@ -20,7 +24,7 @@ function ComparisonTable() {
       <div className="mt-4 hidden overflow-x-auto md:block">
         <table className="w-full border-collapse text-sm">
           <caption className="sr-only">
-            Kailasha Stays compared with a typical hotel and a dharamshala
+            Compared with a typical hotel and a dharamshala
           </caption>
           <thead>
             <tr>
@@ -29,7 +33,7 @@ function ComparisonTable() {
                 scope="col"
                 className="border-primary bg-primary-tint text-primary rounded-t-md border border-b-0 p-2 text-left font-semibold"
               >
-                Kailasha Stays
+                Us
               </th>
               <th scope="col" className="text-text-muted p-2 text-left font-medium">
                 Typical hotel
@@ -40,14 +44,14 @@ function ComparisonTable() {
             </tr>
           </thead>
           <tbody>
-            {COMPARISON_ROWS.map((row, i) => (
+            {rows.map((row, i) => (
               <tr key={row.label} className="border-border border-t">
                 <th scope="row" className="p-2 text-left font-normal">
                   {row.label}
                 </th>
                 <td
                   className={`border-primary bg-primary-tint text-success border-x p-2 font-medium ${
-                    i === COMPARISON_ROWS.length - 1 ? "rounded-b-md border-b" : ""
+                    i === rows.length - 1 ? "rounded-b-md border-b" : ""
                   }`}
                 >
                   {row.us}
@@ -62,7 +66,7 @@ function ComparisonTable() {
 
       <div className="mt-4 space-y-3 md:hidden">
         {[
-          { name: "Kailasha Stays", key: "us" as const, highlight: true },
+          { name: "Us", key: "us" as const, highlight: true },
           { name: "Typical hotel", key: "hotel" as const, highlight: false },
           { name: "Dharamshala", key: "dharamshala" as const, highlight: false },
         ].map((col) => (
@@ -76,7 +80,7 @@ function ComparisonTable() {
               {col.name}
             </p>
             <dl className="mt-2 space-y-1 text-sm">
-              {COMPARISON_ROWS.map((row) => (
+              {rows.map((row) => (
                 <div key={row.label} className="flex justify-between gap-3">
                   <dt className="text-text-muted">{row.label}</dt>
                   <dd className="shrink-0 text-right font-medium">{row[col.key]}</dd>
@@ -90,26 +94,31 @@ function ComparisonTable() {
   );
 }
 
+/**
+ * resolveFaq() in lib/homepage.ts already drops the whole section when zero
+ * items survive token resolution, so `resolved === null` is the only gate
+ * this component needs — everything else here is plain resolved data, which
+ * (unlike the old `copy` reader function) crosses the server/client boundary
+ * without needing to be pre-flattened into individual string props.
+ */
 export function Faq({
-  items,
+  resolved,
   whatsappHref,
-  heading,
 }: {
-  items: FaqItem[];
+  resolved: ResolvedFaq | null;
   whatsappHref: string | null;
-  /* A resolved string, not the `copy` reader: this is a client component and a
-     function prop cannot cross the server boundary. */
-  heading: string;
 }) {
+  if (!resolved) return null;
+
   return (
     <Section>
       <div className="mx-auto max-w-[760px]">
         <h2 className="mt-3 font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
-          {heading}
+          {resolved.heading}
         </h2>
 
         <div className="border-border mt-6 divide-y rounded-lg border">
-          {items.map((item) => (
+          {resolved.items.map((item) => (
             <details
               key={item.q}
               name={undefined}
@@ -130,7 +139,7 @@ export function Faq({
               </summary>
               <div className="text-text-muted pb-4 leading-relaxed">
                 <p>{item.a}</p>
-                {item.comparison ? <ComparisonTable /> : null}
+                {item.comparison ? <ComparisonTable rows={resolved.comparisonRows} /> : null}
               </div>
             </details>
           ))}
@@ -138,7 +147,7 @@ export function Faq({
 
         {whatsappHref ? (
           <p className="text-text-muted mt-6 flex flex-wrap items-center gap-3 text-sm">
-            Still have a question? Just ask — we don&apos;t mind.
+            {resolved.closingLine || "Still have a question? Just ask — we don't mind."}
             <WhatsAppLink href={whatsappHref} context="lp-faq">
               Ask on WhatsApp
             </WhatsAppLink>

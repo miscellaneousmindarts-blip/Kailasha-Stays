@@ -1,10 +1,19 @@
 import { z } from "zod";
 import {
   Columns2,
+  Home as HomeIcon,
   Image as ImageIcon,
   LayoutGrid,
+  ListChecks,
+  MapPin,
+  MessageSquareQuote,
+  Percent,
   Quote,
   Sigma,
+  Sparkles,
+  Star,
+  Sun,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -13,207 +22,236 @@ import {
  *
  * Two halves, because the homepage has two kinds of section:
  *
- *   BUILTIN_SECTIONS — sections whose markup lives in components/landing/. The
- *   admin controls their order and visibility and may override individual
- *   strings and images. The defaults live HERE, not inline in the components,
- *   so the admin form and the renderer can never disagree about what the
- *   default is: the form shows `defaults[field]` as its placeholder and the
- *   renderer falls back to the same value.
+ *   builtinSchemas — sections whose markup lives in components/landing/. Every
+ *   field the admin can edit is declared here as a zod schema, and `content` in
+ *   the database is the WHOLE section (not a sparse override — see
+ *   docs/homepage-builder-v2-plan.md §1). A row that fails its schema is
+ *   skipped at render, never crashes the page.
  *
- *   LAYOUTS — templates for sections the admin composes from scratch. These
- *   have no code default; the row is the whole section.
+ *   layoutSchemas — templates for sections the admin composes from scratch.
+ *   Unchanged from v1.
  *
- * Every override value is a plain string. Image fields hold a Supabase storage
- * path or a `/public` path, which is exactly what imageUrl() already accepts,
- * so images need no separate shape.
+ * Ordering, visibility and pinning are NOT here — they live on the
+ * homepage_sections row itself (sort_order, visible, can_hide, pin), because
+ * they're facts about a specific row, not about the section type.
  */
 
-export type FieldKind = "text" | "textarea" | "image";
+/* ------------------------------------------------------------------ */
+/* Shared pieces                                                      */
+/* ------------------------------------------------------------------ */
 
-export type SectionField = {
-  key: string;
-  label: string;
-  kind: FieldKind;
-  /** Shown under the input in the admin form when the field needs context. */
-  hint?: string;
-};
+/** A reference into the homepage_images library, or none. */
+const imageId = z.string().uuid().nullable().default(null);
 
-export type BuiltinSection = {
-  label: string;
-  /** One line telling the admin what this section is for, in the builder list. */
-  note: string;
-  fields: SectionField[];
-  /** Field key -> the string the component renders when there is no override. */
-  defaults: Record<string, string>;
-};
+/* ------------------------------------------------------------------ */
+/* Builtin section schemas                                            */
+/* ------------------------------------------------------------------ */
 
-const t = (key: string, label: string, hint?: string): SectionField => ({
-  key,
-  label,
-  kind: "text",
-  ...(hint ? { hint } : {}),
-});
-const ta = (key: string, label: string, hint?: string): SectionField => ({
-  key,
-  label,
-  kind: "textarea",
-  ...(hint ? { hint } : {}),
-});
-const img = (key: string, label: string, hint?: string): SectionField => ({
-  key,
-  label,
-  kind: "image",
-  ...(hint ? { hint } : {}),
-});
+export const builtinSchemas = {
+  hero: z.object({
+    eyebrow: z.string().default(""),
+    headingHi: z.string().default(""),
+    heading: z.string().default(""),
+    lede: z.string().default(""),
+    ctaLabelHi: z.string().default(""),
+    ctaLabel: z.string().default(""),
+    imageId,
+    chips: z.array(z.object({ label: z.string().min(1) })).default([]),
+    // Ad-traffic message-match variants for ?src=. `src` must stay one of
+    // these three values — isHeroVariant() in components/landing/hero.tsx
+    // gates which ?src= values are even accepted.
+    variants: z
+      .array(
+        z.object({
+          src: z.enum(["shravan", "aiims", "weekend"]),
+          heading: z.string().min(1),
+          lede: z.string().min(1),
+        }),
+      )
+      .default([]),
+  }),
 
-export const BUILTIN_SECTIONS: Record<string, BuiltinSection> = {
-  hero: {
-    label: "Hero",
-    note: "The first screen. Cannot be hidden or moved.",
-    fields: [
-      t("eyebrow", "Eyebrow"),
-      t("headingHi", "Heading (Hindi)"),
-      t("heading", "Heading (English)", "Only used for direct visitors — ad traffic with ?src= gets its own headline."),
-      ta("lede", "Sub-heading"),
-      t("ctaLabelHi", "Button label (Hindi)"),
-      t("ctaLabel", "Button label (English)"),
-      img("image", "Background photo"),
-    ],
-    defaults: {
-      eyebrow: "Deoghar · Jharkhand",
-      headingHi: "आपके परिवार के लिए देवघर में एक अपना घर",
-      heading: "",
-      lede: "",
-      ctaLabelHi: "घर देखिए",
-      ctaLabel: "View our homes",
-      image: "",
-    },
-  },
+  trust_ribbon: z.object({
+    items: z
+      .array(
+        z.object({
+          icon: z.enum(["check", "star"]).default("check"),
+          label: z.string().min(1),
+        }),
+      )
+      .default([]),
+  }),
 
-  trust_ribbon: {
-    label: "Trust ribbon",
-    note: "The thin row of reassurances under the hero.",
-    fields: [],
-    defaults: {},
-  },
+  map: z.object({
+    heading: z.string().default(""),
+    sub: z.string().default(""),
+    // Positional against the property's own Distances rows — index 0 is the
+    // first row. Reordering those rows does NOT reorder these photos.
+    landmarkImages: z
+      .tuple([imageId, imageId, imageId])
+      .default([null, null, null]),
+  }),
 
-  map: {
-    label: "Where you'll be",
-    note: "Map tile plus the three nearest landmarks. Distances come from the property's own Distances section.",
-    fields: [
-      t("heading", "Heading"),
-      ta("sub", "Sub-line", "Appears over the map image."),
-      img(
-        "landmark1",
-        "Photo for landmark 1",
-        "Slots are positional — landmark 1 is the first row of the property's Distances section, not a named place. Reorder those rows and these photos stay where they are.",
-      ),
-      img("landmark2", "Photo for landmark 2"),
-      img("landmark3", "Photo for landmark 3"),
-    ],
-    defaults: {
-      heading: "Where you'll be",
-      sub: "every distance below measured from our door",
-    },
-  },
+  homes: z.object({
+    eyebrowHi: z.string().default(""),
+    eyebrow: z.string().default(""),
+    heading: z.string().default(""),
+    lede: z.string().default(""),
+  }),
 
-  homes: {
-    label: "Our homes",
-    note: "The property cards. Cannot be hidden — it is where the primary button points.",
-    fields: [t("eyebrowHi", "Eyebrow (Hindi)"), t("eyebrow", "Eyebrow"), t("heading", "Heading"), ta("lede", "Sub-heading")],
-    defaults: {
-      eyebrowHi: "हमारे घर",
-      eyebrow: "Our homes",
-      heading: "",
-      lede: "",
-    },
-  },
+  why_apartment: z.object({
+    heading: z.string().default(""),
+    body: z.string().default(""),
+  }),
 
-  why_apartment: {
-    label: "Why a 2BHK + price calculator",
-    note: "One short argument, then the saving calculator.",
-    fields: [t("heading", "Heading"), ta("body", "Body copy")],
-    defaults: {
-      heading: "Why a 2BHK apartment is better than three hotel rooms",
-      body: "Six people in a hotel means three rooms, three bills and three sets of keys. Here it's one flat, one price, and nobody sleeping in a corridor away from their family. It usually costs less, too. Don't take our word for it — put your own numbers in.",
-    },
-  },
+  meet_host: z.object({
+    eyebrowHi: z.string().default(""),
+    eyebrow: z.string().default(""),
+    heading: z.string().default(""),
+    body: z.string().default(""),
+    imageId,
+    videoCallTitle: z.string().default(""),
+    videoCallBody: z.string().default(""),
+    videoCallCta: z.string().default(""),
+  }),
 
-  meet_host: {
-    label: "Meet your host",
-    note: "Hidden automatically until a host name is set in landing-config.",
-    fields: [t("eyebrow", "Eyebrow"), t("heading", "Heading"), ta("body", "Body copy"), img("image", "Host photo")],
-    defaults: { eyebrow: "", heading: "", body: "", image: "" },
-  },
+  nothing_hidden: z.object({
+    heading: z.string().default(""),
+    lede: z.string().default(""),
+    // Any number of photos — this is the one section with a genuinely
+    // unbounded upload. See §6 of the plan re: the 16-image page budget.
+    photos: z
+      .array(
+        z.object({
+          imageId: z.string().uuid(),
+        }),
+      )
+      .default([]),
+    footNote: z.string().default(""),
+  }),
 
-  nothing_hidden: {
-    label: "Nothing hidden (photo grid)",
-    note: "The full-width photo grid of the parts other listings skip.",
-    fields: [
-      t("heading", "Heading"),
-      ta("lede", "Sub-heading"),
-      img("image1", "Photo 1 (large)"),
-      img("image2", "Photo 2"),
-      img("image3", "Photo 3"),
-      img("image4", "Photo 4"),
-      img("image5", "Photo 5"),
-      img("image6", "Photo 6"),
-    ],
-    defaults: {
-      heading: "We photograph the parts other listings don't.",
-      lede: "",
-    },
-  },
+  proof: z.object({
+    heading: z.string().default(""),
+    // Never seed a default rating here — proof is only ever real numbers or
+    // absent. The editor must not offer a plausible-looking placeholder.
+    stats: z
+      .object({
+        googleRating: z.number().min(0).max(5).nullable().default(null),
+        googleCount: z.number().int().min(0).default(0),
+        googleReviewUrl: z.string().default(""),
+        mmtRating: z.number().min(0).max(5).nullable().default(null),
+        familiesHosted: z.number().int().min(0).nullable().default(null),
+        yearStarted: z.string().default(""),
+        repeatPct: z.number().min(0).max(100).nullable().default(null),
+      })
+      .default({
+        googleRating: null,
+        googleCount: 0,
+        googleReviewUrl: "",
+        mmtRating: null,
+        familiesHosted: null,
+        yearStarted: "",
+        repeatPct: null,
+      }),
+    reviews: z
+      .array(
+        z.object({
+          name: z.string().min(1),
+          city: z.string().default(""),
+          stars: z.number().int().min(1).max(5),
+          quote: z.string().min(1),
+          reply: z.string().nullish(),
+          imageId: z.string().uuid().nullish(),
+        }),
+      )
+      .default([]),
+    carousel: z
+      .object({
+        enabled: z.boolean().default(true),
+        // Seconds for one full loop. Higher = slower/calmer.
+        speedSeconds: z.number().min(10).max(120).default(40),
+        pauseOnHover: z.boolean().default(true),
+      })
+      .default({ enabled: true, speedSeconds: 40, pauseOnHover: true }),
+  }),
 
-  proof: {
-    label: "Reviews and proof",
-    note: "Renders only what real review data exists. Never invents numbers.",
-    fields: [t("heading", "Heading")],
-    defaults: { heading: "" },
-  },
+  services: z.object({
+    note: z.string().default(""),
+  }),
 
-  services: {
-    label: "Add-on services",
-    note: "Pulls the first three active add-ons from the add-on catalogue.",
-    fields: [ta("note", "Closing line")],
-    defaults: { note: "All arranged on the same WhatsApp thread as your stay." },
-  },
+  shravan: z.object({
+    eyebrow: z.string().default(""),
+    heading: z.string().default(""),
+    body: z.string().default(""),
+    promise: z.string().default(""),
+    ctaLabel: z.string().default(""),
+    // Real numbers only, carrying its own update date. null hides the pill —
+    // never guess this; faking scarcity would destroy the only asset this
+    // page is building.
+    freeUnits: z.number().int().min(0).nullable().default(null),
+    lastUpdated: z.string().nullable().default(null),
+  }),
 
-  shravan: {
-    label: "Shravan notice",
-    note: "The dark seasonal band about booking early.",
-    fields: [t("eyebrow", "Eyebrow"), t("heading", "Heading"), ta("body", "Paragraph"), ta("promise", "Emphasised paragraph")],
-    defaults: {
-      eyebrow: "Shravan · July–August",
-      heading: "Shravani Mela — please book early.",
-      body: "Deoghar receives over 40 lakh devotees through Shravan. Our homes are usually full months ahead.",
-      promise: "",
-    },
-  },
+  faq: z.object({
+    heading: z.string().default(""),
+    items: z
+      .array(
+        z.object({
+          q: z.string().min(1),
+          a: z.string().min(1),
+          comparison: z.boolean().default(false),
+        }),
+      )
+      .default([]),
+    comparisonRows: z
+      .array(
+        z.object({
+          label: z.string().min(1),
+          us: z.string().min(1),
+          hotel: z.string().min(1),
+          dharamshala: z.string().min(1),
+        }),
+      )
+      .default([]),
+    closingLine: z.string().default(""),
+  }),
 
-  faq: {
-    label: "FAQ",
-    note: "Questions come from the FAQ builder and feed the page's search-result markup.",
-    fields: [t("heading", "Heading")],
-    defaults: { heading: "The things families actually ask us" },
-  },
+  close: z.object({
+    headingHi: z.string().default(""),
+    heading: z.string().default(""),
+    body: z.string().default(""),
+    ctaLabel: z.string().default(""),
+    shareHeadingHi: z.string().default(""),
+    shareBody: z.string().default(""),
+  }),
+} as const;
 
-  close: {
-    label: "Closing CTA",
-    note: "The last screen. Cannot be hidden or moved.",
-    fields: [t("headingHi", "Heading (Hindi)"), t("heading", "Heading (English)"), ta("body", "Body copy")],
-    defaults: { headingHi: "अपना घर चुनिए।", heading: "", body: "" },
-  },
+export type BuiltinKey = keyof typeof builtinSchemas;
+export type BuiltinContent<K extends BuiltinKey> = z.infer<(typeof builtinSchemas)[K]>;
+
+export function isBuiltinKey(value: string): value is BuiltinKey {
+  return value in builtinSchemas;
+}
+
+/** Display metadata for the admin outline. Ordering/visibility/pinning live on the DB row, not here. */
+export const BUILTIN_META: Record<BuiltinKey, { label: string; note: string; icon: LucideIcon }> = {
+  hero: { label: "Hero", note: "The first screen.", icon: Sparkles },
+  trust_ribbon: { label: "Trust ribbon", note: "The thin row of reassurances under the hero.", icon: ListChecks },
+  map: { label: "Where you'll be", note: "Map tile plus the three nearest landmarks.", icon: MapPin },
+  homes: { label: "Our homes", note: "The property cards.", icon: HomeIcon },
+  why_apartment: { label: "Why a 2BHK + calculator", note: "One short argument, then the saving calculator.", icon: Percent },
+  meet_host: { label: "Meet your host", note: "Hidden until you set a host name.", icon: UserRound },
+  nothing_hidden: { label: "Nothing hidden (photo grid)", note: "The full-width photo grid.", icon: ImageIcon },
+  proof: { label: "Reviews and proof", note: "Renders only what real review data exists.", icon: Star },
+  services: { label: "Add-on services", note: "Pulls from the add-on catalogue.", icon: Sparkles },
+  shravan: { label: "Shravan notice", note: "The dark seasonal band about booking early.", icon: Sun },
+  faq: { label: "FAQ", note: "Questions and the comparison table.", icon: MessageSquareQuote },
+  close: { label: "Closing CTA", note: "The last screen.", icon: Sparkles },
 };
 
 /* ------------------------------------------------------------------ */
 /* Custom section layouts                                             */
 /* ------------------------------------------------------------------ */
-
-const imageRef = z.object({
-  storage_path: z.string().min(1),
-  alt: z.string().nullish(),
-});
 
 /** Which band the section paints itself on, so custom sections alternate like the built-in ones do. */
 const band = z.enum(["canvas", "sand", "ink"]).default("canvas");
@@ -225,7 +263,7 @@ export const layoutSchemas = {
     heading: z.string().min(1),
     body: z.string().nullish(),
     bullets: z.array(z.string().min(1)).default([]),
-    image: imageRef.nullish(),
+    imageId,
     imageSide: z.enum(["left", "right"]).default("left"),
   }),
 
@@ -233,7 +271,7 @@ export const layoutSchemas = {
   feature_band: z.object({
     heading: z.string().min(1),
     body: z.string().nullish(),
-    image: imageRef.nullish(),
+    imageId,
     ctaLabel: z.string().nullish(),
     ctaHref: z.string().nullish(),
   }),
@@ -247,7 +285,7 @@ export const layoutSchemas = {
         z.object({
           heading: z.string().min(1),
           body: z.string().nullish(),
-          image: imageRef.nullish(),
+          imageId,
           wide: z.boolean().default(false),
           tone: z.enum(["light", "dark"]).default("light"),
         }),
@@ -324,18 +362,38 @@ export function isLayoutType(value: string): value is LayoutType {
 export function blankLayout(type: LayoutType): Record<string, unknown> {
   switch (type) {
     case "split":
-      return { band: "canvas", heading: "", body: "", bullets: [], image: null, imageSide: "left" };
+      return { band: "canvas", heading: "", body: "", bullets: [], imageId: null, imageSide: "left" };
     case "feature_band":
-      return { heading: "", body: "", image: null, ctaLabel: "", ctaHref: "" };
+      return { heading: "", body: "", imageId: null, ctaLabel: "", ctaHref: "" };
     case "bento":
       return {
         band: "canvas",
         heading: "",
-        tiles: [{ heading: "", body: "", image: null, wide: true, tone: "dark" }],
+        tiles: [{ heading: "", body: "", imageId: null, wide: true, tone: "dark" }],
       };
     case "stat_row":
       return { band: "sand", heading: "", stats: [{ figure: "", label: "" }, { figure: "", label: "" }] };
     case "quote":
       return { band: "sand", quote: "", attribution: "", role: "" };
+  }
+}
+
+/**
+ * Generic image-id collector for custom sections: walks the validated content
+ * looking for any `imageId` key (top-level `split`/`feature_band`, or nested
+ * in `bento`'s tiles) rather than special-casing each of the five shapes.
+ * Used only to count images against the page's 16-image budget — see
+ * lib/homepage.ts.
+ */
+export function collectLayoutImageIds(content: unknown, into: Set<string>): void {
+  if (Array.isArray(content)) {
+    for (const item of content) collectLayoutImageIds(item, into);
+    return;
+  }
+  if (content && typeof content === "object") {
+    for (const [key, value] of Object.entries(content)) {
+      if (key === "imageId" && typeof value === "string") into.add(value);
+      else collectLayoutImageIds(value, into);
+    }
   }
 }

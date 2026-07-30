@@ -14,10 +14,8 @@ import { Faq } from "@/components/landing/faq";
 import { Close } from "@/components/landing/close";
 import { StickyBar } from "@/components/landing/sticky-bar";
 import { CustomSection } from "@/components/landing/custom-sections";
-import { getLandingData, templeDistance, travelTime, waContext } from "@/lib/landing";
-import { getHomepageLayout, copyFor } from "@/lib/homepage";
-import { isLayoutType } from "@/lib/homepage-blocks";
-import { buildFaq } from "@/lib/landing-faq";
+import { getLandingBase, finalizePropertyImages, waContext } from "@/lib/landing";
+import { getHomepageContent } from "@/lib/homepage";
 import { landingJsonLd } from "@/lib/landing-schema";
 import { publicEnv } from "@/lib/env";
 
@@ -56,124 +54,45 @@ export default async function Home(props: PageProps<"/">) {
   const srcParam = Array.isArray(params.src) ? params.src[0] : params.src;
   const variant: HeroVariant = isHeroVariant(srcParam) ? srcParam : "brand";
 
-  const [{ settings, properties, addons, primary }, layout] = await Promise.all([
-    getLandingData(),
-    getHomepageLayout(),
-  ]);
+  // Two-phase: the homepage's own admin-edited sections have to be resolved
+  // before the property cards' share of the 16-image budget is known — see
+  // lib/landing.ts's getLandingBase()/finalizePropertyImages() split.
+  const base = await getLandingBase();
+  const content = await getHomepageContent(base.settings, base.properties, base.primary);
+  const { settings, properties, addons, primary } = finalizePropertyImages(base, content.fixedImageCount);
+
   const year = new Date().getFullYear();
   const currency = properties[0]?.currency ?? "INR";
-  // The hero's travel time and the FAQ's distance answer come from the same
-  // home the map is centred on, so the page tells one consistent location
-  // story rather than mixing landmarks across cities.
-  const temple = templeDistance(primary?.distances ?? []);
 
   const wa = settings.whatsapp_number;
-  const href = (context: string, extra = "") =>
-    wa ? waContext(wa, context, extra) : null;
+  const href = (context: string, extra = "") => (wa ? waContext(wa, context, extra) : null);
 
   const shareSummary = `${settings.business_name} — a home of your own in Deoghar, near Baba Baidyanath Dham. The whole flat is yours, at a fixed price, with free cancellation.`;
-
-  const faq = buildFaq({
-    sleeps: Math.max(0, ...properties.map((p) => p.sleeps)) || null,
-    temple,
-  });
-
-  const jsonLd = landingJsonLd({
-    settings,
-    properties,
-    faq,
-    siteUrl: publicEnv.siteUrl,
-  });
 
   const rateOptions = properties
     .filter((p) => p.ratePerNight !== null)
     .map((p) => ({ rate: p.ratePerNight as number, sleeps: p.sleeps }));
 
-  /**
-   * Section order, visibility and copy now come from homepage_sections, so the
-   * owner can rearrange the page without a deploy. Each case reads its
-   * overrides through `copy`, which falls back to the registry default — the
-   * page renders identically to before until someone edits a field.
-   */
-  function builtin(key: string) {
-    const copy = copyFor(key, layout.overrides);
-    const image = (field: string) => layout.overrides[key]?.[field] ?? null;
+  // Pulled out for cross-cutting uses: the hero photo backs the Shravan strip
+  // and the JSON-LD image/logo at zero extra image-budget cost, and the FAQ
+  // and proof entries feed the page's structured data.
+  const heroEntry = content.order.find((e) => e.kind === "builtin" && e.key === "hero");
+  const heroImage = heroEntry?.kind === "builtin" && heroEntry.key === "hero" ? heroEntry.resolved.image : null;
+  const faqEntry = content.order.find((e) => e.kind === "builtin" && e.key === "faq");
+  const faqItems = faqEntry?.kind === "builtin" && faqEntry.key === "faq" ? (faqEntry.resolved?.items ?? []) : [];
+  const proofEntry = content.order.find((e) => e.kind === "builtin" && e.key === "proof");
+  const proofResolved = proofEntry?.kind === "builtin" && proofEntry.key === "proof" ? proofEntry.resolved : null;
 
-    switch (key) {
-      case "hero":
-        return (
-          <Hero
-            variant={variant}
-            whatsappHref={href("lp-hero")}
-            phone={settings.contact_phone}
-            shareSummary={shareSummary}
-            templeTime={travelTime(temple)}
-            copy={copy}
-            imageOverride={image("image")}
-          />
-        );
-      case "trust_ribbon":
-        return <TrustRibbon />;
-      case "map":
-        return (
-          <MapStrip
-            property={primary}
-            copy={copy}
-            imageOverrides={layout.overrides[key] ?? {}}
-          />
-        );
-      case "homes":
-        return <HomesSection properties={properties} copy={copy} />;
-      case "why_apartment":
-        return (
-          <WhyApartment
-            options={rateOptions}
-            currency={currency}
-            shareSummary={shareSummary}
-            copy={copy}
-          />
-        );
-      case "meet_host":
-        return (
-          <MeetHost
-            videoCallHref={href(
-              "lp-videocall",
-              "Can you show me the flat on a video call?",
-            )}
-            phone={settings.contact_phone}
-            copy={copy}
-            imageOverride={image("image")}
-          />
-        );
-      case "nothing_hidden":
-        return <NothingHidden copy={copy} imageOverrides={layout.overrides[key] ?? {}} />;
-      case "proof":
-        return <Proof copy={copy} />;
-      case "services":
-        return <ServicesStrip addons={addons} currency={currency} copy={copy} />;
-      case "shravan":
-        return <ShravanStrip year={year} copy={copy} />;
-      case "faq":
-        // A resolved string: Faq is a client component, so the reader itself
-        // cannot be passed across the boundary.
-        return (
-          <Faq items={faq} whatsappHref={href("lp-faq")} heading={copy("heading")} />
-        );
-      case "close":
-        return (
-          <Close
-            properties={properties}
-            whatsappHref={href("lp-close")}
-            phone={settings.contact_phone}
-            address={settings.address}
-            shareSummary={shareSummary}
-            copy={copy}
-          />
-        );
-      default:
-        return null;
-    }
-  }
+  const jsonLd = landingJsonLd({
+    settings,
+    properties,
+    faq: faqItems,
+    siteUrl: publicEnv.siteUrl,
+    heroImage,
+    googleRating: proofResolved?.stats.googleRating ?? null,
+    googleCount: proofResolved?.stats.googleCount ?? 0,
+    reviewsDisplayed: proofResolved?.reviews.length ?? 0,
+  });
 
   return (
     <>
@@ -184,26 +103,124 @@ export default async function Home(props: PageProps<"/">) {
       />
 
       <main>
-        {layout.order.map((section) =>
-          section.kind === "builtin" ? (
-            // Fragment, not a wrapper div: several of these sections are
-            // full-bleed and a stray element in between would give them
-            // something to be constrained by.
-            <Fragment key={section.id}>{builtin(section.key)}</Fragment>
-          ) : isLayoutType(section.type) ? (
-            <CustomSection
-              key={section.id}
-              type={section.type}
-              content={section.content}
-            />
-          ) : null,
-        )}
+        {content.order.map((entry) => {
+          if (entry.kind === "custom") {
+            return (
+              <CustomSection key={entry.id} type={entry.type} content={entry.content} images={content.images} />
+            );
+          }
+
+          switch (entry.key) {
+            case "hero":
+              return (
+                <Fragment key={entry.id}>
+                  <Hero
+                    variant={variant}
+                    whatsappHref={href("lp-hero")}
+                    phone={settings.contact_phone}
+                    shareSummary={shareSummary}
+                    resolved={entry.resolved}
+                  />
+                </Fragment>
+              );
+            case "trust_ribbon":
+              return (
+                <Fragment key={entry.id}>
+                  <TrustRibbon resolved={entry.resolved} />
+                </Fragment>
+              );
+            case "map":
+              return (
+                <Fragment key={entry.id}>
+                  <MapStrip property={primary} resolved={entry.resolved} />
+                </Fragment>
+              );
+            case "homes":
+              return (
+                <Fragment key={entry.id}>
+                  <HomesSection properties={properties} resolved={entry.resolved} />
+                </Fragment>
+              );
+            case "why_apartment":
+              return (
+                <Fragment key={entry.id}>
+                  <WhyApartment
+                    options={rateOptions}
+                    currency={currency}
+                    shareSummary={shareSummary}
+                    hotelRoomRate={settings.hotel_room_rate}
+                    resolved={entry.resolved}
+                  />
+                </Fragment>
+              );
+            case "meet_host":
+              return (
+                <Fragment key={entry.id}>
+                  <MeetHost
+                    videoCallHref={href("lp-videocall", "Can you show me the flat on a video call?")}
+                    phone={settings.contact_phone}
+                    resolved={entry.resolved}
+                  />
+                </Fragment>
+              );
+            case "nothing_hidden":
+              return (
+                <Fragment key={entry.id}>
+                  <NothingHidden resolved={entry.resolved} />
+                </Fragment>
+              );
+            case "proof":
+              return (
+                <Fragment key={entry.id}>
+                  <Proof resolved={entry.resolved} />
+                </Fragment>
+              );
+            case "services":
+              return (
+                <Fragment key={entry.id}>
+                  <ServicesStrip addons={addons} currency={currency} resolved={entry.resolved} />
+                </Fragment>
+              );
+            case "shravan":
+              return (
+                <Fragment key={entry.id}>
+                  <ShravanStrip year={year} resolved={entry.resolved} backgroundImage={heroImage} />
+                </Fragment>
+              );
+            case "faq":
+              return (
+                <Fragment key={entry.id}>
+                  <Faq resolved={entry.resolved} whatsappHref={href("lp-faq")} />
+                </Fragment>
+              );
+            case "close":
+              return (
+                <Fragment key={entry.id}>
+                  <Close
+                    properties={properties}
+                    whatsappHref={href("lp-close")}
+                    phone={settings.contact_phone}
+                    address={settings.address}
+                    shareSummary={shareSummary}
+                    mapsUrl={settings.maps_url}
+                    resolved={entry.resolved}
+                  />
+                </Fragment>
+              );
+            default:
+              return null;
+          }
+        })}
       </main>
 
       {wa ? (
         <StickyBar
           whatsappHref={waContext(wa, "lp-sticky")}
           phone={settings.contact_phone}
+          replyMinutes={settings.reply_minutes}
+          hoursStart={settings.hours_start}
+          hoursStartHour={settings.hours_start_hour}
+          hoursEndHour={settings.hours_end_hour}
         />
       ) : null}
     </>

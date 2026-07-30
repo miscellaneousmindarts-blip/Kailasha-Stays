@@ -213,8 +213,12 @@ export function PhotosTab({
         can tell rooms apart while browsing.
       </p>
 
+      {/* Explicit id: without one, dnd-kit's aria-describedby id comes from an
+          incrementing counter that React 18 Strict Mode's dev-only
+          double-render can bump differently server vs client, tripping a
+          hydration mismatch. */}
       {ordered.length ? (
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <DndContext id="property-photos" sensors={sensors} onDragEnd={handleDragEnd}>
           <SortableContext items={ordered.map((i) => i.id)} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {ordered.map((img) => (

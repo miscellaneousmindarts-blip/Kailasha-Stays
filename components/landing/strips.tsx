@@ -1,11 +1,9 @@
 import Image from "next/image";
 import { ArrowDown, Car, HandHeart, MapPinned } from "lucide-react";
 
-import { landingConfig } from "@/lib/landing-config";
 import { money } from "@/lib/format";
-import { imageUrl } from "@/lib/images";
 import type { LandingData } from "@/lib/landing";
-import type { Copy } from "@/lib/homepage";
+import type { ResolvedImage, ResolvedServices, ResolvedShravan } from "@/lib/homepage";
 
 const SERVICE_ICONS = [Car, HandHeart, MapPinned];
 
@@ -21,11 +19,11 @@ const SERVICE_ICONS = [Car, HandHeart, MapPinned];
 export function ServicesStrip({
   addons,
   currency,
-  copy,
+  resolved,
 }: {
   addons: LandingData["addons"];
   currency: string;
-  copy: Copy;
+  resolved: ResolvedServices;
 }) {
   if (!addons.length) return null;
 
@@ -62,9 +60,9 @@ export function ServicesStrip({
             );
           })}
         </ul>
-        <p className="text-text-muted mt-4 text-center text-sm">
-          {copy("note")}
-        </p>
+        {resolved.note ? (
+          <p className="text-text-muted mt-4 text-center text-sm">{resolved.note}</p>
+        ) : null}
       </div>
     </div>
   );
@@ -77,16 +75,23 @@ export function ServicesStrip({
  * market defined by dishonesty, faking scarcity would destroy the only asset
  * being built here.
  */
-export function ShravanStrip({ year, copy }: { year: number; copy: Copy }) {
-  const { shravan, pricing, images } = landingConfig;
-  const heroSrc = imageUrl(images.hero.path);
-  const showPill = shravan.freeUnits !== null && shravan.lastUpdated;
+export function ShravanStrip({
+  year,
+  resolved,
+  backgroundImage,
+}: {
+  year: number;
+  resolved: ResolvedShravan;
+  /** Reuses the hero's own image at zero extra cost against the 16-image budget. */
+  backgroundImage: ResolvedImage | null;
+}) {
+  const showPill = resolved.freeUnits !== null && resolved.lastUpdated;
 
   return (
     <section className="bg-foreground relative isolate overflow-hidden">
-      {heroSrc ? (
+      {backgroundImage ? (
         <Image
-          src={heroSrc}
+          src={backgroundImage.url}
           alt=""
           aria-hidden="true"
           fill
@@ -97,27 +102,26 @@ export function ShravanStrip({ year, copy }: { year: number; copy: Copy }) {
       ) : null}
 
       <div className="container-page py-14 md:py-20">
-        <p className="text-warning text-xs font-semibold tracking-[0.14em] uppercase">
-          {copy("eyebrow")}
-        </p>
+        {resolved.eyebrow ? (
+          <p className="text-warning text-xs font-semibold tracking-[0.14em] uppercase">
+            {resolved.eyebrow}
+          </p>
+        ) : null}
         <h2 className="text-background mt-3 max-w-2xl font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
-          {copy("heading")}
+          {resolved.heading}
         </h2>
         <div className="mt-4 max-w-[640px] space-y-3 text-[rgba(253,251,247,0.82)]">
-          <p>{copy("body")}</p>
-          <p className="font-medium text-[rgba(253,251,247,0.95)]">
-            {copy(
-              "promise",
-              `Reserve with ${pricing.advancePct}% advance, pay the balance on arrival. Your written confirmation will be honoured. We do not cancel on guests, at any price.`,
-            )}
-          </p>
+          {resolved.body ? <p>{resolved.body}</p> : null}
+          {resolved.promise ? (
+            <p className="font-medium text-[rgba(253,251,247,0.95)]">{resolved.promise}</p>
+          ) : null}
         </div>
 
         {showPill ? (
           <p className="border-warning text-background mt-5 inline-block rounded-full border px-4 py-2 text-sm">
-            <span className="tabular font-medium">{shravan.freeUnits}</span> homes
+            <span className="tabular font-medium">{resolved.freeUnits}</span> homes
             still free for Shravan {year}
-            <span className="opacity-70"> · updated {shravan.lastUpdated}</span>
+            <span className="opacity-70"> · updated {resolved.lastUpdated}</span>
           </p>
         ) : null}
 
@@ -127,7 +131,7 @@ export function ShravanStrip({ year, copy }: { year: number; copy: Copy }) {
             href="#homes"
             className="bg-primary text-primary-foreground hover:bg-primary-hover pressable inline-flex h-12 items-center gap-2 rounded-md px-6 font-medium"
           >
-            See which homes are free
+            {resolved.ctaLabel}
             <ArrowDown className="size-4" aria-hidden="true" />
           </a>
         </div>

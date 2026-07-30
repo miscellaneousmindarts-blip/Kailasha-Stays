@@ -3,9 +3,8 @@ import { ArrowDown, MapPin } from "lucide-react";
 import { Section } from "@/components/landing/primitives";
 import { LandingPropertyCard } from "@/components/landing/property-card";
 import { PhoneLink, ShareButton, WhatsAppLink } from "@/components/landing/actions";
-import { landingConfig } from "@/lib/landing-config";
 import type { LandingProperty } from "@/lib/landing";
-import type { Copy } from "@/lib/homepage";
+import type { ResolvedClose } from "@/lib/homepage";
 
 /**
  * The person who reached the bottom is the highest-intent visitor on the
@@ -19,41 +18,38 @@ export function Close({
   phone,
   address,
   shareSummary,
-  copy,
+  mapsUrl,
+  resolved,
 }: {
   properties: LandingProperty[];
   whatsappHref: string | null;
   phone: string | null;
   address: string | null;
   shareSummary: string;
-  copy: Copy;
+  mapsUrl: string | null;
+  resolved: ResolvedClose;
 }) {
-  const { links } = landingConfig;
-
   return (
     <Section band="sand">
       <div className="text-center">
-        <h2
-          lang="hi"
-          className="mt-3 text-[28px] leading-[1.35] font-semibold md:text-[38px]"
-        >
-          {copy("headingHi")}
-        </h2>
-        <p className="text-text-muted mt-2 text-lg font-medium">
-          {copy("heading", "Pick your home. We'll do the rest.")}
-        </p>
-        <p className="text-text-muted mx-auto mt-3 max-w-[560px]">
-          {copy(
-            "body",
-            "Every home has its own page with full photos, exact price and a direct WhatsApp line to us.",
-          )}
-        </p>
+        {resolved.headingHi ? (
+          <h2
+            lang="hi"
+            className="mt-3 text-[28px] leading-[1.35] font-semibold md:text-[38px]"
+          >
+            {resolved.headingHi}
+          </h2>
+        ) : null}
+        <p className="text-text-muted mt-2 text-lg font-medium">{resolved.heading}</p>
+        {resolved.body ? (
+          <p className="text-text-muted mx-auto mt-3 max-w-[560px]">{resolved.body}</p>
+        ) : null}
 
         <a
           href="#homes"
           className="bg-primary text-primary-foreground hover:bg-primary-hover pressable mt-6 inline-flex h-12 items-center gap-2 rounded-md px-7 font-medium"
         >
-          See our homes
+          {resolved.ctaLabel}
           <ArrowDown className="size-4" aria-hidden="true" />
         </a>
       </div>
@@ -69,18 +65,21 @@ export function Close({
         ))}
       </div>
 
-      <div className="border-border bg-surface mx-auto mt-10 max-w-[560px] rounded-lg border p-5 text-center">
-        <p lang="hi" className="font-semibold">
-          परिवार से पूछना है?
-        </p>
-        <p className="text-text-muted mt-1 text-sm">
-          Send this page to your family group — they can see everything you just
-          saw.
-        </p>
-        <div className="mt-4 flex justify-center">
-          <ShareButton location="close" summary={shareSummary} variant="button" />
+      {resolved.shareHeadingHi || resolved.shareBody ? (
+        <div className="border-border bg-surface mx-auto mt-10 max-w-[560px] rounded-lg border p-5 text-center">
+          {resolved.shareHeadingHi ? (
+            <p lang="hi" className="font-semibold">
+              {resolved.shareHeadingHi}
+            </p>
+          ) : null}
+          {resolved.shareBody ? (
+            <p className="text-text-muted mt-1 text-sm">{resolved.shareBody}</p>
+          ) : null}
+          <div className="mt-4 flex justify-center">
+            <ShareButton location="close" summary={shareSummary} variant="button" />
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="text-text-muted mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
         {whatsappHref ? (
@@ -90,9 +89,9 @@ export function Close({
         ) : null}
         {phone ? <PhoneLink phone={phone} context="lp-close" /> : null}
         {address ? (
-          links.mapsUrl ? (
+          mapsUrl ? (
             <a
-              href={links.mapsUrl}
+              href={mapsUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="pressable inline-flex min-h-11 items-center gap-2 underline-offset-2 hover:underline"

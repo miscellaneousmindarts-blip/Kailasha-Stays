@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import {
-  BUILTIN_SECTIONS,
   blankLayout,
+  builtinSchemas,
+  isBuiltinKey,
   isLayoutType,
   layoutSchemas,
 } from "@/lib/homepage-blocks";
@@ -19,28 +20,26 @@ export type ActionResult = { error?: string; success?: boolean };
  */
 function revalidateBuilder() {
   revalidatePath("/admin/homepage");
+  revalidatePath("/(public)", "layout");
 }
 
 const NOT_APPLIED =
-  "The homepage builder needs migration 0007. Run supabase/migrations/0007_homepage_sections.sql in the Supabase SQL editor, then reload this page.";
+  "The homepage builder needs migration 0008. Run supabase/migrations/0008_homepage_builder_v2.sql in the Supabase SQL editor, then reload this page.";
 
 /** Postgres 42P01 = undefined_table, i.e. the migration hasn't been applied. */
 function friendly(error: { code?: string; message: string }): string {
   return error.code === "42P01" ? NOT_APPLIED : error.message;
 }
 
-export async function updateSectionVisibility(
-  id: string,
-  visible: boolean,
-): Promise<ActionResult> {
+export async function updateSectionVisibility(id: string, visible: boolean): Promise<ActionResult> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("homepage_sections")
     .update({ visible })
     .eq("id", id)
-    // Refuse at the query, not just in the UI: a locked section is one the page
-    // cannot render without.
-    .eq("locked", false)
+    // Refuse at the query, not just in the UI: `homes` is the one section
+    // that can never hide — it's where the hero's primary button points.
+    .eq("can_hide", true)
     .select("id");
 
   if (error) return { error: friendly(error) };
@@ -51,71 +50,71 @@ export async function updateSectionVisibility(
 }
 
 /**
- * Swaps sort_order with the neighbour in the given direction.
- *
- * Locked sections are skipped as move targets AND as movers, which keeps the
- * hero first and the closing CTA last without needing a separate pinning
- * mechanism — nothing can be reordered past them because they refuse to swap.
+ * Bulk reorder from the drag-and-drop outline: writes sort_order = index*10
+ * for every row in one pass. Rejects the whole reorder rather than applying
+ * it partially if a pinned row (hero must stay first, close must stay last)
+ * would move — the outline's own drag constraints should prevent this from
+ * ever being sent, so a rejection here means the client-side guard was
+ * bypassed, not that the user made a normal mistake.
  */
-export async function moveSection(
-  id: string,
-  direction: "up" | "down",
-): Promise<ActionResult> {
+export async function reorderSections(orderedIds: string[]): Promise<ActionResult> {
   const supabase = await createClient();
   const { data: rows, error: readError } = await supabase
     .from("homepage_sections")
-    .select("id,sort_order,locked")
-    .order("sort_order", { ascending: true });
-
+    .select("id,pin");
   if (readError) return { error: friendly(readError) };
   if (!rows) return { error: "Couldn't read the section order." };
 
-  const index = rows.findIndex((r) => r.id === id);
-  if (index === -1) return { error: "That section no longer exists." };
-  if (rows[index].locked) return { error: "That section can't be moved." };
+  const known = new Set(rows.map((r) => r.id));
+  if (orderedIds.length !== rows.length || orderedIds.some((id) => !known.has(id))) {
+    return { error: "That order doesn't match the current sections. Reload and try again." };
+  }
 
-  const target = direction === "up" ? index - 1 : index + 1;
-  if (target < 0 || target >= rows.length) return { success: true };
-  if (rows[target].locked) return { error: "That section can't move any further." };
+  const first = rows.find((r) => r.pin === "first");
+  const last = rows.find((r) => r.pin === "last");
+  if (first && orderedIds[0] !== first.id) {
+    return { error: "The hero has to stay first." };
+  }
+  if (last && orderedIds[orderedIds.length - 1] !== last.id) {
+    return { error: "The closing section has to stay last." };
+  }
 
-  const a = rows[index];
-  const b = rows[target];
-  const [{ error: e1 }, { error: e2 }] = await Promise.all([
-    supabase.from("homepage_sections").update({ sort_order: b.sort_order }).eq("id", a.id),
-    supabase.from("homepage_sections").update({ sort_order: a.sort_order }).eq("id", b.id),
-  ]);
-  if (e1 || e2) return { error: (e1 ?? e2)!.message };
+  const updates = orderedIds.map((id, index) =>
+    supabase.from("homepage_sections").update({ sort_order: index * 10 }).eq("id", id),
+  );
+  const results = await Promise.all(updates);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) return { error: failed.error.message };
 
   revalidateBuilder();
   return { success: true };
 }
 
 /**
- * Saves a builtin section's copy and image overrides.
- *
- * Only fields declared in the registry are written, so a crafted form post
- * can't smuggle arbitrary keys into the jsonb, and blanks are dropped rather
- * than stored — an absent key is what makes the code default apply, so
- * clearing a field has to actually remove it.
+ * Saves a builtin section's whole content, validated against its zod schema.
+ * Unlike v1, `content` is the entire section (see plan §1) — it's sent as
+ * JSON from the editor's own local state, not read off a <form>, because
+ * several sections hold arrays (FAQ items, trust-ribbon items, review cards)
+ * that don't map cleanly onto FormData.
  */
-export async function updateBuiltinOverrides(
-  key: string,
-  formData: FormData,
-): Promise<ActionResult> {
-  const spec = BUILTIN_SECTIONS[key];
-  if (!spec) return { error: "Unknown section." };
+export async function updateBuiltinSection(id: string, key: string, content: unknown): Promise<ActionResult> {
+  if (!isBuiltinKey(key)) return { error: "Unknown section." };
 
-  const content: Record<string, string> = {};
-  for (const field of spec.fields) {
-    const value = String(formData.get(field.key) ?? "").trim();
-    if (value) content[field.key] = value;
+  const parsed = builtinSchemas[key].safeParse(content);
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    return {
+      error: first
+        ? `${first.path.join(".") || "This section"}: ${first.message.toLowerCase()}`
+        : "That section isn't filled in yet.",
+    };
   }
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("homepage_sections")
-    .update({ content })
-    .eq("key", key)
+    .update({ content: parsed.data })
+    .eq("id", id)
     .eq("kind", "builtin");
 
   if (error) return { error: friendly(error) };
@@ -123,22 +122,20 @@ export async function updateBuiltinOverrides(
   return { success: true };
 }
 
-export async function addCustomSection(
-  type: string,
-): Promise<ActionResult & { id?: string }> {
+export async function addCustomSection(type: string): Promise<ActionResult & { id?: string }> {
   if (!isLayoutType(type)) return { error: "Unknown layout." };
 
   const supabase = await createClient();
   const { data: rows, error: readError } = await supabase
     .from("homepage_sections")
-    .select("key,sort_order,locked")
+    .select("key,sort_order,pin")
     .order("sort_order", { ascending: true });
   if (readError) return { error: friendly(readError) };
 
-  // Land it just above the last locked section (the closing CTA) so a new
-  // section never appears after the page's final call to action.
-  const lastUnlocked = [...(rows ?? [])].reverse().find((r) => !r.locked);
-  const sortOrder = (lastUnlocked?.sort_order ?? 0) + 5;
+  // Land it just above the pinned closing section, so a new section never
+  // appears after the page's final call to action.
+  const beforeLast = [...(rows ?? [])].reverse().find((r) => r.pin !== "last");
+  const sortOrder = (beforeLast?.sort_order ?? 0) + 5;
 
   const used = new Set((rows ?? []).map((r) => r.key));
   let n = 1;
@@ -153,7 +150,8 @@ export async function addCustomSection(
       title: null,
       content: blankLayout(type),
       visible: false, // Hidden until the admin has filled it in and saved.
-      locked: false,
+      can_hide: true,
+      pin: null,
       sort_order: sortOrder,
     })
     .select("id")
@@ -213,7 +211,7 @@ export async function readHomepageSections(): Promise<HomepageSection[] | null> 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("homepage_sections")
-    .select("id,key,kind,type,title,content,visible,locked,sort_order,updated_at")
+    .select("id,key,kind,type,title,content,visible,locked,can_hide,pin,sort_order,updated_at")
     .order("sort_order", { ascending: true });
 
   if (error) return null;

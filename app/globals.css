@@ -270,6 +270,22 @@
   }
 }
 
+/* Reviews carousel: the track is rendered twice back to back and slides
+   exactly one copy's width, so the loop point is invisible. transform only —
+   never scrollLeft in a timer — so it stays on the compositor thread. The
+   reduced-motion branch never mounts this animation at all (see
+   components/landing/reviews-carousel.tsx); the global !important duration
+   clamp below is a backstop, not the primary mechanism, because a 0.01ms
+   infinite-iteration animation would flicker rather than truly stop. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 /* §8.2 — every animation collapses to a plain fade when the user asks for less motion */
 @media (prefers-reduced-motion: reduce) {
   *,

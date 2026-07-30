@@ -28,6 +28,23 @@ export type SiteSettings = {
   /** Fallback check-in/check-out time for any property that hasn't set its own (HH:MM). */
   default_check_in_time: string;
   default_check_out_time: string;
+  /** Shown as commitments across the homepage — keep them true. */
+  reply_minutes: number;
+  hours_start: string;
+  hours_end: string;
+  /** Same window as hours_start/hours_end, in 24-hour numbers, for the sticky bar's "open now" comparison. */
+  hours_start_hour: number;
+  hours_end_hour: number;
+  cancel_days: number;
+  advance_pct: number;
+  /** Indicative local hotel room rate, for the savings calculator's comparison. */
+  hotel_room_rate: number;
+  /** Setting this is what unhides the Meet-your-host section. */
+  host_name: string | null;
+  host_years: string | null;
+  maps_url: string | null;
+  instagram_url: string | null;
+  facebook_url: string | null;
   updated_at: string;
 };
 
@@ -112,9 +129,10 @@ export type PropertySection = {
  * One section of the homepage, in render order.
  *
  * `kind` distinguishes a section whose markup lives in components/landing/ —
- * where `content` is a sparse map of admin overrides on top of the code
- * defaults — from one the admin composed from a layout template, where
- * `content` is the entire section.
+ * validated against its own zod schema in lib/homepage-blocks.ts — from one
+ * the admin composed from a layout template. Either way `content` is now the
+ * WHOLE section, not a sparse override map: see docs/homepage-builder-v2-plan.md
+ * §1 for why that changed.
  */
 export type HomepageSection = {
   id: string;
@@ -124,9 +142,32 @@ export type HomepageSection = {
   title: string | null;
   content: unknown;
   visible: boolean;
+  /** Superseded by can_hide/pin below; kept only so old code paths don't error while unused. */
   locked: boolean;
+  /** False only for `homes` — it is where the hero's primary button points. */
+  can_hide: boolean;
+  /** 'first' for hero, 'last' for close, else null. A pinned section can't be dragged out of its slot or past. */
+  pin: "first" | "last" | null;
   sort_order: number;
   updated_at: string;
+};
+
+/**
+ * One photo in the homepage media library. `storage_path` holds either a
+ * homepage-media bucket path or a `/public` path — homepageImageUrl() in
+ * lib/images.ts passes the latter straight through.
+ */
+export type HomepageImage = {
+  id: string;
+  storage_path: string;
+  /** For screen readers and search. Never rendered as visible text. */
+  alt: string | null;
+  /** The visible caption — what "nothing hidden" renders under each photo. */
+  title: string | null;
+  /** Drives the amber "Sample photo" badge. */
+  is_placeholder: boolean;
+  brief: string | null;
+  created_at: string;
 };
 
 /** One shared catalog — which properties offer a given item lives in PropertyAddonService, not here. */
@@ -329,6 +370,7 @@ export type Database = {
         BelongsToProperty<"property_sections_property_id_fkey">
       >;
       homepage_sections: Table<HomepageSection>;
+      homepage_images: Table<HomepageImage>;
       addon_services: Table<AddonService>;
       property_addon_services: Table<
         PropertyAddonService,
@@ -410,6 +452,10 @@ export type Database = {
       request_addon: {
         Args: { p_token: string; p_addon_id: string; p_qty?: number };
         Returns: string;
+      };
+      homepage_image_usage: {
+        Args: { image_id: string };
+        Returns: number;
       };
     };
     Enums: Record<never, never>;
