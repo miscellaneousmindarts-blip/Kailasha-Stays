@@ -2,34 +2,12 @@ import { Section } from "@/components/landing/primitives";
 import { SavingsCalculator } from "@/components/landing/savings-calculator";
 
 /**
- * These four map one-to-one onto the strongest fears in this market: food
- * purity, elders' comfort, women's safety, and cost guilt.
- *
- * Deliberately NOT icon-in-a-tinted-rounded-square cards. That component —
- * a Lucide glyph in a soft tinted square above a bold title above three lines
- * of grey — is the single most recognisable template pattern on the web, and
- * it makes a page look generated no matter how good the writing is. A serif
- * numeral and a hairline carry the same structure without the stock smell.
+ * One claim, then the arithmetic. The four feature cards that used to sit here
+ * were doing the calculator's job worse — asserting cheapness in prose right
+ * above a tool that proves it with the visitor's own numbers. A figure someone
+ * generated themselves is far more persuasive than a paragraph telling them
+ * what to conclude.
  */
-const REASONS = [
-  {
-    title: "Induction for the basics",
-    body: "An induction hob for tea, coffee and baby food. Not a full kitchen, and we won't pretend otherwise. Pure vegetarian building, so no onion-garlic worries during Shravan.",
-  },
-  {
-    title: "Comfortable for elders",
-    body: "Ground-floor option. Western toilet with a grab bar. Hot water 24×7. No long corridors. The car parks at your door.",
-  },
-  {
-    title: "One private home, one key",
-    body: "Not a corridor of strangers. The whole flat is yours. Verified host, CCTV at the entrance, safe for the women travelling with you.",
-  },
-  {
-    title: "Cheaper than three rooms",
-    body: "One home instead of a corridor of them. Work out your exact saving below.",
-  },
-];
-
 export function WhyApartment({
   options,
   currency,
@@ -41,25 +19,16 @@ export function WhyApartment({
 }) {
   return (
     <Section>
-      <h2 className="font-display max-w-2xl text-[26px] leading-[1.15] font-semibold md:text-[36px]">
-        Why families choose one apartment over three hotel rooms
-      </h2>
-
-      <div className="mt-10 grid gap-x-10 gap-y-8 sm:grid-cols-2">
-        {REASONS.map(({ title, body }, i) => (
-          <div key={title} className="border-border border-t pt-5">
-            <div className="flex items-baseline gap-3">
-              <span
-                aria-hidden="true"
-                className="font-display text-text-muted/50 text-lg leading-none"
-              >
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <h3 className="font-semibold">{title}</h3>
-            </div>
-            <p className="text-text-muted mt-2 pl-8 leading-relaxed">{body}</p>
-          </div>
-        ))}
+      <div className="max-w-2xl">
+        <h2 className="font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
+          Why a 2BHK apartment is better than three hotel rooms
+        </h2>
+        <p className="text-text-muted mt-4 text-[17px] leading-relaxed md:text-[19px]">
+          Six people in a hotel means three rooms, three bills and three sets of
+          keys. Here it&apos;s one flat, one price, and nobody sleeping in a
+          corridor away from their family. It usually costs less, too. Don&apos;t
+          take our word for it — put your own numbers in.
+        </p>
       </div>
 
       {options.length ? (

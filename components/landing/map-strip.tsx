@@ -1,12 +1,20 @@
+import Image from "next/image";
 import { ExternalLink, MapPin } from "lucide-react";
 
 import { landingConfig } from "@/lib/landing-config";
 import { serverEnv } from "@/lib/env";
+import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
 import type { LandingProperty } from "@/lib/landing";
 
 /**
  * Distance to landmark is the first specification a pilgrim checks, so this
  * sits directly under the trust ribbon.
+ *
+ * Laid out as a bento: one large anchor tile carrying the map and the heading,
+ * then the landmarks as their own tiles. The asymmetry is doing real work — the
+ * first landmark is the temple, which is the entire reason the family is
+ * searching, so it gets the one dark tile on the page's light band and reads
+ * first. The remaining two recede.
  *
  * A STATIC map image, not an embedded interactive one, for three reasons
  * that all matter more on a phone on mobile data than the interactivity
@@ -48,7 +56,7 @@ function staticMapUrl(
   const params = new URLSearchParams({
     // No explicit center/zoom: letting Static Maps auto-fit guarantees every
     // pin is actually in frame, which a guessed zoom cannot.
-    size: "640x420",
+    size: "640x640",
     scale: "2",
     maptype: "roadmap",
     key,
@@ -69,6 +77,19 @@ function directionsUrl(property: LandingProperty): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(home ?? property.title)}`;
 }
 
+/**
+ * "1.4 km — 15 min walk" becomes a big figure and a quiet qualifier. Splits on
+ * dashes only, never on spaces: "15 min walk" has to survive intact when the
+ * owner wrote no distance at all.
+ */
+function splitValue(value: string): { figure: string; mode: string | null } {
+  const parts = value
+    .split(/\s*[—–]\s*/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return { figure: parts[0] ?? value, mode: parts[1] ?? null };
+}
+
 export function MapStrip({ property }: { property: LandingProperty | null }) {
   if (!property) return null;
 
@@ -77,81 +98,131 @@ export function MapStrip({ property }: { property: LandingProperty | null }) {
 
   const key = serverEnv.googleMapsStaticKey;
   const mapUrl = key ? staticMapUrl(property, landmarks, key) : null;
+  // Without a Maps key the anchor tile still needs to be a place, not a grey
+  // box — the home's own cover photo is honest and costs nothing extra, since
+  // the Homes section already loads this exact URL.
+  const fallbackSrc = mapUrl ? null : imageUrl(property.images[0]?.storage_path ?? null);
+  const href = directionsUrl(property);
+
+  // Only the full three-landmark set fills a 4×2 bento; fewer collapse to a
+  // single row rather than leaving a hole where a tile should be.
+  const full = landmarks.length >= 3;
 
   return (
     <div className="bg-background">
       <div className="container-page py-10 md:py-14">
-        <div className="grid items-center gap-6 md:grid-cols-2 md:gap-10">
-          {mapUrl ? (
-            <a
-              href={directionsUrl(property)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group border-border bg-surface-subtle pressable relative block overflow-hidden rounded-lg border"
-              aria-label={`Open ${property.title} in Google Maps`}
-            >
-              {/* Plain <img>: this is an external, already-optimised PNG, so
-                  next/image would proxy it for no benefit. Explicit
-                  dimensions keep CLS at zero. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={mapUrl}
-                alt={`Map showing ${property.title} in ${property.city ?? "Deoghar"} and nearby landmarks`}
-                width={640}
-                height={420}
+        <div
+          className={`grid grid-cols-2 gap-3 md:grid-cols-4 ${full ? "md:grid-rows-2" : ""}`}
+        >
+          {/* Anchor tile. The heading lives in the overlay so the map reads as
+              the section rather than as an illustration beside it. */}
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`group border-border bg-foreground pressable relative col-span-2 block aspect-[4/3] overflow-hidden rounded-xl border sm:aspect-[16/10] md:aspect-auto md:min-h-[340px] ${full ? "md:row-span-2" : ""}`}
+            aria-label={`Open ${property.title} in Google Maps`}
+          >
+            {mapUrl ? (
+              <>{/* Plain <img>: an external, already-optimised PNG, so
+                    next/image would proxy it for no benefit. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={mapUrl}
+                  alt={`Map showing ${property.title} in ${property.city ?? "Deoghar"} and nearby landmarks`}
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-0 size-full object-cover"
+                />
+              </>
+            ) : fallbackSrc ? (
+              <Image
+                src={fallbackSrc}
+                alt={property.images[0]?.alt ?? property.title}
+                fill
+                sizes="(min-width: 768px) 50vw, 100vw"
                 loading="lazy"
-                decoding="async"
-                className="aspect-[64/42] w-full object-cover"
+                placeholder="blur"
+                blurDataURL={BLUR_DATA_URL}
+                className="object-cover"
               />
-              <span className="bg-surface/95 text-foreground shadow-card absolute right-3 bottom-3 flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium backdrop-blur-sm">
-                Open in Maps
-                <ExternalLink className="size-3.5" aria-hidden="true" />
-              </span>
-            </a>
-          ) : null}
-
-          <div>
-            <h2 className="font-display text-[22px] leading-[1.15] font-semibold md:text-[28px]">
-              Where you&apos;ll be
-            </h2>
-            <p className="text-text-muted mt-1 text-sm">
-              {property.city ? `${property.city}, ` : ""}measured from our door.
-            </p>
-
-            <ol className="mt-4 space-y-3">
-              {landmarks.map((l, i) => (
-                <li key={l.label} className="flex items-start gap-3">
-                  {/* Numbers tie each row to its pin — legible at 375px in a
-                      way that labels drawn on the map itself never are, and
-                      readable by a screen reader, which a map image is not. */}
-                  <span
-                    aria-hidden="true"
-                    className="bg-foreground text-background mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                  >
-                    {i + 1}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block font-medium">{l.label}</span>
-                    <span className="text-text-muted block text-sm">{l.value}</span>
-                  </span>
-                </li>
-              ))}
-            </ol>
-
-            {!mapUrl ? (
-              <p className="text-text-muted mt-4 flex items-start gap-2 text-sm">
-                <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                <a
-                  href={directionsUrl(property)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline-offset-2 hover:underline"
-                >
-                  Open {property.title} in Google Maps
-                </a>
-              </p>
             ) : null}
-          </div>
+
+            {/* Weighted to the bottom so the map's own detail stays readable
+                through the top two-thirds. */}
+            <span
+              aria-hidden="true"
+              className="absolute inset-x-0 bottom-0 block h-3/5 bg-[linear-gradient(to_top,rgba(33,26,20,0.94)_0%,rgba(33,26,20,0.72)_38%,rgba(33,26,20,0)_100%)]"
+            />
+
+            <div className="absolute inset-x-0 bottom-0 p-5 md:p-6">
+              <h2 className="font-display text-[26px] leading-[1.1] font-semibold text-white md:text-[34px]">
+                Where you&apos;ll be
+              </h2>
+              <p className="mt-1.5 text-sm text-[rgba(255,255,255,0.82)]">
+                {property.city ? `${property.city} · ` : ""}every distance below
+                measured from our door
+              </p>
+            </div>
+
+            <span className="bg-surface/95 text-foreground shadow-card absolute top-4 right-4 flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium backdrop-blur-sm">
+              {mapUrl ? (
+                <ExternalLink className="size-3.5" aria-hidden="true" />
+              ) : (
+                <MapPin className="size-3.5" aria-hidden="true" />
+              )}
+              Open in Maps
+            </span>
+          </a>
+
+          {landmarks.map((l, i) => {
+            const { figure, mode } = splitValue(l.value);
+            // The first landmark is the temple. It carries the decision, so it
+            // gets the inverted tile instead of a third identical card.
+            const lead = i === 0;
+
+            return (
+              <div
+                key={l.label}
+                className={`relative flex min-h-[136px] flex-col justify-end overflow-hidden rounded-xl border p-4 md:min-h-[158px] md:p-5 ${
+                  lead
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border bg-surface-subtle"
+                } ${full && lead ? "col-span-2" : ""}`}
+              >
+                {/* Ties the tile to its numbered pin on the map, and gives the
+                    flat surface some depth without an image. */}
+                <span
+                  aria-hidden="true"
+                  className={`font-display pointer-events-none absolute -top-3 right-2 text-[86px] leading-none font-semibold md:text-[104px] ${
+                    lead ? "text-white/[0.10]" : "text-foreground/[0.07]"
+                  }`}
+                >
+                  {i + 1}
+                </span>
+
+                <h3
+                  className={`relative text-[15px] leading-snug font-medium ${lead ? "" : "text-foreground"}`}
+                >
+                  {l.label}
+                </h3>
+                <p
+                  className={`font-display tabular relative mt-1 text-[24px] leading-none font-semibold md:text-[30px] ${
+                    lead ? "text-primary-tint" : "text-foreground"
+                  }`}
+                >
+                  {figure}
+                </p>
+                {mode ? (
+                  <p
+                    className={`relative mt-1.5 text-sm ${lead ? "text-[rgba(253,251,247,0.72)]" : "text-text-muted"}`}
+                  >
+                    {mode}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

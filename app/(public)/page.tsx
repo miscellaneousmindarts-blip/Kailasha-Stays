@@ -5,7 +5,6 @@ import { TrustRibbon } from "@/components/landing/trust-strip";
 import { MapStrip } from "@/components/landing/map-strip";
 import { HomesSection } from "@/components/landing/homes-section";
 import { WhyApartment } from "@/components/landing/why-apartment";
-import { HonestPrice } from "@/components/landing/honest-price";
 import { MeetHost } from "@/components/landing/meet-host";
 import { NothingHidden } from "@/components/landing/nothing-hidden";
 import { Proof } from "@/components/landing/proof";
@@ -107,8 +106,6 @@ export default async function Home(props: PageProps<"/">) {
           currency={currency}
           shareSummary={shareSummary}
         />
-
-        <HonestPrice properties={properties} currency={currency} addons={addons} />
 
         <MeetHost
           videoCallHref={href(
