@@ -189,27 +189,49 @@ type KeyValueSection = {
 };
 
 /**
- * Reads one property's "Distances" key_value block. Kept per-property rather
- * than merged: the landmarks a guest cares about are the ones near the home
- * they're actually looking at.
+ * Reads one property's Distances. Kept per-property rather than merged: the
+ * landmarks a guest cares about are the ones near the home they're actually
+ * looking at.
+ *
+ * Two source shapes, because the property page's distances block moved from
+ * a plain `key_value` facts table to the photo-bento `distances` block type
+ * (components/blocks/distances-block.tsx) without a migration — the row
+ * itself just changes `type`. A `distances` section wins outright wherever
+ * one exists; `key_value` titled "Distances" is read only as a fallback for
+ * properties that haven't been moved onto the new block yet. Only the
+ * label/value pair matters here — a photo chosen on the property page is
+ * that page's own thing, unrelated to the separate photos the homepage picks
+ * for its own landmark tiles.
  */
 function readDistances(sections?: KeyValueSection[] | null): LandingDistance[] {
-  const out: LandingDistance[] = [];
+  const rows = sections ?? [];
+  const isPublic = (s: KeyValueSection) => s.visible && s.audience !== "guest";
 
-  for (const section of sections ?? []) {
-    if (section.type !== "key_value" || !section.visible) continue;
+  const fromDistancesBlock: LandingDistance[] = [];
+  for (const section of rows) {
+    if (section.type !== "distances" || !isPublic(section)) continue;
+    const content = section.content as { items?: { label?: string; value?: string }[] };
+    for (const item of content?.items ?? []) {
+      const label = item.label?.trim();
+      const value = item.value?.trim();
+      if (label && value) fromDistancesBlock.push({ label, value });
+    }
+  }
+  if (fromDistancesBlock.length) return fromDistancesBlock;
+
+  const fromKeyValue: LandingDistance[] = [];
+  for (const section of rows) {
+    if (section.type !== "key_value" || !isPublic(section)) continue;
     if (!/distance/i.test(section.title ?? "")) continue;
-    // Guest-only sections aren't public, so they don't belong here.
-    if (section.audience === "guest") continue;
 
     const content = section.content as { rows?: { label?: string; value?: string }[] };
     for (const row of content?.rows ?? []) {
       const label = row.label?.trim();
       const value = row.value?.trim();
-      if (label && value) out.push({ label, value });
+      if (label && value) fromKeyValue.push({ label, value });
     }
   }
-  return out;
+  return fromKeyValue;
 }
 
 /** The temple row, for the hero and FAQ. Matches the landmark by name rather

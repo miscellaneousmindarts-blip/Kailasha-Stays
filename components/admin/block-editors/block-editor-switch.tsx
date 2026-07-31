@@ -6,6 +6,7 @@ import type { PropertyImage } from "@/lib/types/database";
 import { ParagraphEditor } from "./paragraph-editor";
 import { ListEditor } from "./list-editor";
 import { KeyValueEditor } from "./key-value-editor";
+import { DistancesEditor } from "./distances-editor";
 import { FaqEditor } from "./faq-editor";
 import { ImageEditor } from "./image-editor";
 import { GalleryEditor } from "./gallery-editor";
@@ -71,6 +72,15 @@ export function BlockEditorSwitch({
         <KeyValueEditor
           content={safeContent as BlockContent<"key_value">}
           onSave={onSave}
+          {...common}
+        />
+      );
+    case "distances":
+      return (
+        <DistancesEditor
+          content={safeContent as BlockContent<"distances">}
+          onSave={onSave}
+          propertyImages={propertyImages}
           {...common}
         />
       );

@@ -4,6 +4,7 @@ import type { PropertySection } from "@/lib/types/database";
 import { ParagraphBlock } from "./paragraph-block";
 import { ListBlock } from "./list-block";
 import { KeyValueBlock } from "./key-value-block";
+import { DistancesBlock } from "./distances-block";
 import { FaqBlock } from "./faq-block";
 import { ImageBlock } from "./image-block";
 import { GalleryBlock } from "./gallery-block";
@@ -29,6 +30,8 @@ function BlockBody({ type, content }: { type: string; content: unknown }) {
       return <ListBlock content={block.content as BlockContent<"list">} />;
     case "key_value":
       return <KeyValueBlock content={block.content as BlockContent<"key_value">} />;
+    case "distances":
+      return <DistancesBlock content={block.content as BlockContent<"distances">} />;
     case "faq":
       return <FaqBlock content={block.content as BlockContent<"faq">} />;
     case "image":

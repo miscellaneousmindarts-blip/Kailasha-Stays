@@ -4,6 +4,7 @@ import { ExternalLink, MapPin } from "lucide-react";
 import { landingConfig } from "@/lib/landing-config";
 import { serverEnv } from "@/lib/env";
 import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
+import { splitDistanceValue } from "@/lib/distance-format";
 import type { LandingProperty } from "@/lib/landing";
 import type { ResolvedMap } from "@/lib/homepage";
 
@@ -76,19 +77,6 @@ function staticMapUrl(
 function directionsUrl(property: LandingProperty): string {
   const home = locationOf(property);
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(home ?? property.title)}`;
-}
-
-/**
- * "1.4 km — 15 min walk" becomes a big figure and a quiet qualifier. Splits on
- * dashes only, never on spaces: "15 min walk" has to survive intact when the
- * owner wrote no distance at all.
- */
-function splitValue(value: string): { figure: string; mode: string | null } {
-  const parts = value
-    .split(/\s*[—–]\s*/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  return { figure: parts[0] ?? value, mode: parts[1] ?? null };
 }
 
 export function MapStrip({
@@ -186,7 +174,7 @@ export function MapStrip({
           </a>
 
           {landmarks.map((l, i) => {
-            const { figure, mode } = splitValue(l.value);
+            const { figure, mode } = splitDistanceValue(l.value);
             // The first landmark is the temple. It carries the decision, so it
             // gets the wide tile rather than being the third identical card.
             const lead = i === 0;

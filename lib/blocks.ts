@@ -6,6 +6,7 @@ import {
   Images,
   Link2,
   List,
+  MapPin,
   Table2,
   type LucideIcon,
 } from "lucide-react";
@@ -69,6 +70,26 @@ export const blockSchemas = {
       .min(1),
   }),
 
+  /**
+   * Distances to nearby landmarks, laid out as a photo bento — the property
+   * page's counterpart to the homepage's "Where you'll be" tiles, using the
+   * property's own uploaded photos rather than the homepage's separate media
+   * library. Capped at 5: the whole point of a bento is one clear layout per
+   * count, and DistancesEditor/DistancesBlock only define layouts for 1–5.
+   */
+  distances: z.object({
+    items: z
+      .array(
+        z.object({
+          label: z.string().min(1),
+          value: z.string().min(1),
+          image: imageRef.nullish(),
+        }),
+      )
+      .min(1)
+      .max(5),
+  }),
+
   faq: z.object({
     items: z
       .array(
@@ -104,9 +125,15 @@ export const BLOCK_TYPES: Record<
   },
   key_value: {
     label: "Facts table",
-    description: "Label and value pairs, e.g. distances to temples.",
+    description: "Label and value pairs, plain text.",
     icon: Table2,
     empty: { rows: [{ label: "", value: "" }] },
+  },
+  distances: {
+    label: "Distances (photo grid)",
+    description: "Nearby landmarks as a photo bento — up to 5, each with an optional photo.",
+    icon: MapPin,
+    empty: { items: [{ label: "", value: "", image: null }] },
   },
   faq: {
     label: "Questions",
