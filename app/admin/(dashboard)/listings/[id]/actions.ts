@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePublicProperties } from "@/lib/admin/revalidate";
 import { AMENITY_KEYS } from "@/lib/amenities";
 import { BLOCK_TYPES, blockSchemas, isKnownBlockType } from "@/lib/blocks";
-import type { Property, PropertyStatus, SectionAudience } from "@/lib/types/database";
+import type { Property, PropertyImage, PropertyStatus, SectionAudience } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
 
@@ -184,7 +184,7 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export async function uploadPropertyImage(
   propertyId: string,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<ActionResult & { image?: PropertyImage }> {
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     return { error: "Choose a photo to upload." };
@@ -210,16 +210,23 @@ export async function uploadPropertyImage(
     .select("id", { count: "exact", head: true })
     .eq("property_id", propertyId);
 
-  const { error: insertError } = await supabase.from("property_images").insert({
-    property_id: propertyId,
-    storage_path: path,
-    is_cover: (count ?? 0) === 0,
-    sort_order: count ?? 0,
-  });
+  const alt = String(formData.get("alt") ?? "").trim();
+
+  const { data, error: insertError } = await supabase
+    .from("property_images")
+    .insert({
+      property_id: propertyId,
+      storage_path: path,
+      alt: alt || null,
+      is_cover: (count ?? 0) === 0,
+      sort_order: count ?? 0,
+    })
+    .select("*")
+    .single();
   if (insertError) return { error: insertError.message };
 
   revalidateEditor(propertyId);
-  return { success: true };
+  return { success: true, image: data as PropertyImage };
 }
 
 export async function deletePropertyImage(

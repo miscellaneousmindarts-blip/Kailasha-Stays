@@ -179,6 +179,7 @@ function SectionRow({
               pending={content.pending}
               error={content.error}
               saved={content.saved}
+              propertyId={propertyId}
               propertyImages={propertyImages}
             />
           </div>

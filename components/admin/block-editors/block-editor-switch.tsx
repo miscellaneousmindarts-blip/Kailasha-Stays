@@ -22,6 +22,7 @@ export function BlockEditorSwitch({
   pending,
   error,
   saved,
+  propertyId,
   propertyImages,
 }: {
   type: string;
@@ -30,6 +31,7 @@ export function BlockEditorSwitch({
   pending: boolean;
   error: string | null;
   saved: boolean;
+  propertyId: string;
   propertyImages: PropertyImage[];
 }) {
   if (!isKnownBlockType(type)) {
@@ -80,6 +82,7 @@ export function BlockEditorSwitch({
         <DistancesEditor
           content={safeContent as BlockContent<"distances">}
           onSave={onSave}
+          propertyId={propertyId}
           propertyImages={propertyImages}
           {...common}
         />

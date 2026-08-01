@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
-import { Check, ImageOff, Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { SaveBar } from "@/components/admin/save-bar";
-import { imageUrl } from "@/lib/images";
+import { PropertyMediaPicker } from "@/components/admin/block-editors/property-media-picker";
 import type { BlockContent } from "@/lib/blocks";
 import type { PropertyImage } from "@/lib/types/database";
 
@@ -29,6 +27,7 @@ export function DistancesEditor({
   pending,
   error,
   saved,
+  propertyId,
   propertyImages,
 }: {
   content: BlockContent<"distances">;
@@ -36,14 +35,24 @@ export function DistancesEditor({
   pending: boolean;
   error: string | null;
   saved: boolean;
+  propertyId: string;
   propertyImages: PropertyImage[];
 }) {
   const [items, setItems] = useState<Item[]>(
     content.items.length ? content.items.map((i) => ({ ...i, image: i.image ?? null })) : [emptyItem()],
   );
+  // Own copy rather than reading propertyImages directly: a photo uploaded
+  // from inside this editor should be pickable for every landmark row
+  // immediately, without waiting on the Photos tab or a page refresh to hand
+  // back a fresh list.
+  const [pool, setPool] = useState(propertyImages);
 
   function patch(i: number, next: Partial<Item>) {
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...next } : it)));
+  }
+
+  function addToPool(image: PropertyImage) {
+    setPool((prev) => [image, ...prev]);
   }
 
   return (
@@ -60,7 +69,8 @@ export function DistancesEditor({
     >
       <p className="text-text-muted text-sm">
         Up to {MAX_ITEMS} landmarks, shown as a photo grid — the first one leads, so put the nearest or most
-        important one there. A photo is optional per landmark; without one the tile falls back to just the figure.
+        important one there. A photo is optional per landmark, and can be uploaded right here — it doesn&apos;t
+        have to already be in the Photos tab. Without one the tile falls back to just the figure.
       </p>
 
       <div className="space-y-3">
@@ -98,62 +108,20 @@ export function DistancesEditor({
               />
             </div>
 
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Photo (optional)</Label>
-                {item.image ? (
-                  <button
-                    type="button"
-                    onClick={() => patch(i, { image: null })}
-                    className="text-text-muted hover:text-foreground pressable inline-flex items-center gap-1 text-xs font-medium"
-                  >
-                    <X className="size-3" aria-hidden="true" />
-                    Remove photo
-                  </button>
-                ) : null}
-              </div>
-
-              {propertyImages.length ? (
-                <div className="grid grid-cols-5 gap-2 sm:grid-cols-7">
-                  {propertyImages.map((img) => {
-                    const src = imageUrl(img.storage_path);
-                    const selected = item.image?.storage_path === img.storage_path;
-                    return (
-                      <button
-                        key={img.id}
-                        type="button"
-                        onClick={() =>
-                          patch(i, {
-                            image: selected
-                              ? null
-                              : { storage_path: img.storage_path, alt: img.alt ?? undefined },
-                          })
-                        }
-                        aria-label={`${selected ? "Deselect" : "Use"} photo for landmark ${i + 1}`}
-                        aria-pressed={selected}
-                        className={`bg-surface-subtle relative aspect-square overflow-hidden rounded-md ring-2 ${
-                          selected ? "ring-primary" : "ring-transparent hover:ring-border"
-                        }`}
-                      >
-                        {src ? (
-                          <Image src={src} alt="" fill sizes="80px" className="object-cover" />
-                        ) : null}
-                        {selected ? (
-                          <span className="bg-primary text-primary-foreground absolute top-0.5 right-0.5 flex size-4 items-center justify-center rounded-full">
-                            <Check className="size-2.5" aria-hidden="true" />
-                          </span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-text-muted flex items-center gap-1.5 text-xs">
-                  <ImageOff className="size-3.5 shrink-0" aria-hidden="true" />
-                  Upload photos in the Photos tab to add one here.
-                </p>
-              )}
-            </div>
+            <PropertyMediaPicker
+              propertyId={propertyId}
+              pool={pool}
+              value={item.image?.storage_path ?? null}
+              onChange={(path) =>
+                patch(i, {
+                  image: path
+                    ? { storage_path: path, alt: pool.find((p) => p.storage_path === path)?.alt ?? undefined }
+                    : null,
+                })
+              }
+              onUploaded={addToPool}
+              label="Photo (optional)"
+            />
           </div>
         ))}
 
