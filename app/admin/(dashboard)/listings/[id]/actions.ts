@@ -8,7 +8,17 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePublicProperties } from "@/lib/admin/revalidate";
 import { AMENITY_KEYS } from "@/lib/amenities";
 import { BLOCK_TYPES, blockSchemas, isKnownBlockType } from "@/lib/blocks";
-import type { Property, PropertyImage, PropertyStatus, SectionAudience } from "@/lib/types/database";
+import { slugify } from "@/lib/slug";
+import type {
+  Property,
+  PropertyContact,
+  PropertyImage,
+  PropertyPrivate,
+  PropertySection,
+  PropertyStatus,
+  RatePeriod,
+  SectionAudience,
+} from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
 
@@ -172,6 +182,288 @@ export async function deleteProperty(propertyId: string) {
   revalidatePublicProperties();
   revalidatePath("/admin/listings");
   redirect("/admin/listings");
+}
+
+// ---------------------------------------------------------------------------
+// Duplicate a listing
+//
+// Copies everything that *describes* the property — the row itself, its
+// private info, contacts, page sections, price periods and add-on selection
+// — and, on request, its photos.
+//
+// Deliberately not copied is everything tied to the original unit's real
+// history: bookings, enquiries, and the iCal calendar sources. That last one
+// matters most — pointing a second listing at the first one's Airbnb feed
+// would block out the wrong flat's dates on every sync.
+//
+// The copy always lands as a draft, whatever the original's status, so a
+// half-edited clone can't go live by accident.
+// ---------------------------------------------------------------------------
+
+/** Blocks whose entire content IS the photo — there's nothing left worth
+ *  keeping when the copy is made without photos. */
+const PHOTO_ONLY_BLOCKS = new Set(["image", "gallery"]);
+
+/**
+ * Rewrites every `storage_path` in a block's content through `map`. All three
+ * photo-bearing block types (image, gallery, distances) spell an image
+ * reference the same way, so walking the JSON generically covers them — and
+ * any block type added later — without a per-type branch.
+ */
+function remapStoragePaths(value: unknown, map: Map<string, string>): unknown {
+  if (Array.isArray(value)) return value.map((v) => remapStoragePaths(v, map));
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+      out[key] =
+        key === "storage_path" && typeof v === "string"
+          ? (map.get(v) ?? v)
+          : remapStoragePaths(v, map);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
+ * Drops optional image references (a `distances` row's photo, say) when the
+ * copy is made without photos. Without this they'd keep pointing at the
+ * original listing's files, so the clone would quietly render another
+ * property's photos as its own.
+ *
+ * Blocks whose image isn't optional are skipped wholesale by the caller.
+ */
+function stripImageRefs(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripImageRefs);
+  if (value && typeof value === "object") {
+    const entries = value as Record<string, unknown>;
+    if (typeof entries.storage_path === "string") return null;
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(entries)) out[key] = stripImageRefs(v);
+    return out;
+  }
+  return value;
+}
+
+/** First free slug derived from `title` — `x`, then `x-2`, `x-3`, … */
+async function uniquePropertySlug(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  title: string,
+): Promise<string> {
+  const base = slugify(title) || "property";
+  let slug = base;
+  for (let suffix = 2; suffix <= 50; suffix++) {
+    const { data: existing } = await supabase
+      .from("properties")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (!existing) return slug;
+    slug = `${base}-${suffix}`;
+  }
+  return `${base}-${Date.now()}`;
+}
+
+export async function duplicateProperty(
+  propertyId: string,
+  title: string,
+  withImages: boolean,
+): Promise<ActionResult> {
+  const newTitle = title.trim();
+  if (!newTitle) return { error: "Give the new listing a title." };
+  if (newTitle.length > 160) return { error: "Keep the title under 160 characters." };
+
+  const supabase = await createClient();
+
+  const { data: source, error: readError } = await supabase
+    .from("properties")
+    .select("*")
+    .eq("id", propertyId)
+    .maybeSingle();
+  if (readError) return { error: readError.message };
+  if (!source) return { error: "That listing no longer exists." };
+
+  // Everything except the identity and timestamp columns carries over as-is,
+  // so a column added to `properties` later is copied without touching this
+  // action.
+  const carriedOver: Partial<Property> = { ...(source as Property) };
+  delete carriedOver.id;
+  delete carriedOver.slug;
+  delete carriedOver.created_at;
+  delete carriedOver.updated_at;
+
+  const { data: created, error: insertError } = await supabase
+    .from("properties")
+    .insert({
+      ...carriedOver,
+      title: newTitle,
+      slug: await uniquePropertySlug(supabase, newTitle),
+      status: "draft",
+    })
+    .select("id")
+    .single();
+
+  if (insertError) return { error: insertError.message };
+  const newId = created.id;
+
+  // Past this point the new listing exists, so any failure has to clean up
+  // after itself — a half-copied listing is harder to notice than none.
+  const copiedPaths: string[] = [];
+  async function rollback(message: string): Promise<ActionResult> {
+    if (copiedPaths.length) {
+      await supabase.storage.from("property-images").remove(copiedPaths);
+    }
+    await supabase.from("properties").delete().eq("id", newId);
+    return { error: message };
+  }
+
+  // --- Photos: real copies, not shared references. Deleting a photo removes
+  // --- its file from storage, so two listings pointing at one file would
+  // --- mean deleting from either one blanks the other.
+  const pathMap = new Map<string, string>();
+  if (withImages) {
+    const { data: images, error: imagesError } = await supabase
+      .from("property_images")
+      .select("*")
+      .eq("property_id", propertyId)
+      .order("sort_order");
+    if (imagesError) return rollback(imagesError.message);
+
+    for (const image of (images ?? []) as PropertyImage[]) {
+      const ext = image.storage_path.split(".").pop() || "jpg";
+      const newPath = `${newId}/${randomUUID()}.${ext}`;
+      const { error: copyError } = await supabase.storage
+        .from("property-images")
+        .copy(image.storage_path, newPath);
+      if (copyError) return rollback(`Couldn't copy the photos: ${copyError.message}`);
+
+      copiedPaths.push(newPath);
+      pathMap.set(image.storage_path, newPath);
+    }
+
+    if (images?.length) {
+      const rows = (images as PropertyImage[]).map((image) => ({
+        property_id: newId,
+        storage_path: pathMap.get(image.storage_path)!,
+        alt: image.alt,
+        tag: image.tag,
+        is_cover: image.is_cover,
+        sort_order: image.sort_order,
+      }));
+      const { error } = await supabase.from("property_images").insert(rows);
+      if (error) return rollback(error.message);
+    }
+  }
+
+  // --- Page sections
+  const { data: sections, error: sectionsError } = await supabase
+    .from("property_sections")
+    .select("*")
+    .eq("property_id", propertyId)
+    .order("sort_order");
+  if (sectionsError) return rollback(sectionsError.message);
+
+  const sectionRows = [];
+  for (const section of (sections ?? []) as PropertySection[]) {
+    // A photo-only block minus its photos is an empty shell its own schema
+    // would reject, so leave it out rather than write something unrenderable.
+    if (!withImages && PHOTO_ONLY_BLOCKS.has(section.type)) continue;
+
+    const content = withImages
+      ? remapStoragePaths(section.content, pathMap)
+      : stripImageRefs(section.content);
+
+    // Stripping can leave a block short of what its schema needs. Validating
+    // here means a copy never carries content the renderer would skip anyway.
+    if (!withImages && isKnownBlockType(section.type)) {
+      if (!blockSchemas[section.type].safeParse(content).success) continue;
+    }
+
+    sectionRows.push({
+      property_id: newId,
+      title: section.title,
+      type: section.type,
+      content,
+      audience: section.audience,
+      visible: section.visible,
+      sort_order: section.sort_order,
+    });
+  }
+  if (sectionRows.length) {
+    const { error } = await supabase.from("property_sections").insert(sectionRows);
+    if (error) return rollback(error.message);
+  }
+
+  // --- Contacts
+  const { data: contacts, error: contactsError } = await supabase
+    .from("property_contacts")
+    .select("*")
+    .eq("property_id", propertyId)
+    .order("sort_order");
+  if (contactsError) return rollback(contactsError.message);
+  if (contacts?.length) {
+    const rows = (contacts as PropertyContact[]).map((c) => ({
+      property_id: newId,
+      name: c.name,
+      role: c.role,
+      phone: c.phone,
+      show_to_guest: c.show_to_guest,
+      sort_order: c.sort_order,
+    }));
+    const { error } = await supabase.from("property_contacts").insert(rows);
+    if (error) return rollback(error.message);
+  }
+
+  // --- Private info (admin + guest portal only, never public)
+  const { data: priv, error: privError } = await supabase
+    .from("property_private")
+    .select("*")
+    .eq("property_id", propertyId)
+    .maybeSingle();
+  if (privError) return rollback(privError.message);
+  if (priv) {
+    const { error } = await supabase
+      .from("property_private")
+      .insert({ ...(priv as PropertyPrivate), property_id: newId });
+    if (error) return rollback(error.message);
+  }
+
+  // --- Price periods
+  const { data: periods, error: periodsError } = await supabase
+    .from("rate_periods")
+    .select("*")
+    .eq("property_id", propertyId);
+  if (periodsError) return rollback(periodsError.message);
+  if (periods?.length) {
+    const rows = (periods as RatePeriod[]).map((p) => ({
+      property_id: newId,
+      label: p.label,
+      start_date: p.start_date,
+      end_date: p.end_date,
+      direct_price: p.direct_price,
+      airbnb_price: p.airbnb_price,
+    }));
+    const { error } = await supabase.from("rate_periods").insert(rows);
+    if (error) return rollback(error.message);
+  }
+
+  // --- Which add-ons this listing offers
+  const { data: addons, error: addonsError } = await supabase
+    .from("property_addon_services")
+    .select("addon_service_id")
+    .eq("property_id", propertyId);
+  if (addonsError) return rollback(addonsError.message);
+  if (addons?.length) {
+    const rows = addons.map((a) => ({
+      property_id: newId,
+      addon_service_id: a.addon_service_id,
+    }));
+    const { error } = await supabase.from("property_addon_services").insert(rows);
+    if (error) return rollback(error.message);
+  }
+
+  revalidatePath("/admin/listings");
+  redirect(editorPath(newId));
 }
 
 // ---------------------------------------------------------------------------

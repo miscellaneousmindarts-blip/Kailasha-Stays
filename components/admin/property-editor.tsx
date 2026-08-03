@@ -57,6 +57,7 @@ export function PropertyEditor({
         <StatusControls
           propertyId={property.id}
           slug={property.slug}
+          title={property.title}
           status={property.status}
         />
       </div>

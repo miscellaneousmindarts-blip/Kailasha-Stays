@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 
 import { useSaveAction } from "@/components/admin/use-save-action";
+import { DuplicateListing } from "@/components/admin/duplicate-listing";
 import {
   deleteProperty,
   setPropertyStatus,
@@ -20,10 +21,12 @@ const STATUS_STYLES: Record<PropertyStatus, string> = {
 export function StatusControls({
   propertyId,
   slug,
+  title,
   status,
 }: {
   propertyId: string;
   slug: string;
+  title: string;
   status: PropertyStatus;
 }) {
   const statusAction = useSaveAction(setPropertyStatus);
@@ -94,6 +97,8 @@ export function StatusControls({
           Archive
         </button>
       ) : null}
+
+      <DuplicateListing propertyId={propertyId} title={title} />
 
       {statusAction.error ? (
         <span role="alert" className="text-danger text-sm">
