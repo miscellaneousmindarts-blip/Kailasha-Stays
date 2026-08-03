@@ -1,39 +1,13 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
 import Image from "next/image";
 import { Star } from "lucide-react";
 
 import { BLUR_DATA_URL } from "@/lib/images";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 import type { ResolvedProof } from "@/lib/homepage";
 
 type Review = ResolvedProof["reviews"][number];
-
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
-
-/**
- * useSyncExternalStore, not useState+useEffect: matchMedia is genuinely
- * external, client-only state, which is exactly what this hook is for. It
- * avoids two problems a state+effect version would have — setting state
- * synchronously inside an effect (flagged by this project's lint rule), and a
- * hydration mismatch from guessing `false` during SSR and then discovering
- * the real value on the client after the animated markup already rendered.
- */
-function subscribeReducedMotion(callback: () => void) {
-  const mq = window.matchMedia(REDUCED_MOTION_QUERY);
-  mq.addEventListener("change", callback);
-  return () => mq.removeEventListener("change", callback);
-}
-function getReducedMotionSnapshot() {
-  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
-}
-function getReducedMotionServerSnapshot() {
-  // true, not false: this is also what pre-hydration first paint uses, and a
-  // motion-sensitive visitor seeing a still carousel for a moment is the
-  // correct failure mode — the reverse (a moment of unwanted auto-scroll)
-  // is exactly what "no auto-scroll at all" rules out.
-  return true;
-}
 
 function Stars({ count }: { count: number }) {
   return (
@@ -124,11 +98,7 @@ export function ReviewsCarousel({
   speedSeconds: number;
   pauseOnHover: boolean;
 }) {
-  const reducedMotion = useSyncExternalStore(
-    subscribeReducedMotion,
-    getReducedMotionSnapshot,
-    getReducedMotionServerSnapshot,
-  );
+  const reducedMotion = useReducedMotion();
 
   const shouldAnimate = enabled && !reducedMotion && reviews.length >= 3;
 

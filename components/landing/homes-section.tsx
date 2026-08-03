@@ -1,5 +1,5 @@
 import { Eyebrow, Section } from "@/components/landing/primitives";
-import { LandingPropertyCard } from "@/components/landing/property-card";
+import { PropertyCarousel } from "@/components/landing/property-carousel";
 import type { LandingProperty } from "@/lib/landing";
 import type { ResolvedHomes } from "@/lib/homepage";
 
@@ -26,15 +26,7 @@ export function HomesSection({
         <p className="text-text-muted mt-3 max-w-xl">{resolved.lede}</p>
       ) : null}
 
-      <div className="mt-8 grid gap-5 md:grid-cols-2">
-        {properties.map((property) => (
-          <LandingPropertyCard
-            key={property.id}
-            property={property}
-            section="homes"
-          />
-        ))}
-      </div>
+      <PropertyCarousel properties={properties} section="homes" ariaLabel="Our homes" />
     </Section>
   );
 }

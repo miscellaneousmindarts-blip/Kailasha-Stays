@@ -348,8 +348,9 @@ insert into public.homepage_sections (key, kind, type, title, can_hide, pin, sor
 }'::jsonb),
 
 -- ── Our homes ───────────────────────────────────────────────────────────────
--- can_hide false: the hero's primary button points here.
-('homes', 'builtin', 'homes', 'Our homes', false, null, 30, '{
+-- Hideable like every other section (see 0009) — the hero's primary button
+-- points here, but that's the admin's call to make, not a hard lock.
+('homes', 'builtin', 'homes', 'Our homes', true, null, 30, '{
   "eyebrowHi": "हमारे घर",
   "eyebrow": "Our homes",
   "heading": "{count} {homes}. Each one yours alone.",

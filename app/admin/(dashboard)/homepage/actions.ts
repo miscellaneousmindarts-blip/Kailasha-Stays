@@ -38,8 +38,9 @@ export async function updateSectionVisibility(id: string, visible: boolean): Pro
     .from("homepage_sections")
     .update({ visible })
     .eq("id", id)
-    // Refuse at the query, not just in the UI: `homes` is the one section
-    // that can never hide — it's where the hero's primary button points.
+    // Refuse at the query, not just in the UI — belt and suspenders against
+    // a crafted request for a row the outline's own drag/toggle guards would
+    // never send. Every builtin is hideable; see 0009_homepage_homes_hideable.
     .eq("can_hide", true)
     .select("id");
 

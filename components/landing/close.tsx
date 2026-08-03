@@ -1,7 +1,7 @@
 import { ArrowDown, MapPin } from "lucide-react";
 
 import { Section } from "@/components/landing/primitives";
-import { LandingPropertyCard } from "@/components/landing/property-card";
+import { PropertyCarousel } from "@/components/landing/property-carousel";
 import { PhoneLink, ShareButton, WhatsAppLink } from "@/components/landing/actions";
 import type { LandingProperty } from "@/lib/landing";
 import type { ResolvedClose } from "@/lib/homepage";
@@ -54,16 +54,13 @@ export function Close({
         </a>
       </div>
 
-      <div className="mx-auto mt-10 grid max-w-3xl gap-4 sm:grid-cols-2">
-        {properties.map((property) => (
-          <LandingPropertyCard
-            key={property.id}
-            property={property}
-            section="close"
-            compact
-          />
-        ))}
-      </div>
+      <PropertyCarousel
+        properties={properties}
+        section="close"
+        compact
+        ariaLabel="Our homes"
+        className="mx-auto mt-10 max-w-3xl"
+      />
 
       {resolved.shareHeadingHi || resolved.shareBody ? (
         <div className="border-border bg-surface mx-auto mt-10 max-w-[560px] rounded-lg border p-5 text-center">

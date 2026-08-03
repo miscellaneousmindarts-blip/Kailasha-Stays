@@ -107,10 +107,14 @@ function OutlineRow({
   section,
   selected,
   onSelect,
+  onToggled,
 }: {
   section: HomepageSection;
   selected: boolean;
   onSelect: () => void;
+  /** Local state has no other way to learn the toggle succeeded — the server
+   *  action only revalidates the *next* full page load, not this component. */
+  onToggled: (visible: boolean) => void;
 }) {
   const pinned = section.pin !== null;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -164,7 +168,11 @@ function OutlineRow({
 
       <button
         type="button"
-        onClick={() => vis.run(section.id, !section.visible)}
+        onClick={async () => {
+          const next = !section.visible;
+          const ok = await vis.runAndWait(section.id, next);
+          if (ok) onToggled(next);
+        }}
         disabled={!section.can_hide || vis.pending}
         aria-label={
           !section.can_hide ? `${label} is always shown` : section.visible ? `Hide ${label}` : `Show ${label}`
@@ -467,6 +475,10 @@ function ShellInner({
                     section={section}
                     selected={section.id === selectedId}
                     onSelect={() => setSelectedId(section.id)}
+                    onToggled={(visible) => {
+                      patchSection(section.id, { visible });
+                      refreshPreview();
+                    }}
                   />
                 ))}
               </SortableContext>
