@@ -2,13 +2,18 @@ import type { Metadata } from "next";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 
 import { HomepageShell } from "@/components/admin/homepage/homepage-shell";
+import { getSiteSettingsAdmin } from "@/lib/admin/queries";
 import { readHomepageSections } from "./actions";
 import { readHomepageImages } from "./media-actions";
 
 export const metadata: Metadata = { title: "Homepage" };
 
 export default async function HomepageSettingsPage() {
-  const [sections, images] = await Promise.all([readHomepageSections(), readHomepageImages()]);
+  const [sections, images, settings] = await Promise.all([
+    readHomepageSections(),
+    readHomepageImages(),
+    getSiteSettingsAdmin(),
+  ]);
 
   return (
     <div className="flex h-full flex-col space-y-4">
@@ -48,7 +53,7 @@ export default async function HomepageSettingsPage() {
           </div>
         </div>
       ) : (
-        <HomepageShell sections={sections} images={images} />
+        <HomepageShell sections={sections} images={images} settings={settings} />
       )}
     </div>
   );

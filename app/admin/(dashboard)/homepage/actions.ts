@@ -9,8 +9,9 @@ import {
   isBuiltinKey,
   isLayoutType,
   layoutSchemas,
+  type BuiltinKey,
 } from "@/lib/homepage-blocks";
-import type { HomepageSection } from "@/lib/types/database";
+import type { HomepageSection, SiteSettings } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
 
@@ -91,13 +92,42 @@ export async function reorderSections(orderedIds: string[]): Promise<ActionResul
 }
 
 /**
+ * A few site_settings columns are read by exactly ONE homepage section, so
+ * they're edited inside that section's own form rather than on a distant
+ * settings page — you set the host's name where you can see the host section
+ * it appears in. They stay in site_settings rather than moving into the
+ * section's jsonb because the token resolver reads them from there.
+ *
+ * The whitelist is what makes that safe: a crafted request can only ever
+ * touch the columns its section is allowed to, never arbitrary settings.
+ *
+ * Values quoted by MORE than one section (cancel_days, advance_pct,
+ * reply_minutes) deliberately stay on the Settings page — see
+ * updateBookingPolicy for why.
+ */
+type SectionSettingKey = "host_name" | "host_years" | "hotel_room_rate";
+
+const SECTION_SETTINGS: Partial<Record<BuiltinKey, readonly SectionSettingKey[]>> = {
+  meet_host: ["host_name", "host_years"],
+  why_apartment: ["hotel_room_rate"],
+};
+
+/**
  * Saves a builtin section's whole content, validated against its zod schema.
  * Unlike v1, `content` is the entire section (see plan §1) — it's sent as
  * JSON from the editor's own local state, not read off a <form>, because
  * several sections hold arrays (FAQ items, trust-ribbon items, review cards)
  * that don't map cleanly onto FormData.
+ *
+ * `settingsPatch` carries this section's own site_settings values (if it has
+ * any) so the editor keeps a single Save button rather than two.
  */
-export async function updateBuiltinSection(id: string, key: string, content: unknown): Promise<ActionResult> {
+export async function updateBuiltinSection(
+  id: string,
+  key: string,
+  content: unknown,
+  settingsPatch?: Partial<Record<SectionSettingKey, string | number | null>>,
+): Promise<ActionResult> {
   if (!isBuiltinKey(key)) return { error: "Unknown section." };
 
   const parsed = builtinSchemas[key].safeParse(content);
@@ -118,6 +148,33 @@ export async function updateBuiltinSection(id: string, key: string, content: unk
     .eq("kind", "builtin");
 
   if (error) return { error: friendly(error) };
+
+  if (settingsPatch) {
+    const allowed = SECTION_SETTINGS[key] ?? [];
+    const patch: Partial<Pick<SiteSettings, SectionSettingKey>> = {};
+    for (const column of allowed) {
+      if (!(column in settingsPatch)) continue;
+      const value = settingsPatch[column];
+      if (column === "hotel_room_rate") {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n < 0) return { error: "Enter a valid hotel room rate." };
+        patch.hotel_room_rate = n;
+      } else {
+        patch[column] = value === null || value === "" ? null : String(value);
+      }
+    }
+
+    if (Object.keys(patch).length) {
+      const { error: settingsError } = await supabase
+        .from("site_settings")
+        .update(patch)
+        .eq("id", true);
+      // The section content already saved, so report the settings failure
+      // rather than pretending the whole save succeeded.
+      if (settingsError) return { error: settingsError.message };
+    }
+  }
+
   revalidateBuilder();
   return { success: true };
 }

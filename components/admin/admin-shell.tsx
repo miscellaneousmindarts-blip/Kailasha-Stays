@@ -2,41 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  CalendarDays,
-  Home,
-  Inbox,
-  LayoutDashboard,
-  LogOut,
-  Palette,
-  Receipt,
-  Settings,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 
 import { signOut } from "@/app/admin/(dashboard)/actions";
-
-// Desktop sidebar shows every section. The mobile bottom tab bar is capped at
-// 5 items (see PLAN §9 bottom-nav-limit), so Settings lives in the mobile
-// header instead of competing for a tab slot.
-const NAV = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/admin/bookings", label: "Bookings", icon: Receipt },
-  { href: "/admin/enquiries", label: "Enquiries", icon: Inbox },
-  { href: "/admin/listings", label: "Listings", icon: Home },
-];
-
-const MOBILE_NAV = NAV;
-const SETTINGS_ITEM = { href: "/admin/settings", label: "Settings", icon: Settings };
-// Homepage joins Settings outside the mobile tab bar for the same reason: the
-// bar is capped at 5 and Bookings/Enquiries are the tabs the owner opens daily.
-// Both are one tap away from the mobile header instead.
-const HOMEPAGE_ITEM = { href: "/admin/homepage", label: "Homepage", icon: Palette };
-const DESKTOP_NAV = [...NAV, HOMEPAGE_ITEM, SETTINGS_ITEM];
-
-function isActive(pathname: string, href: string) {
-  return href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
-}
+import {
+  MOBILE_TABS,
+  MORE_ITEM,
+  NAV_GROUPS,
+  isActive,
+  isMoreRoute,
+} from "@/lib/admin/nav";
 
 export function AdminShell({
   userEmail,
@@ -49,29 +24,39 @@ export function AdminShell({
 
   return (
     <div className="flex min-h-dvh">
-      {/* desktop sidebar */}
+      {/* Desktop sidebar — every destination, grouped by how often it's used. */}
       <aside className="border-border hidden w-64 shrink-0 flex-col border-r p-4 lg:flex">
         <p className="px-2 py-2 font-semibold">Admin</p>
-        <nav className="mt-4 flex flex-col gap-1">
-          {DESKTOP_NAV.map((item) => {
-            const active = isActive(pathname, item.href);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`pressable flex h-11 items-center gap-3 rounded-md px-3 font-medium ${
-                  active
-                    ? "bg-primary-tint text-primary"
-                    : "hover:bg-surface-subtle"
-                }`}
-              >
-                <Icon className="size-5" aria-hidden="true" />
-                {item.label}
-              </Link>
-            );
-          })}
+
+        <nav className="mt-3 flex flex-col gap-5">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label}>
+              <p className="text-text-muted px-3 pb-1 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                {group.label}
+              </p>
+              <div className="flex flex-col gap-1">
+                {group.items.map((item) => {
+                  const active = isActive(pathname, item.href);
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      className={`pressable flex h-11 items-center gap-3 rounded-md px-3 font-medium ${
+                        active ? "bg-primary-tint text-primary" : "hover:bg-surface-subtle"
+                      }`}
+                    >
+                      <Icon className="size-5" aria-hidden="true" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
+
         <div className="border-border mt-auto border-t pt-3">
           <p className="text-text-muted truncate px-2 text-sm">{userEmail}</p>
           <form action={signOut}>
@@ -87,52 +72,32 @@ export function AdminShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* mobile top bar */}
+        {/* Mobile top bar. Deliberately holds no navigation any more — the two
+            unlabelled icons that used to live here (Homepage, Settings) were
+            icon-only nav, which hurts discoverability; both are now labelled
+            rows on the More tab instead. */}
         <header className="border-border bg-background sticky top-0 z-30 flex h-14 items-center justify-between border-b px-4 lg:hidden">
           <p className="font-semibold">Admin</p>
-          <div className="flex items-center">
-            <Link
-              href={HOMEPAGE_ITEM.href}
-              aria-label="Homepage"
-              className={`pressable flex size-11 items-center justify-center rounded-full ${
-                isActive(pathname, HOMEPAGE_ITEM.href) ? "text-primary" : ""
-              }`}
-            >
-              <Palette className="size-5" aria-hidden="true" />
-            </Link>
-            <Link
-              href={SETTINGS_ITEM.href}
-              aria-label="Settings"
-              className={`pressable flex size-11 items-center justify-center rounded-full ${
-                isActive(pathname, SETTINGS_ITEM.href) ? "text-primary" : ""
-              }`}
-            >
-              <Settings className="size-5" aria-hidden="true" />
-            </Link>
-            <form action={signOut}>
-              <button
-                type="submit"
-                aria-label="Sign out"
-                className="hover:bg-surface-subtle pressable flex size-11 items-center justify-center rounded-full"
-              >
-                <LogOut className="size-5" aria-hidden="true" />
-              </button>
-            </form>
-          </div>
         </header>
 
         <main className="flex-1 p-4 pb-24 md:p-6 lg:pb-6">{children}</main>
       </div>
 
-      {/* mobile bottom tab bar */}
+      {/* Mobile tab bar — four daily destinations plus More, at the 5-item cap. */}
       <nav className="border-border bg-background fixed inset-x-0 bottom-0 z-30 flex h-16 items-stretch border-t pb-[env(safe-area-inset-bottom)] lg:hidden">
-        {MOBILE_NAV.map((item) => {
-          const active = isActive(pathname, item.href);
+        {MOBILE_TABS.map((item) => {
+          // The More tab stays lit while you're inside any screen it leads to,
+          // so the bar never looks like nothing is selected.
+          const active =
+            item.href === MORE_ITEM.href
+              ? isMoreRoute(pathname)
+              : isActive(pathname, item.href);
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               className={`flex flex-1 flex-col items-center justify-center gap-0.5 text-xs font-medium ${
                 active ? "text-primary" : "text-text-muted"
               }`}

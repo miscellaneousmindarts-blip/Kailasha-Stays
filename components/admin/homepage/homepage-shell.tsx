@@ -72,7 +72,7 @@ import {
   type BuiltinKey,
   type LayoutType,
 } from "@/lib/homepage-blocks";
-import type { HomepageImage, HomepageSection } from "@/lib/types/database";
+import type { HomepageImage, HomepageSection, SiteSettings } from "@/lib/types/database";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BUILTIN_EDITORS: Record<BuiltinKey, React.ComponentType<any>> = {
@@ -177,7 +177,15 @@ function OutlineRow({
   );
 }
 
-function BuiltinEditorPanel({ section, onSaved }: { section: HomepageSection; onSaved: () => void }) {
+function BuiltinEditorPanel({
+  section,
+  settings,
+  onSaved,
+}: {
+  section: HomepageSection;
+  settings: SiteSettings;
+  onSaved: () => void;
+}) {
   const save = useSaveAction(updateBuiltinSection);
   if (!isBuiltinKey(section.key)) return null;
   const Editor = BUILTIN_EDITORS[section.key];
@@ -185,11 +193,14 @@ function BuiltinEditorPanel({ section, onSaved }: { section: HomepageSection; on
   return (
     <Editor
       content={section.content}
+      settings={settings}
       pending={save.pending}
       error={save.error}
       saved={save.saved}
-      onSave={async (content: unknown) => {
-        const ok = await save.runAndWait(section.id, section.key, content);
+      // `settingsPatch` is undefined for the sections that don't own any
+      // site_settings values; the action ignores it in that case.
+      onSave={async (content: unknown, settingsPatch?: Record<string, string | number | null>) => {
+        const ok = await save.runAndWait(section.id, section.key, content, settingsPatch);
         if (ok) onSaved();
       }}
     />
@@ -332,7 +343,13 @@ function LayoutPicker({ onPick, onCancel, pending }: { onPick: (type: LayoutType
 
 type Tab = "sections" | "media";
 
-function ShellInner({ initialSections }: { initialSections: HomepageSection[] }) {
+function ShellInner({
+  initialSections,
+  settings,
+}: {
+  initialSections: HomepageSection[];
+  settings: SiteSettings;
+}) {
   const [sections, setSections] = useState(initialSections);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("sections");
@@ -518,6 +535,7 @@ function ShellInner({ initialSections }: { initialSections: HomepageSection[] })
               <BuiltinEditorPanel
                 key={selected.id}
                 section={selected}
+                settings={settings}
                 onSaved={refreshPreview}
               />
             ) : (
@@ -618,13 +636,15 @@ function ShellInner({ initialSections }: { initialSections: HomepageSection[] })
 export function HomepageShell({
   sections,
   images,
+  settings,
 }: {
   sections: HomepageSection[];
   images: HomepageImage[];
+  settings: SiteSettings;
 }) {
   return (
     <MediaLibraryProvider initialPool={images}>
-      <ShellInner initialSections={sections} />
+      <ShellInner initialSections={sections} settings={settings} />
     </MediaLibraryProvider>
   );
 }

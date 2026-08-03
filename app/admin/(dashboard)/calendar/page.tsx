@@ -1,13 +1,21 @@
-import { AdminCalendar } from "@/components/admin/calendar/admin-calendar";
-import { listPropertyOptions } from "@/lib/admin/queries";
+import type { Metadata } from "next";
+
+import { CalendarTabs } from "@/components/admin/calendar/calendar-tabs";
+import { listAllCalendarSources, listPropertyOptions } from "@/lib/admin/queries";
+import { publicEnv, serverEnv } from "@/lib/env";
+
+export const metadata: Metadata = { title: "Calendar" };
 
 export default async function AdminCalendarPage() {
-  const properties = await listPropertyOptions();
+  const [properties, sources] = await Promise.all([
+    listPropertyOptions(),
+    listAllCalendarSources(),
+  ]);
 
   return (
     <div>
       <h1 className="text-2xl font-semibold">Calendar</h1>
-      <p className="text-text-muted mt-1">
+      <p className="text-text-muted mt-1 max-w-2xl text-sm">
         Every source in one place — direct bookings, manual blocks, and
         synced Airbnb / Booking.com dates.
       </p>
@@ -21,7 +29,12 @@ export default async function AdminCalendarPage() {
         </div>
       ) : (
         <div className="mt-6">
-          <AdminCalendar properties={properties} />
+          <CalendarTabs
+            properties={properties}
+            sources={sources}
+            exportBaseUrl={`${publicEnv.siteUrl}/api/ical`}
+            exportKey={serverEnv.icalExportSecret}
+          />
         </div>
       )}
     </div>

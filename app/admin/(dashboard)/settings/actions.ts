@@ -41,6 +41,9 @@ export async function updateSiteSettings(formData: FormData): Promise<ActionResu
       contact_email: email || null,
       address: String(formData.get("address") ?? "").trim() || null,
       response_note: String(formData.get("response_note") ?? "").trim() || null,
+      maps_url: String(formData.get("maps_url") ?? "").trim() || null,
+      instagram_url: String(formData.get("instagram_url") ?? "").trim() || null,
+      facebook_url: String(formData.get("facebook_url") ?? "").trim() || null,
     })
     .eq("id", true);
 
@@ -81,12 +84,17 @@ function formatHour12(time: string): string {
 }
 
 /**
- * The homepage quotes these facts in several sections at once (the trust
- * ribbon's cancellation line, the hero's response-time chip, the FAQ, the
- * Shravan advance-payment line) via {tokens} — see
- * docs/homepage-builder-v2-plan.md §2 — so they live here once rather than
- * inside any single section, and can't drift between sections the way a
- * hardcoded number copy-pasted into each one could.
+ * Booking policy — the promises quoted back to guests.
+ *
+ * These stay central rather than moving into the homepage section that shows
+ * them, because each is quoted by MORE THAN ONE section: {cancelDays} appears
+ * in the trust ribbon and the FAQ, {advancePct} in the Shravan notice and the
+ * FAQ, {replyMinutes} in the hero chips and the sticky bar. A per-section copy
+ * would let two parts of the same page promise different things.
+ *
+ * (Values used by exactly one section — the host's name and years, the
+ * indicative hotel rate — moved out to those sections' own editors, so they're
+ * edited where their effect is visible.)
  *
  * Reply hours are entered as two <input type="time"> fields rather than as a
  * display string ("8am") AND a separate 24-hour number: deriving both from
@@ -94,7 +102,7 @@ function formatHour12(time: string): string {
  * the sticky bar's "open now" pip promises a response time, so it must never
  * disagree with the hours shown next to it.
  */
-export async function updateHostAndPromises(formData: FormData): Promise<ActionResult> {
+export async function updateBookingPolicy(formData: FormData): Promise<ActionResult> {
   const hoursStart = String(formData.get("hours_start_24") ?? "").trim();
   const hoursEnd = String(formData.get("hours_end_24") ?? "").trim();
   if (!TIME_RE.test(hoursStart) || !TIME_RE.test(hoursEnd)) {
@@ -116,17 +124,10 @@ export async function updateHostAndPromises(formData: FormData): Promise<ActionR
     return { error: "Advance must be a percentage between 0 and 100." };
   }
 
-  const hotelRoomRate = Number(formData.get("hotel_room_rate"));
-  if (!Number.isFinite(hotelRoomRate) || hotelRoomRate < 0) {
-    return { error: "Enter a valid hotel room rate." };
-  }
-
   const supabase = await createClient();
   const { error } = await supabase
     .from("site_settings")
     .update({
-      host_name: String(formData.get("host_name") ?? "").trim() || null,
-      host_years: String(formData.get("host_years") ?? "").trim() || null,
       reply_minutes: replyMinutes,
       hours_start: formatHour12(hoursStart),
       hours_end: formatHour12(hoursEnd),
@@ -134,10 +135,6 @@ export async function updateHostAndPromises(formData: FormData): Promise<ActionR
       hours_end_hour: Number(hoursEnd.split(":")[0]),
       cancel_days: cancelDays,
       advance_pct: advancePct,
-      hotel_room_rate: hotelRoomRate,
-      maps_url: String(formData.get("maps_url") ?? "").trim() || null,
-      instagram_url: String(formData.get("instagram_url") ?? "").trim() || null,
-      facebook_url: String(formData.get("facebook_url") ?? "").trim() || null,
     })
     .eq("id", true);
 

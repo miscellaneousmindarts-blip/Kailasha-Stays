@@ -12,6 +12,7 @@ import { MediaPicker } from "@/components/admin/homepage/media-picker";
 import { RepeatableList } from "@/components/admin/homepage/repeatable-list";
 import { useMediaLibrary } from "@/components/admin/homepage/media-library-context";
 import { builtinSchemas, type BuiltinContent, type BuiltinKey } from "@/lib/homepage-blocks";
+import type { SiteSettings } from "@/lib/types/database";
 
 /**
  * One editor per builtin section. Each parses the row's raw content against
@@ -24,7 +25,13 @@ import { builtinSchemas, type BuiltinContent, type BuiltinKey } from "@/lib/home
 
 export type EditorProps<K extends BuiltinKey> = {
   content: unknown;
-  onSave: (content: BuiltinContent<K>) => void;
+  /** Current site_settings, for the few sections that own a value from it. */
+  settings: SiteSettings;
+  onSave: (
+    content: BuiltinContent<K>,
+    /** Only the columns this section owns — see SECTION_SETTINGS in the action. */
+    settingsPatch?: Record<string, string | number | null>,
+  ) => void;
   pending: boolean;
   error: string | null;
   saved: boolean;
@@ -313,16 +320,26 @@ export function HomesEditor({ content, onSave, pending, error, saved }: EditorPr
 
 /* ---------------------------------------------------------- why apartment */
 
-export function WhyApartmentEditor({ content, onSave, pending, error, saved }: EditorProps<"why_apartment">) {
+export function WhyApartmentEditor({
+  content,
+  settings,
+  onSave,
+  pending,
+  error,
+  saved,
+}: EditorProps<"why_apartment">) {
   const c = parse("why_apartment", content);
   const [heading, setHeading] = useState(c.heading);
   const [body, setBody] = useState(c.body);
+  // Lives in site_settings but is read by this section alone, so it's edited
+  // here — next to the calculator it feeds — and saved by the same button.
+  const [hotelRoomRate, setHotelRoomRate] = useState(String(settings.hotel_room_rate));
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onSave({ heading, body });
+        onSave({ heading, body }, { hotel_room_rate: Number(hotelRoomRate) || 0 });
       }}
       className="space-y-4"
     >
@@ -334,6 +351,25 @@ export function WhyApartmentEditor({ content, onSave, pending, error, saved }: E
         <Label htmlFor="why-body">Body copy</Label>
         <Textarea id="why-body" value={body} onChange={(e) => setBody(e.target.value)} rows={4} />
       </div>
+
+      <div className="border-border space-y-1 border-t pt-4">
+        <Label htmlFor="why-hotel-rate">Typical local hotel room rate (₹/night)</Label>
+        <Input
+          id="why-hotel-rate"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          value={hotelRoomRate}
+          onChange={(e) => setHotelRoomRate(e.target.value)}
+          className="h-10 max-w-[200px]"
+          required
+        />
+        <p className="text-text-muted text-xs">
+          The number the savings calculator below this copy compares against — an indicative market
+          rate, not any specific hotel&apos;s.
+        </p>
+      </div>
+
       <SaveBar pending={pending} saved={saved} error={error} />
     </form>
   );
@@ -341,8 +377,20 @@ export function WhyApartmentEditor({ content, onSave, pending, error, saved }: E
 
 /* -------------------------------------------------------------- meet host */
 
-export function MeetHostEditor({ content, onSave, pending, error, saved }: EditorProps<"meet_host">) {
+export function MeetHostEditor({
+  content,
+  settings,
+  onSave,
+  pending,
+  error,
+  saved,
+}: EditorProps<"meet_host">) {
   const c = parse("meet_host", content);
+  // Both live in site_settings but are read only by this section, so they're
+  // edited here rather than on a distant settings page. Setting the name is
+  // also what makes the section appear at all.
+  const [hostName, setHostName] = useState(settings.host_name ?? "");
+  const [hostYears, setHostYears] = useState(settings.host_years ?? "");
   const [eyebrowHi, setEyebrowHi] = useState(c.eyebrowHi);
   const [eyebrow, setEyebrow] = useState(c.eyebrow);
   const [heading, setHeading] = useState(c.heading);
@@ -356,14 +404,40 @@ export function MeetHostEditor({ content, onSave, pending, error, saved }: Edito
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onSave({ eyebrowHi, eyebrow, heading, body, imageId, videoCallTitle, videoCallBody, videoCallCta });
+        onSave(
+          { eyebrowHi, eyebrow, heading, body, imageId, videoCallTitle, videoCallBody, videoCallCta },
+          { host_name: hostName.trim() || null, host_years: hostYears.trim() || null },
+        );
       }}
       className="space-y-4"
     >
-      <p className="text-text-muted text-sm">
-        This whole section stays hidden on the homepage until you set your name in Settings → Host & booking
-        promises.
-      </p>
+      <div className="border-border grid gap-3 rounded-md border p-3 sm:grid-cols-2">
+        <div className="space-y-1 sm:col-span-2">
+          <p className="text-text-muted text-xs">
+            This whole section stays hidden on the homepage until you fill in your name.
+          </p>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="host-name">Your name</Label>
+          <Input
+            id="host-name"
+            value={hostName}
+            onChange={(e) => setHostName(e.target.value)}
+            placeholder="Kamal Kishan"
+            className="h-10"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="host-years">Years in Deoghar</Label>
+          <Input
+            id="host-years"
+            value={hostYears}
+            onChange={(e) => setHostYears(e.target.value)}
+            placeholder="40"
+            className="h-10"
+          />
+        </div>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">

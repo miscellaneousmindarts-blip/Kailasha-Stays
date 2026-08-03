@@ -98,6 +98,46 @@ export function ContactSettingsForm({ settings }: { settings: SiteSettings }) {
         />
       </div>
 
+      {/* Links live with the rest of the business identity rather than in
+          their own section — they're the same kind of fact, and splitting
+          them out was part of what made the old page five screens long. */}
+      <div className="border-border space-y-5 border-t pt-5">
+        <div className="space-y-2">
+          <Label htmlFor="maps_url">Google Maps link</Label>
+          <Input
+            id="maps_url"
+            name="maps_url"
+            type="url"
+            defaultValue={settings.maps_url ?? ""}
+            placeholder="https://maps.app.goo.gl/…"
+            className="h-11"
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="instagram_url">Instagram</Label>
+            <Input
+              id="instagram_url"
+              name="instagram_url"
+              type="url"
+              defaultValue={settings.instagram_url ?? ""}
+              className="h-11"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="facebook_url">Facebook</Label>
+            <Input
+              id="facebook_url"
+              name="facebook_url"
+              type="url"
+              defaultValue={settings.facebook_url ?? ""}
+              className="h-11"
+            />
+          </div>
+        </div>
+      </div>
+
       <SaveBar pending={action.pending} saved={action.saved} error={action.error} />
     </form>
   );
