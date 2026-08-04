@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentTenantId } from "@/lib/admin/tenant";
 import {
   blankLayout,
   builtinSchemas,
@@ -169,7 +170,7 @@ export async function updateBuiltinSection(
       const { error: settingsError } = await supabase
         .from("site_settings")
         .update(patch)
-        .eq("id", true);
+        .eq("tenant_id", await getCurrentTenantId(supabase));
       // The section content already saved, so report the settings failure
       // rather than pretending the whole save succeeded.
       if (settingsError) return { error: settingsError.message };

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { syncCalendarSource } from "@/lib/admin/ical-sync";
 import { revalidatePublicProperties } from "@/lib/admin/revalidate";
+import { getCurrentTenantId } from "@/lib/admin/tenant";
 import type { CalendarPlatform } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
@@ -45,7 +46,7 @@ export async function updateSiteSettings(formData: FormData): Promise<ActionResu
       instagram_url: String(formData.get("instagram_url") ?? "").trim() || null,
       facebook_url: String(formData.get("facebook_url") ?? "").trim() || null,
     })
-    .eq("id", true);
+    .eq("tenant_id", await getCurrentTenantId(supabase));
 
   if (error) return { error: error.message };
   revalidateSettings();
@@ -68,7 +69,7 @@ export async function updateStayDefaults(formData: FormData): Promise<ActionResu
       default_check_in_time: checkIn,
       default_check_out_time: checkOut,
     })
-    .eq("id", true);
+    .eq("tenant_id", await getCurrentTenantId(supabase));
 
   if (error) return { error: error.message };
   revalidateSettings();
@@ -136,7 +137,7 @@ export async function updateBookingPolicy(formData: FormData): Promise<ActionRes
       cancel_days: cancelDays,
       advance_pct: advancePct,
     })
-    .eq("id", true);
+    .eq("tenant_id", await getCurrentTenantId(supabase));
 
   if (error) return { error: error.message };
   revalidateSettings();

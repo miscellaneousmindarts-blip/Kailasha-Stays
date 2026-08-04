@@ -21,7 +21,8 @@ Decisions locked with the owner before writing this:
 | A — manual booking | **Done** | none needed |
 | B0 — tenants, members, superadmin | **Done** | `0011_tenants.sql` |
 | B1 — tenant_id + RLS rewrite | **Done**, isolation test green | `0012`, `0013` |
-| B2 onward | Not started | — |
+| B2 — site_settings per tenant | **Done, migration not yet run** | `0014` |
+| B3 onward | Not started | — |
 
 Tenant #1 is `kailasha-stays`. `supabase/tests/tenant_isolation.sql` is the
 regression gate — **re-run it after any migration that touches RLS or adds a
@@ -44,6 +45,33 @@ Two rules follow, for every later phase:
    reads through `createPublicClient()`, which is cookie-free and always runs
    as `anon`. `authenticated` on a public-read policy means "any logged-in
    customer", which is never what is wanted.
+
+### What B2 built, and the two bridge functions it left for B3/B4 to retire
+
+`site_settings` moved from a `boolean` singleton PK to `tenant_id` as PK —
+same shape `property_private` already used for its own per-property
+singleton. Every tenant now gets a settings row automatically the moment it's
+created (an AFTER INSERT trigger on `tenants`), so "the settings row is
+missing" stops being a bug class.
+
+Two of B2's tables have no session to resolve a tenant from, and B3/B4 don't
+exist yet to solve that properly — so B2 added narrow, explicitly-temporary
+bridges instead of blocking on phases that come after it:
+
+- **`getPrimaryTenantId()`** (`lib/tenant.ts`) — what the **public** site uses.
+  No request has a resolved tenant yet, so this answers "which tenant is this
+  site" from `NEXT_PUBLIC_PRIMARY_TENANT_SLUG` (defaults to
+  `kailasha-stays`). **B3 replaces every caller of this** with real
+  per-request resolution.
+- **`getCurrentTenantId()`** (`lib/admin/tenant.ts`) — what **admin writes**
+  use. RLS alone isn't enough for an UPDATE: a superadmin belongs to every
+  tenant, so an update scoped only by RLS would touch all of them at once.
+  This picks the signed-in admin's first (today: only) membership row.
+  **B4's `requireTenant()` replaces every caller of this.**
+
+Neither is a design decision to preserve — both exist because the phases that
+would make them unnecessary haven't been built yet. Do not add new call
+sites; add the real thing once B3/B4 land instead.
 
 ---
 

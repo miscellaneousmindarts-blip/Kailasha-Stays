@@ -17,7 +17,8 @@ export type AddonStatus = "requested" | "confirmed" | "cancelled";
 export type CalendarPlatform = "airbnb" | "booking_com" | "other";
 
 export type SiteSettings = {
-  id: true;
+  /** Owning tenant, and the primary key — one row per tenant. */
+  tenant_id: string;
   business_name: string;
   /** digits only, international format, e.g. "919876543210" */
   whatsapp_number: string | null;

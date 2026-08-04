@@ -28,6 +28,14 @@ export const publicEnv = {
   // environment — they live in the site_settings table so the admin can change
   // them without a redeploy. See lib/settings.ts.
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  /**
+   * Which tenant the public site resolves to until phase B3 gives every
+   * request a real resolved tenant (from a /s/{slug} path, then a subdomain).
+   * Until then every public page effectively has exactly one answer to
+   * "whose site is this", and this is where that answer lives. See
+   * lib/tenant.ts.
+   */
+  primaryTenantSlug: process.env.NEXT_PUBLIC_PRIMARY_TENANT_SLUG || "kailasha-stays",
 };
 
 export const serverEnv = {

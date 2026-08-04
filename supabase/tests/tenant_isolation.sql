@@ -126,7 +126,8 @@ declare
     'properties','addon_services','homepage_sections','homepage_images',
     'property_private','property_contacts','property_images','property_sections',
     'rate_periods','calendar_sources','property_addon_services','enquiries',
-    'bookings','external_events','booking_addons','payments','guest_documents'
+    'bookings','external_events','booking_addons','payments','guest_documents',
+    'site_settings'
   ];
 begin
   select z.a_tenant, z.b_tenant, z.a_user, z.b_user
@@ -231,6 +232,19 @@ begin
     null;
   end;
 
+  -- (e) rewrite tenant B's business name through site_settings_admin_all —
+  -- the policy this phase actually rewrote, so it earns its own check rather
+  -- than only being covered by the generic loop in assertion 1.
+  begin
+    update public.site_settings set business_name = 'stolen' where tenant_id = b_tenant;
+    get diagnostics n = row_count;
+    if n > 0 then
+      violations := violations || 'site_settings: A updated B''s business_name';
+    end if;
+  exception when insufficient_privilege then
+    null;
+  end;
+
   perform set_config('role', 'postgres', true);
 
   if array_length(violations, 1) > 0 then
@@ -290,6 +304,13 @@ begin
   perform set_config('request.jwt.claims', '', true);
 
   -- Published content must remain visible to a logged-out visitor.
+  --
+  -- Deliberately absent from both lists below: homepage_images and
+  -- site_settings. Both stay `using (true)` for anon — readable across every
+  -- tenant, not just the visitor's own — a known gap tracked to B3 (which
+  -- resolves a real per-request tenant) and B8 (which re-paths storage).
+  -- Asserting privacy for either here would just be a test that's guaranteed
+  -- to fail until those phases land, for a hole that's already documented.
   foreach t in array array[
     'properties','property_images','property_sections','rate_periods',
     'property_addon_services','addon_services','homepage_sections'

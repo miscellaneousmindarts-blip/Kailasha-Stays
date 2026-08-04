@@ -349,6 +349,14 @@ export async function listUpcomingStays(days = 7): Promise<UpcomingStay[]> {
 // Settings
 // -----------------------------------------------------------------------------
 
+/**
+ * Relies on RLS (site_settings_admin_all) to scope this to the caller's own
+ * tenant, rather than filtering by tenant_id explicitly — safe for a read
+ * because every admin belongs to exactly one tenant today. A superadmin
+ * viewing more than one tenant's data at once is what phase B4's
+ * requireTenant() exists to make explicit; until then this, like every other
+ * admin query in this file, implicitly means "my tenant's".
+ */
 export async function getSiteSettingsAdmin(): Promise<SiteSettings> {
   const supabase = await createClient();
   const { data, error } = await supabase.from("site_settings").select("*").maybeSingle();
