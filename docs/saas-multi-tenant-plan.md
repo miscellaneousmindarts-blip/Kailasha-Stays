@@ -23,14 +23,29 @@ Decisions locked with the owner before writing this:
 | B1 — tenant_id + RLS rewrite | **Done**, isolation test green | `0012`, `0013` |
 | B2 — site_settings per tenant | **Done** | `0014` |
 | B3a — tenant-aware public queries | **Done** | none needed |
-| B3b — routing (`/s/{tenant}`, proxy) | Not started | — |
+| B3b — routing (`/s/{tenant}`, proxy) | **Done**, verified against a real 2nd tenant | none needed |
 | B4 onward | Not started | — |
 
-B3 is split in two because the routing half is the only part that can take
-the live site down, and it is much safer to do it once the data layer
-underneath is already proven. **B3a changes no routes and no behaviour** —
-every public query simply takes a `tenantId` it currently always receives
-from `getPrimaryTenantId()`. B3b then only has to pass a different value.
+B3 was split in two because the routing half is the only part that can take
+the live site down, and it was much safer once the data layer underneath was
+already proven. B3a changed no routes and no behaviour; B3b then only had to
+pass a different value.
+
+### Two things B3b is carrying that later phases must retire
+
+- **The admin's "View live" link** (`components/admin/status-controls.tsx`)
+  still points at a bare `/properties/{slug}`. Correct for the primary
+  tenant, wrong for anyone else. **B4** resolves the admin's tenant properly
+  via `requireTenant()`, which is where this gets its base path.
+- **The guest portal's branding** (`/stay/[token]`) is the primary tenant's,
+  not the booking's. Correct while there is one tenant. Fixing it needs
+  `tenant_id` on the `get_booking_by_token` bundle, which belongs with
+  **B5**'s white-label work so the logo and brand fields land together.
+
+Also worth knowing: `notFound()` inside a property page returns 200 in dev
+rather than 404. Verified identical before and after B3b, so it is
+pre-existing and not a routing regression — but it is a soft-404 worth
+confirming against a production build at some point.
 
 Tenant #1 is `kailasha-stays`. `supabase/tests/tenant_isolation.sql` is the
 regression gate — **re-run it after any migration that touches RLS or adds a

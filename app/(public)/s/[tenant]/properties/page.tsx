@@ -3,9 +3,17 @@ import { Home } from "lucide-react";
 
 import { PropertyCard } from "@/components/property-card";
 import { listProperties } from "@/lib/queries";
-import { getPrimaryTenantId } from "@/lib/tenant";
+import { getTenantBySlug, listActiveTenantSlugs, tenantBasePath } from "@/lib/tenant";
+import { notFound } from "next/navigation";
 
 export const revalidate = 300;
+
+// Without this the [tenant] segment has no known values and this page drops
+// from static+ISR to fully dynamic on every request.
+export async function generateStaticParams() {
+  const slugs = await listActiveTenantSlugs();
+  return slugs.map((tenant) => ({ tenant }));
+}
 
 export const metadata: Metadata = {
   title: "Properties",
@@ -13,9 +21,15 @@ export const metadata: Metadata = {
     "Browse our apartments and studios in Vrindavan. Book directly with the host — no booking fee.",
 };
 
-export default async function PropertiesPage() {
-  const tenantId = await getPrimaryTenantId();
-  const properties = tenantId ? await listProperties(tenantId) : [];
+export default async function PropertiesPage(
+  props: PageProps<"/s/[tenant]/properties">,
+) {
+  const { tenant: slug } = await props.params;
+  const tenant = await getTenantBySlug(slug);
+  if (!tenant) notFound();
+
+  const basePath = tenantBasePath(tenant.slug);
+  const properties = await listProperties(tenant.id);
 
   return (
     <main className="container-page py-10 md:py-14">
@@ -43,7 +57,7 @@ export default async function PropertiesPage() {
               className="animate-[--animate-rise-in]"
               style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
             >
-              <PropertyCard property={property} priority={i < 3} />
+              <PropertyCard property={property} basePath={basePath} priority={i < 3} />
             </li>
           ))}
         </ul>

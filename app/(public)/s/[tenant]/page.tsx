@@ -19,7 +19,8 @@ import { getLandingBase, finalizePropertyImages, waContext } from "@/lib/landing
 import { getHomepageContent } from "@/lib/homepage";
 import { landingJsonLd } from "@/lib/landing-schema";
 import { publicEnv } from "@/lib/env";
-import { getPrimaryTenantId } from "@/lib/tenant";
+import { getTenantBySlug, tenantBasePath } from "@/lib/tenant";
+import { getSiteSettings } from "@/lib/settings";
 
 /**
  * Dynamic rather than statically generated: the hero swaps its H1 and lede on
@@ -29,16 +30,25 @@ import { getPrimaryTenantId } from "@/lib/tenant";
  */
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  // `absolute` so the root layout's "| Stays in Vrindavan" template doesn't
+/**
+ * The primary tenant keeps its hand-written, hand-tuned strings verbatim —
+ * these are what currently rank, and rewriting them as a side effect of a
+ * routing change would be an unforced SEO loss. Every other tenant gets a
+ * neutral line derived from their own business name, so no one else's site
+ * ever ships this one's copy.
+ *
+ * The real fix is for this copy to live in the database like the rest of the
+ * homepage does, which is phase B5's white-label work. Until then this is the
+ * honest split rather than a pretend-generic template.
+ */
+const PRIMARY_HOME_METADATA: Metadata = {
+  // `absolute` so the tenant layout's "| {business}" template doesn't
   // double-suffix a title that already names the business.
   title: {
     absolute: "Guest House Near Baidyanath Temple | Kailasha Stays Deoghar",
   },
   description:
     "Clean serviced apartments for families in Deoghar, minutes from Baba Baidyanath Dham. The whole flat is yours. Fixed prices, free cancellation, airport pickup and pooja arranged.",
-  alternates: { canonical: "/" },
-  robots: { index: true, follow: true },
   openGraph: {
     // This page gets forwarded on WhatsApp — the OG card is what the family
     // group actually sees, so it's a first-class design surface, not an
@@ -51,7 +61,32 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function Home(props: PageProps<"/">) {
+export async function generateMetadata(
+  props: PageProps<"/s/[tenant]">,
+): Promise<Metadata> {
+  const { tenant: slug } = await props.params;
+  const tenant = await getTenantBySlug(slug);
+  if (!tenant) return {};
+
+  const basePath = tenantBasePath(tenant.slug);
+  const canonical = basePath || "/";
+
+  if (basePath === "") {
+    return { ...PRIMARY_HOME_METADATA, alternates: { canonical }, robots: { index: true, follow: true } };
+  }
+
+  const settings = await getSiteSettings(tenant.id);
+  const description = settings.response_note ?? `Book directly with ${settings.business_name}.`;
+  return {
+    title: { absolute: settings.business_name },
+    description,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
+    openGraph: { title: settings.business_name, description, type: "website" },
+  };
+}
+
+export default async function Home(props: PageProps<"/s/[tenant]">) {
   const params = await props.searchParams;
   const srcParam = Array.isArray(params.src) ? params.src[0] : params.src;
   const variant: HeroVariant = isHeroVariant(srcParam) ? srcParam : "brand";
@@ -59,13 +94,13 @@ export default async function Home(props: PageProps<"/">) {
   // Two-phase: the homepage's own admin-edited sections have to be resolved
   // before the property cards' share of the 16-image budget is known — see
   // lib/landing.ts's getLandingBase()/finalizePropertyImages() split.
-  // B3b replaces this with the tenant resolved from the URL; until then the
-  // public site has exactly one answer to "whose site is this".
-  const tenantId = await getPrimaryTenantId();
-  if (!tenantId) notFound();
+  const { tenant: tenantSlug } = await props.params;
+  const tenant = await getTenantBySlug(tenantSlug);
+  if (!tenant) notFound();
+  const basePath = tenantBasePath(tenant.slug);
 
-  const base = await getLandingBase(tenantId);
-  const content = await getHomepageContent(tenantId, base.settings, base.properties, base.primary);
+  const base = await getLandingBase(tenant.id);
+  const content = await getHomepageContent(tenant.id, base.settings, base.properties, base.primary);
   const { settings, properties, addons, primary } = finalizePropertyImages(base, content.fixedImageCount);
 
   const year = new Date().getFullYear();
@@ -145,7 +180,7 @@ export default async function Home(props: PageProps<"/">) {
             case "homes":
               return (
                 <Fragment key={entry.id}>
-                  <HomesSection properties={properties} resolved={entry.resolved} />
+                  <HomesSection properties={properties} resolved={entry.resolved} basePath={basePath} />
                 </Fragment>
               );
             case "why_apartment":
@@ -211,6 +246,7 @@ export default async function Home(props: PageProps<"/">) {
                     shareSummary={shareSummary}
                     mapsUrl={settings.maps_url}
                     resolved={entry.resolved}
+                    basePath={basePath}
                   />
                 </Fragment>
               );

@@ -22,12 +22,15 @@ import type { LandingProperty } from "@/lib/landing";
 export function PropertyCarousel({
   properties,
   section,
+  basePath,
   compact = false,
   ariaLabel,
   className = "mt-8",
 }: {
   properties: LandingProperty[];
   section: string;
+  /** "" for the tenant served at the bare domain, "/s/{slug}" otherwise. */
+  basePath: string;
   compact?: boolean;
   ariaLabel: string;
   className?: string;
@@ -80,7 +83,12 @@ export function PropertyCarousel({
       >
         {properties.map((property) => (
           <li key={property.id} className={`shrink-0 snap-start ${cardWidth}`}>
-            <LandingPropertyCard property={property} section={section} compact={compact} />
+            <LandingPropertyCard
+              property={property}
+              section={section}
+              basePath={basePath}
+              compact={compact}
+            />
           </li>
         ))}
       </ul>

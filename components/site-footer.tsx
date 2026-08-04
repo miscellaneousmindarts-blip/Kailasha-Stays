@@ -1,10 +1,16 @@
 import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
 
-import { getSiteSettings } from "@/lib/settings";
+import type { SiteSettings } from "@/lib/types/database";
 
-export async function SiteFooter() {
-  const settings = await getSiteSettings();
+export function SiteFooter({
+  settings,
+  basePath,
+}: {
+  settings: SiteSettings;
+  /** "" for the tenant served at the bare domain, "/s/{slug}" otherwise. */
+  basePath: string;
+}) {
   const year = new Date().getFullYear();
 
   return (
@@ -39,7 +45,7 @@ export async function SiteFooter() {
               {settings.contact_email}
             </a>
           ) : null}
-          <Link href="/properties" className="hover:text-primary flex min-h-11 items-center">
+          <Link href={`${basePath}/properties`} className="hover:text-primary flex min-h-11 items-center">
             All properties
           </Link>
         </div>

@@ -20,6 +20,7 @@ export function Close({
   shareSummary,
   mapsUrl,
   resolved,
+  basePath,
 }: {
   properties: LandingProperty[];
   whatsappHref: string | null;
@@ -28,6 +29,7 @@ export function Close({
   shareSummary: string;
   mapsUrl: string | null;
   resolved: ResolvedClose;
+  basePath: string;
 }) {
   return (
     <Section band="sand">
@@ -57,6 +59,7 @@ export function Close({
       <PropertyCarousel
         properties={properties}
         section="close"
+        basePath={basePath}
         compact
         ariaLabel="Our homes"
         className="mx-auto mt-10 max-w-3xl"

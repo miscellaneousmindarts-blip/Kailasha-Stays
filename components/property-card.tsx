@@ -8,9 +8,12 @@ import type { PropertyCardData } from "@/lib/queries";
 
 export function PropertyCard({
   property,
+  basePath,
   priority = false,
 }: {
   property: PropertyCardData;
+  /** "" for the tenant served at the bare domain, "/s/{slug}" otherwise. */
+  basePath: string;
   priority?: boolean;
 }) {
   const cover = pickCover(property.property_images);
@@ -18,7 +21,7 @@ export function PropertyCard({
   const price = money(property.base_price, property.currency);
 
   return (
-    <Link href={`/properties/${property.slug}`} className="group block">
+    <Link href={`${basePath}/properties/${property.slug}`} className="group block">
       {/* plain tint, not .skeleton — this is the real image's backdrop while it
           decodes, and must not shimmer indefinitely behind a loaded photo */}
       <div className="bg-surface-subtle relative aspect-[4/3] overflow-hidden rounded-lg">

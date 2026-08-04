@@ -1,20 +1,25 @@
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 
-import { getSiteSettings } from "@/lib/settings";
+import type { SiteSettings } from "@/lib/types/database";
 
 /**
  * Sticky public header. Deliberately contains no link to /admin — the owner
  * reaches it by typing the URL (PLAN §5).
  */
-export async function SiteHeader() {
-  const settings = await getSiteSettings();
-
+export function SiteHeader({
+  settings,
+  basePath,
+}: {
+  settings: SiteSettings;
+  /** "" for the tenant served at the bare domain, "/s/{slug}" otherwise. */
+  basePath: string;
+}) {
   return (
     <header className="border-border sticky top-0 z-40 border-b bg-[rgba(255,255,255,0.85)] backdrop-blur-md">
       <div className="container-page flex h-16 items-center justify-between gap-3">
         <Link
-          href="/"
+          href={basePath || "/"}
           className="min-w-0 truncate text-lg font-semibold tracking-tight"
           aria-label={`${settings.business_name} — home`}
         >
@@ -23,7 +28,7 @@ export async function SiteHeader() {
 
         <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
           <Link
-            href="/properties"
+            href={`${basePath}/properties`}
             className="hover:bg-surface-subtle pressable flex h-11 items-center rounded-md px-3 font-medium"
           >
             Properties

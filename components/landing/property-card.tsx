@@ -36,11 +36,14 @@ function Chip({ children }: { children: React.ReactNode }) {
 export function LandingPropertyCard({
   property,
   section,
+  basePath,
   compact = false,
 }: {
   property: LandingProperty;
   /** Which part of the page this card sits in — shows up in `property_click`. */
   section: string;
+  /** "" for the tenant served at the bare domain, "/s/{slug}" otherwise. */
+  basePath: string;
   /** The close-section repeat: one image, tighter. Reuses the same image
    *  urls as the Homes section, so it costs no extra requests. */
   compact?: boolean;
@@ -57,7 +60,7 @@ export function LandingPropertyCard({
 
   return (
     <Link
-      href={`/properties/${property.slug}`}
+      href={`${basePath}/properties/${property.slug}`}
       onClick={() => track("property_click", { property: property.slug, section })}
       className="group border-border bg-surface hover:border-input flex flex-col rounded-lg border p-3 transition-[transform,border-color] duration-150 hover:-translate-y-0.5 focus-visible:-translate-y-0.5"
     >

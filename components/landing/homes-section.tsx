@@ -12,9 +12,11 @@ import type { ResolvedHomes } from "@/lib/homepage";
 export function HomesSection({
   properties,
   resolved,
+  basePath,
 }: {
   properties: LandingProperty[];
   resolved: ResolvedHomes;
+  basePath: string;
 }) {
   return (
     <Section id="homes" band="sand">
@@ -26,7 +28,12 @@ export function HomesSection({
         <p className="text-text-muted mt-3 max-w-xl">{resolved.lede}</p>
       ) : null}
 
-      <PropertyCarousel properties={properties} section="homes" ariaLabel="Our homes" />
+      <PropertyCarousel
+        properties={properties}
+        section="homes"
+        basePath={basePath}
+        ariaLabel="Our homes"
+      />
     </Section>
   );
 }

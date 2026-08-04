@@ -11,24 +11,21 @@ import { imageUrl } from "@/lib/images";
 import { pickCover } from "@/lib/media";
 import { getAddonsForProperty, getProperty, listPublishedPropertyPaths } from "@/lib/queries";
 import { getSiteSettings } from "@/lib/settings";
-import { getPrimaryTenantId } from "@/lib/tenant";
+import { getTenantBySlug, tenantBasePath } from "@/lib/tenant";
 
 export const revalidate = 300;
 
 export async function generateStaticParams() {
-  // Still one tenant per path today; B3b adds the {tenant} segment and this
-  // starts returning the tenant half of each pair too.
-  const paths = await listPublishedPropertyPaths();
-  return paths.map(({ slug }) => ({ slug }));
+  return listPublishedPropertyPaths();
 }
 
 export async function generateMetadata(
-  props: PageProps<"/properties/[slug]">,
+  props: PageProps<"/s/[tenant]/properties/[slug]">,
 ): Promise<Metadata> {
-  const { slug } = await props.params;
-  const tenantId = await getPrimaryTenantId();
-  const property = tenantId ? await getProperty(tenantId, slug) : null;
-  if (!property) return { title: "Property not found" };
+  const { tenant: tenantSlug, slug } = await props.params;
+  const tenant = await getTenantBySlug(tenantSlug);
+  const property = tenant ? await getProperty(tenant.id, slug) : null;
+  if (!tenant || !property) return { title: "Property not found" };
 
   const cover = pickCover(property.property_images);
   const image = imageUrl(cover?.storage_path);
@@ -39,7 +36,9 @@ export async function generateMetadata(
   return {
     title: property.title,
     description,
-    alternates: { canonical: `/properties/${property.slug}` },
+    alternates: {
+      canonical: `${tenantBasePath(tenant.slug)}/properties/${property.slug}`,
+    },
     openGraph: {
       title: property.title,
       description,
@@ -50,18 +49,18 @@ export async function generateMetadata(
 }
 
 export default async function PropertyPage(
-  props: PageProps<"/properties/[slug]">,
+  props: PageProps<"/s/[tenant]/properties/[slug]">,
 ) {
-  const { slug } = await props.params;
-  const tenantId = await getPrimaryTenantId();
-  if (!tenantId) notFound();
+  const { tenant: tenantSlug, slug } = await props.params;
+  const tenant = await getTenantBySlug(tenantSlug);
+  if (!tenant) notFound();
 
-  const property = await getProperty(tenantId, slug);
+  const property = await getProperty(tenant.id, slug);
   if (!property) notFound();
 
   const [addons, settings] = await Promise.all([
     getAddonsForProperty(property.id),
-    getSiteSettings(tenantId),
+    getSiteSettings(tenant.id),
   ]);
 
   const location = [property.area, property.city, property.state]
