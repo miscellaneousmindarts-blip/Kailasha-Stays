@@ -14,6 +14,37 @@ Decisions locked with the owner before writing this:
 | Branding | **Full white-label** — logo, footer, contact details, metadata. No "Kailasha Stays" visible to another owner's guests |
 | Per-tenant theming | Content and branding only. All tenants share the same components/layouts |
 
+## Progress
+
+| Phase | State | Migration |
+|---|---|---|
+| A — manual booking | **Done** | none needed |
+| B0 — tenants, members, superadmin | **Done** | `0011_tenants.sql` |
+| B1 — tenant_id + RLS rewrite | **Done**, isolation test green | `0012`, `0013` |
+| B2 onward | Not started | — |
+
+Tenant #1 is `kailasha-stays`. `supabase/tests/tenant_isolation.sql` is the
+regression gate — **re-run it after any migration that touches RLS or adds a
+table.** It is cheap, it rolls back, and it has already caught one real
+cross-tenant leak that no amount of reading the policies would have found.
+
+### What B1 taught us, that the rest of this plan depends on
+
+RLS policies are **permissive: they OR together.** The first isolation run
+failed on exactly the eight tables carrying a `*_public_read` policy, because
+`for select to anon, authenticated` kept granting tenant A's logged-in admin
+every published row of tenant B — regardless of how tightly the admin policy
+was scoped. Tightening the admin side could never have fixed it.
+
+Two rules follow, for every later phase:
+
+1. **Adding a permissive policy can only widen access, never narrow it.** When
+   scoping something, check what *else* already grants it.
+2. **Never grant a public-read policy to `authenticated`.** The public site
+   reads through `createPublicClient()`, which is cookie-free and always runs
+   as `anon`. `authenticated` on a public-read policy means "any logged-in
+   customer", which is never what is wanted.
+
 ---
 
 # Part A — Admin-created bookings
@@ -284,6 +315,14 @@ Superadmin is exempt from the gate.
 Both buckets currently let any admin write anywhere. After multi-tenancy that
 is a live cross-tenant write vulnerability.
 
+- **Carried over from B1:** `homepage_images_public_read` is still
+  `using (true)`, so anon can enumerate every tenant's media library —
+  including images placed on no page — and the bucket is public, so those
+  paths are fetchable. Deliberately not closed in B1: the correct scope is
+  "only images referenced by a visible section", which means scanning section
+  jsonb for the image id, and getting it subtly wrong silently blanks photos
+  on a live homepage. Close it here, against real content, with the isolation
+  test as the gate.
 - Re-path uploads to `{tenantId}/...` in both `property-images` and
   `homepage-media`.
 - Storage RLS keyed on the first path segment:
