@@ -291,6 +291,36 @@ export type RatePeriod = {
 export type AdminUser = {
   user_id: string;
   email: string | null;
+  /** Sits above all tenants: manages them and can act on their behalf. */
+  is_superadmin: boolean;
+  created_at: string;
+};
+
+export type TenantStatus =
+  | "invited"
+  | "awaiting_payment"
+  | "active"
+  | "suspended"
+  | "cancelled";
+
+export type Tenant = {
+  id: string;
+  /** Public URL segment: /s/{slug} today, {slug}.domain.com later. */
+  slug: string;
+  name: string;
+  /** Reserved for the custom-domain phase. Null until then. */
+  custom_domain: string | null;
+  status: TenantStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TenantRole = "owner" | "staff";
+
+export type TenantMember = {
+  tenant_id: string;
+  user_id: string;
+  role: TenantRole;
   created_at: string;
 };
 
@@ -343,6 +373,19 @@ export type Database = {
   public: {
     Tables: {
       admin_users: Table<AdminUser>;
+      tenants: Table<Tenant>;
+      tenant_members: Table<
+        TenantMember,
+        [
+          {
+            foreignKeyName: "tenant_members_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
       site_settings: Table<SiteSettings>;
       properties: Table<Property>;
       property_private: Table<
@@ -424,6 +467,8 @@ export type Database = {
     Views: Record<never, never>;
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean };
+      is_superadmin: { Args: Record<string, never>; Returns: boolean };
+      current_tenant_ids: { Args: Record<string, never>; Returns: string[] };
       get_unavailable_dates: {
         Args: { p_property_id: string };
         Returns: { start_date: string; end_date: string }[];
