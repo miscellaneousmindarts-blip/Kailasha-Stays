@@ -9,21 +9,25 @@ import { amenity } from "@/lib/amenities";
 import { capacityLine } from "@/lib/format";
 import { imageUrl } from "@/lib/images";
 import { pickCover } from "@/lib/media";
-import { getAddonsForProperty, getProperty, listPropertySlugs } from "@/lib/queries";
+import { getAddonsForProperty, getProperty, listPublishedPropertyPaths } from "@/lib/queries";
 import { getSiteSettings } from "@/lib/settings";
+import { getPrimaryTenantId } from "@/lib/tenant";
 
 export const revalidate = 300;
 
 export async function generateStaticParams() {
-  const slugs = await listPropertySlugs();
-  return slugs.map((slug) => ({ slug }));
+  // Still one tenant per path today; B3b adds the {tenant} segment and this
+  // starts returning the tenant half of each pair too.
+  const paths = await listPublishedPropertyPaths();
+  return paths.map(({ slug }) => ({ slug }));
 }
 
 export async function generateMetadata(
   props: PageProps<"/properties/[slug]">,
 ): Promise<Metadata> {
   const { slug } = await props.params;
-  const property = await getProperty(slug);
+  const tenantId = await getPrimaryTenantId();
+  const property = tenantId ? await getProperty(tenantId, slug) : null;
   if (!property) return { title: "Property not found" };
 
   const cover = pickCover(property.property_images);
@@ -49,12 +53,15 @@ export default async function PropertyPage(
   props: PageProps<"/properties/[slug]">,
 ) {
   const { slug } = await props.params;
-  const property = await getProperty(slug);
+  const tenantId = await getPrimaryTenantId();
+  if (!tenantId) notFound();
+
+  const property = await getProperty(tenantId, slug);
   if (!property) notFound();
 
   const [addons, settings] = await Promise.all([
     getAddonsForProperty(property.id),
-    getSiteSettings(),
+    getSiteSettings(tenantId),
   ]);
 
   const location = [property.area, property.city, property.state]

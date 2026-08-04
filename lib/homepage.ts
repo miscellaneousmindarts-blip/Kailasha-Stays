@@ -474,6 +474,7 @@ type RawSection = {
 };
 
 export async function getHomepageContent(
+  tenantId: string,
   settings: SiteSettings,
   properties: LandingProperty[],
   primary: LandingProperty | null,
@@ -484,9 +485,13 @@ export async function getHomepageContent(
     supabase
       .from("homepage_sections")
       .select("id,key,kind,type,content,visible,can_hide,pin,sort_order")
+      .eq("tenant_id", tenantId)
       .eq("visible", true)
       .order("sort_order", { ascending: true }),
-    supabase.from("homepage_images").select("*"),
+    // homepage_images is still anon-readable across tenants (a known gap
+    // tracked to B8), so this filter is what actually keeps one tenant's
+    // media out of another's page — not the RLS policy.
+    supabase.from("homepage_images").select("*").eq("tenant_id", tenantId),
   ]);
 
   // Missing tables (migration not applied) or any other failure: an empty

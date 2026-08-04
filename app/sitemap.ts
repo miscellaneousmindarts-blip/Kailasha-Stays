@@ -2,10 +2,12 @@ import type { MetadataRoute } from "next";
 
 import { listPropertiesForSitemap } from "@/lib/queries";
 import { publicEnv } from "@/lib/env";
+import { getPrimaryTenantId } from "@/lib/tenant";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = publicEnv.siteUrl;
-  const properties = await listPropertiesForSitemap();
+  const tenantId = await getPrimaryTenantId();
+  const properties = tenantId ? await listPropertiesForSitemap(tenantId) : [];
 
   return [
     { url: base, changeFrequency: "monthly", priority: 1 },

@@ -3,6 +3,7 @@ import { Home } from "lucide-react";
 
 import { PropertyCard } from "@/components/property-card";
 import { listProperties } from "@/lib/queries";
+import { getPrimaryTenantId } from "@/lib/tenant";
 
 export const revalidate = 300;
 
@@ -13,7 +14,8 @@ export const metadata: Metadata = {
 };
 
 export default async function PropertiesPage() {
-  const properties = await listProperties();
+  const tenantId = await getPrimaryTenantId();
+  const properties = tenantId ? await listProperties(tenantId) : [];
 
   return (
     <main className="container-page py-10 md:py-14">

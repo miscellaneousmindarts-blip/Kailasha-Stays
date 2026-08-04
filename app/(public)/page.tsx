@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { Hero, isHeroVariant, type HeroVariant } from "@/components/landing/hero";
 import { TrustRibbon } from "@/components/landing/trust-strip";
@@ -18,6 +19,7 @@ import { getLandingBase, finalizePropertyImages, waContext } from "@/lib/landing
 import { getHomepageContent } from "@/lib/homepage";
 import { landingJsonLd } from "@/lib/landing-schema";
 import { publicEnv } from "@/lib/env";
+import { getPrimaryTenantId } from "@/lib/tenant";
 
 /**
  * Dynamic rather than statically generated: the hero swaps its H1 and lede on
@@ -57,8 +59,13 @@ export default async function Home(props: PageProps<"/">) {
   // Two-phase: the homepage's own admin-edited sections have to be resolved
   // before the property cards' share of the 16-image budget is known — see
   // lib/landing.ts's getLandingBase()/finalizePropertyImages() split.
-  const base = await getLandingBase();
-  const content = await getHomepageContent(base.settings, base.properties, base.primary);
+  // B3b replaces this with the tenant resolved from the URL; until then the
+  // public site has exactly one answer to "whose site is this".
+  const tenantId = await getPrimaryTenantId();
+  if (!tenantId) notFound();
+
+  const base = await getLandingBase(tenantId);
+  const content = await getHomepageContent(tenantId, base.settings, base.properties, base.primary);
   const { settings, properties, addons, primary } = finalizePropertyImages(base, content.fixedImageCount);
 
   const year = new Date().getFullYear();

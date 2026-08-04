@@ -21,8 +21,16 @@ Decisions locked with the owner before writing this:
 | A — manual booking | **Done** | none needed |
 | B0 — tenants, members, superadmin | **Done** | `0011_tenants.sql` |
 | B1 — tenant_id + RLS rewrite | **Done**, isolation test green | `0012`, `0013` |
-| B2 — site_settings per tenant | **Done, migration not yet run** | `0014` |
-| B3 onward | Not started | — |
+| B2 — site_settings per tenant | **Done** | `0014` |
+| B3a — tenant-aware public queries | **Done** | none needed |
+| B3b — routing (`/s/{tenant}`, proxy) | Not started | — |
+| B4 onward | Not started | — |
+
+B3 is split in two because the routing half is the only part that can take
+the live site down, and it is much safer to do it once the data layer
+underneath is already proven. **B3a changes no routes and no behaviour** —
+every public query simply takes a `tenantId` it currently always receives
+from `getPrimaryTenantId()`. B3b then only has to pass a different value.
 
 Tenant #1 is `kailasha-stays`. `supabase/tests/tenant_isolation.sql` is the
 regression gate — **re-run it after any migration that touches RLS or adds a

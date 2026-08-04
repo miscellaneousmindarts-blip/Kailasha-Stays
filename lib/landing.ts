@@ -100,22 +100,24 @@ function allocateImageBudget(propertyCount: number, fixedImageCount: number): nu
  * budget can be split — that split depends on how many images the homepage's
  * own admin-edited sections used, which isn't known until they're resolved.
  */
-export async function getLandingBase(): Promise<LandingBase> {
+export async function getLandingBase(tenantId: string): Promise<LandingBase> {
   const supabase = createPublicClient();
 
   const [settings, propertiesResult, addonsResult] = await Promise.all([
-    getSiteSettings(),
+    getSiteSettings(tenantId),
     supabase
       .from("properties")
       .select(
         "id, slug, title, max_guests, bedrooms, bathrooms, base_price, currency, amenities, city, address_line, lat, lng, property_images(storage_path, alt, tag, is_cover, sort_order), property_sections(title, type, content, visible, audience, sort_order)",
       )
+      .eq("tenant_id", tenantId)
       .eq("status", "published")
       .order("sort_order")
       .order("created_at"),
     supabase
       .from("addon_services")
       .select("id, name, description, price, price_unit")
+      .eq("tenant_id", tenantId)
       .eq("active", true)
       .order("sort_order"),
   ]);

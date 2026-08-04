@@ -31,32 +31,43 @@ export type PropertyDetail = Property & {
   rate_periods: RatePeriod[];
 };
 
-/** Published properties for the /properties grid, in the admin's chosen order. */
-export const listProperties = cache(async (): Promise<PropertyCardData[]> => {
-  const supabase = createPublicClient();
-  const { data, error } = await supabase
-    .from("properties")
-    .select(
-      "id, slug, title, summary, area, city, max_guests, bedrooms, bathrooms, base_price, currency, property_type, property_images(storage_path, alt, is_cover)",
-    )
-    .eq("status", "published")
-    .order("sort_order")
-    .order("created_at");
+/**
+ * Published properties for the /properties grid, in the admin's chosen order.
+ *
+ * tenant_id is filtered here rather than left to RLS on purpose: the public
+ * read policy is `status = 'published'` with no tenant condition, because RLS
+ * cannot know which tenant an anonymous request is *for*. That answer comes
+ * from the URL, so scoping is the query layer's job — see lib/tenant.ts.
+ */
+export const listProperties = cache(
+  async (tenantId: string): Promise<PropertyCardData[]> => {
+    const supabase = createPublicClient();
+    const { data, error } = await supabase
+      .from("properties")
+      .select(
+        "id, slug, title, summary, area, city, max_guests, bedrooms, bathrooms, base_price, currency, property_type, property_images(storage_path, alt, is_cover)",
+      )
+      .eq("tenant_id", tenantId)
+      .eq("status", "published")
+      .order("sort_order")
+      .order("created_at");
 
-  if (error) throw new Error(`Could not load properties: ${error.message}`);
-  return (data ?? []) as PropertyCardData[];
-});
+    if (error) throw new Error(`Could not load properties: ${error.message}`);
+    return (data ?? []) as PropertyCardData[];
+  },
+);
 
 /**
  * One property with its photos and public sections.
  * RLS already filters sections to visible + public/both for anon callers.
  */
 export const getProperty = cache(
-  async (slug: string): Promise<PropertyDetail | null> => {
+  async (tenantId: string, slug: string): Promise<PropertyDetail | null> => {
     const supabase = createPublicClient();
     const { data, error } = await supabase
       .from("properties")
       .select("*, property_images(*), property_sections(*), rate_periods(*)")
+      .eq("tenant_id", tenantId)
       .eq("slug", slug)
       .eq("status", "published")
       .maybeSingle();
@@ -104,24 +115,39 @@ export const getAddonsForProperty = cache(
   },
 );
 
-/** Slugs for generateStaticParams / sitemap. */
-export async function listPropertySlugs(): Promise<string[]> {
-  const supabase = createPublicClient();
-  const { data } = await supabase
-    .from("properties")
-    .select("slug")
-    .eq("status", "published");
-  return (data ?? []).map((p) => p.slug);
-}
-
-/** Slug + last-modified for the sitemap. */
-export async function listPropertiesForSitemap(): Promise<
-  { slug: string; updated_at: string }[]
+/**
+ * Every published property across every ACTIVE tenant, as (tenant slug,
+ * property slug) pairs — what generateStaticParams needs once the public
+ * routes live under /s/[tenant] (phase B3b).
+ *
+ * Joins tenants rather than taking a tenantId because static generation has
+ * to enumerate all of them at build time, not one.
+ */
+export async function listPublishedPropertyPaths(): Promise<
+  { tenant: string; slug: string }[]
 > {
   const supabase = createPublicClient();
   const { data } = await supabase
     .from("properties")
+    .select("slug, tenants!inner(slug, status)")
+    .eq("status", "published")
+    .eq("tenants.status", "active");
+
+  return ((data ?? []) as unknown as {
+    slug: string;
+    tenants: { slug: string };
+  }[]).map((p) => ({ tenant: p.tenants.slug, slug: p.slug }));
+}
+
+/** Slug + last-modified for one tenant's sitemap. */
+export async function listPropertiesForSitemap(
+  tenantId: string,
+): Promise<{ slug: string; updated_at: string }[]> {
+  const supabase = createPublicClient();
+  const { data } = await supabase
+    .from("properties")
     .select("slug, updated_at")
+    .eq("tenant_id", tenantId)
     .eq("status", "published");
   return data ?? [];
 }

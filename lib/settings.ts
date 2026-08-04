@@ -33,23 +33,32 @@ export const DEFAULT_SETTINGS: SiteSettings = {
 };
 
 /**
- * The current tenant's site_settings row — business name, WhatsApp number,
- * contact details. Owned by the admin panel, never by environment variables.
+ * A tenant's site_settings row — business name, WhatsApp number, contact
+ * details. Owned by the admin panel, never by environment variables.
+ *
+ * `tenantId` is optional only because SiteHeader and SiteFooter render from
+ * the shared public layout, which has no tenant param until phase B3b moves
+ * the public routes under /s/[tenant]. Every caller that CAN name its tenant
+ * should — falling back to the primary tenant is right for exactly one
+ * tenant and wrong for the second one, so the default is a bridge, not a
+ * feature.
  *
  * `cache` de-duplicates this across a single render pass, so a page can call it
  * from several components without extra round trips.
  */
-export const getSiteSettings = cache(async (): Promise<SiteSettings> => {
-  const tenantId = await getPrimaryTenantId();
-  if (!tenantId) return DEFAULT_SETTINGS;
+export const getSiteSettings = cache(
+  async (tenantId?: string): Promise<SiteSettings> => {
+    const id = tenantId ?? (await getPrimaryTenantId());
+    if (!id) return DEFAULT_SETTINGS;
 
-  const supabase = createPublicClient();
-  const { data, error } = await supabase
-    .from("site_settings")
-    .select("*")
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
+    const supabase = createPublicClient();
+    const { data, error } = await supabase
+      .from("site_settings")
+      .select("*")
+      .eq("tenant_id", id)
+      .maybeSingle();
 
-  if (error || !data) return DEFAULT_SETTINGS;
-  return data;
-});
+    if (error || !data) return DEFAULT_SETTINGS;
+    return data;
+  },
+);
