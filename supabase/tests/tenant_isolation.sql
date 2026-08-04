@@ -268,6 +268,58 @@ begin
   raise notice 'structural integrity: PASS';
 end $$;
 
+-- -----------------------------------------------------------------------------
+-- Assertion 4 — the public site still works
+--
+-- The fix for cross-tenant reads was to stop granting public reads to
+-- AUTHENTICATED. That trade is only correct if ANON still sees everything a
+-- visitor needs — otherwise we swapped a leak for an outage. This asserts both
+-- halves: published content is readable, private tables are not.
+-- -----------------------------------------------------------------------------
+
+do $$
+declare
+  a_tenant uuid; b_tenant uuid;
+  n int;
+  t text;
+  violations text[] := '{}';
+begin
+  select z.a_tenant, z.b_tenant into a_tenant, b_tenant from zz_iso z;
+
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', '', true);
+
+  -- Published content must remain visible to a logged-out visitor.
+  foreach t in array array[
+    'properties','property_images','property_sections','rate_periods',
+    'property_addon_services','addon_services','homepage_sections'
+  ] loop
+    execute format('select count(*) from public.%I where tenant_id = %L', t, a_tenant) into n;
+    if n = 0 then
+      violations := violations || format('%s: anon can no longer read published content — the public site is broken', t);
+    end if;
+  end loop;
+
+  -- Private tables must stay invisible to anon, for every tenant.
+  foreach t in array array[
+    'property_private','property_contacts','enquiries','bookings',
+    'booking_addons','payments','guest_documents','calendar_sources','external_events'
+  ] loop
+    execute format('select count(*) from public.%I', t) into n;
+    if n <> 0 then
+      violations := violations || format('%s: anon read %s private row(s)', t, n);
+    end if;
+  end loop;
+
+  perform set_config('role', 'postgres', true);
+
+  if array_length(violations, 1) > 0 then
+    raise exception E'PUBLIC ACCESS CHECK FAILED:\n  %', array_to_string(violations, E'\n  ');
+  end if;
+
+  raise notice 'public (anon) access: PASS';
+end $$;
+
 do $$ begin
   raise notice 'tenant isolation: PASS (17 tables, 0 violations)';
 end $$;
