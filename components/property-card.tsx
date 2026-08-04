@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { capacityLine, money } from "@/lib/format";
 import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
+import { pickCover } from "@/lib/media";
 import type { PropertyCardData } from "@/lib/queries";
 
 export function PropertyCard({
@@ -12,9 +13,7 @@ export function PropertyCard({
   property: PropertyCardData;
   priority?: boolean;
 }) {
-  const cover =
-    property.property_images.find((i) => i.is_cover) ??
-    property.property_images[0];
+  const cover = pickCover(property.property_images);
   const src = imageUrl(cover?.storage_path);
   const price = money(property.base_price, property.currency);
 

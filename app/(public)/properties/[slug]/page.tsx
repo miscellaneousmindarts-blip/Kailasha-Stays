@@ -8,6 +8,7 @@ import { BookingCard } from "@/components/booking/booking-card";
 import { amenity } from "@/lib/amenities";
 import { capacityLine } from "@/lib/format";
 import { imageUrl } from "@/lib/images";
+import { pickCover } from "@/lib/media";
 import { getAddonsForProperty, getProperty, listPropertySlugs } from "@/lib/queries";
 import { getSiteSettings } from "@/lib/settings";
 
@@ -25,9 +26,7 @@ export async function generateMetadata(
   const property = await getProperty(slug);
   if (!property) return { title: "Property not found" };
 
-  const cover =
-    property.property_images.find((i) => i.is_cover) ??
-    property.property_images[0];
+  const cover = pickCover(property.property_images);
   const image = imageUrl(cover?.storage_path);
   const description =
     property.summary ??

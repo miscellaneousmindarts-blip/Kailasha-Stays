@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { ChevronLeft, ChevronRight, Grid3x3, X } from "lucide-react";
 
-import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
+import { MediaFill } from "@/components/media/media-fill";
+import { imageUrl } from "@/lib/images";
+import { isVideoPath } from "@/lib/media";
 import type { PropertyImage } from "@/lib/types/database";
 
 type GalleryImage = { src: string; alt: string; tag: string | null };
@@ -127,13 +128,17 @@ function Lightbox({
       >
         {photos.map((photo, i) => (
           <div key={i} className="relative h-full w-full shrink-0 snap-center">
-            <Image
+            {/* Only the visible slide plays — starting every clip in the strip
+                at once would burn bandwidth on media nobody is looking at. */}
+            <MediaFill
               src={photo.src}
               alt={photo.alt}
-              fill
               sizes="100vw"
               priority={i === initialIndex}
-              className="object-contain"
+              fit="contain"
+              play={i === index}
+              controls={isVideoPath(photo.src)}
+              badge={false}
             />
             <TagBadge tag={photo.tag} className="bottom-4 left-4 text-sm" />
           </div>
@@ -233,6 +238,7 @@ export function PropertyGallery({
   if (!photos.length) return null;
 
   const [hero, ...rest] = photos;
+  const hasVideo = photos.some((p) => isVideoPath(p.src));
   const layout = galleryLayout(photos.length);
   const thumbs = rest.slice(0, layout.thumbs.length);
   const heroAspect = photos.length <= 2 ? "aspect-[16/10]" : "aspect-[4/3]";
@@ -247,17 +253,13 @@ export function PropertyGallery({
             type="button"
             onClick={() => setOpenAt(i)}
             className="bg-surface-subtle relative aspect-[4/3] w-[85%] shrink-0 snap-center overflow-hidden rounded-lg"
-            aria-label={`Open photo ${i + 1} of ${photos.length}`}
+            aria-label={`Open ${isVideoPath(photo.src) ? "video" : "photo"} ${i + 1} of ${photos.length}`}
           >
-            <Image
+            <MediaFill
               src={photo.src}
               alt={photo.alt}
-              fill
               sizes="85vw"
               priority={i === 0}
-              placeholder="blur"
-              blurDataURL={BLUR_DATA_URL}
-              className="object-cover"
             />
             <TagBadge tag={photo.tag} className="bottom-2 left-2 text-xs" />
           </button>
@@ -274,15 +276,12 @@ export function PropertyGallery({
           className={`bg-surface-subtle group relative overflow-hidden ${layout.hero}`}
           aria-label="Open photo 1"
         >
-          <Image
+          <MediaFill
             src={hero.src}
             alt={hero.alt}
-            fill
             sizes={thumbs.length ? "50vw" : "100vw"}
             priority
-            placeholder="blur"
-            blurDataURL={BLUR_DATA_URL}
-            className="object-cover transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03]"
+            className="transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03]"
           />
           <TagBadge tag={hero.tag} className="bottom-2 left-2 text-xs" />
         </button>
@@ -293,16 +292,13 @@ export function PropertyGallery({
             type="button"
             onClick={() => setOpenAt(i + 1)}
             className={`bg-surface-subtle group relative overflow-hidden ${layout.thumbs[i]}`}
-            aria-label={`Open photo ${i + 2}`}
+            aria-label={`Open ${isVideoPath(photo.src) ? "video" : "photo"} ${i + 2}`}
           >
-            <Image
+            <MediaFill
               src={photo.src}
               alt={photo.alt}
-              fill
               sizes="25vw"
-              placeholder="blur"
-              blurDataURL={BLUR_DATA_URL}
-              className="object-cover transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03]"
+              className="transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03]"
             />
             <TagBadge tag={photo.tag} className="bottom-2 left-2 text-xs" />
           </button>
@@ -315,7 +311,7 @@ export function PropertyGallery({
             className="bg-background shadow-card hover:bg-surface-subtle pressable absolute right-4 bottom-4 flex h-11 items-center gap-2 rounded-md px-4 text-sm font-medium"
           >
             <Grid3x3 className="size-4" aria-hidden="true" />
-            Show all {photos.length} photos
+            Show all {photos.length} {hasVideo ? "photos & videos" : "photos"}
           </button>
         ) : null}
       </div>

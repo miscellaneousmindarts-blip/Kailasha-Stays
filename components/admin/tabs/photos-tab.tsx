@@ -19,7 +19,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, ImagePlus, Loader2, Star, Trash2 } from "lucide-react";
+import { GripVertical, ImagePlus, Loader2, Play, Star, Trash2 } from "lucide-react";
 
 import { useSaveAction } from "@/components/admin/use-save-action";
 import {
@@ -31,6 +31,7 @@ import {
   uploadPropertyImage,
 } from "@/app/admin/(dashboard)/listings/[id]/actions";
 import { imageUrl } from "@/lib/images";
+import { MEDIA_ACCEPT, isVideoPath } from "@/lib/media";
 import type { PropertyImage } from "@/lib/types/database";
 
 function PhotoCard({
@@ -54,6 +55,7 @@ function PhotoCard({
   const alt = useSaveAction(updateImageAlt);
   const tag = useSaveAction(updateImageTag);
   const src = imageUrl(image.storage_path);
+  const isVideo = isVideoPath(image.storage_path);
 
   return (
     <div
@@ -68,7 +70,26 @@ function PhotoCard({
     >
       <div className="bg-surface-subtle relative aspect-[4/3]">
         {src ? (
-          <Image src={src} alt={image.alt ?? ""} fill sizes="240px" className="object-cover" />
+          isVideo ? (
+            // No autoplay in a management grid: several clips starting at
+            // once is noise, and the first frame is what identifies the file.
+            <video
+              src={src}
+              muted
+              playsInline
+              preload="metadata"
+              controls
+              className="absolute inset-0 size-full object-cover"
+            />
+          ) : (
+            <Image src={src} alt={image.alt ?? ""} fill sizes="240px" className="object-cover" />
+          )
+        ) : null}
+        {isVideo ? (
+          <span className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-[rgba(10,10,10,0.6)] px-2 py-1 text-xs font-medium text-white backdrop-blur-sm">
+            <Play className="size-3 fill-current" aria-hidden="true" />
+            Video
+          </span>
         ) : null}
         {image.is_cover ? (
           <span className="bg-primary text-primary-foreground absolute top-2 left-2 flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium">
@@ -103,7 +124,9 @@ function PhotoCard({
           className="border-border h-9 w-full rounded-md border bg-transparent px-2 text-sm"
         />
         <div className="flex items-center justify-between gap-1">
-          {!image.is_cover ? (
+          {/* Videos can't be the cover — it feeds the grid thumbnail and the
+              OpenGraph tag, both of which need a still. */}
+          {!image.is_cover && !isVideo ? (
             <button
               type="button"
               onClick={() => cover.run(propertyId, image.id)}
@@ -210,7 +233,8 @@ export function PhotosTab({
         grid and in search previews. Drag the{" "}
         <GripVertical className="inline size-3.5 align-text-bottom" aria-hidden="true" />{" "}
         handle to reorder; tag a photo (e.g. &quot;Bedroom&quot;) so guests
-        can tell rooms apart while browsing.
+        can tell rooms apart while browsing. Videos work here too — MP4 or
+        WebM, up to 50MB — but the cover has to be a photo.
       </p>
 
       {/* Explicit id: without one, dnd-kit's aria-describedby id comes from an
@@ -238,7 +262,7 @@ export function PhotosTab({
         <input
           ref={inputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/avif"
+          accept={MEDIA_ACCEPT}
           multiple
           className="sr-only"
           id="photo-upload"
@@ -256,7 +280,7 @@ export function PhotosTab({
           ) : (
             <>
               <ImagePlus className="size-4" aria-hidden="true" />
-              Upload photos
+              Upload photos or video
             </>
           )}
         </label>

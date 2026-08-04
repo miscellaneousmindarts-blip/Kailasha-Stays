@@ -7,6 +7,7 @@ import { ArrowRight } from "lucide-react";
 import { amenity } from "@/lib/amenities";
 import { money } from "@/lib/format";
 import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
+import { isVideoPath } from "@/lib/media";
 import { track } from "@/lib/track";
 import type { LandingProperty } from "@/lib/landing";
 
@@ -44,7 +45,11 @@ export function LandingPropertyCard({
    *  urls as the Homes section, so it costs no extra requests. */
   compact?: boolean;
 }) {
-  const [lead, ...rest] = property.images;
+  // Stills only. This card is a compact link into the property page — a
+  // clip playing inside it competes with the copy for attention and can't be
+  // controlled at this size. Video belongs in the gallery on the page itself.
+  const stills = property.images.filter((img) => !isVideoPath(img.storage_path));
+  const [lead, ...rest] = stills;
   const thumbs = rest.slice(0, 2);
   const amenityLine = HEADLINE_AMENITIES.map((key) => amenity(key)?.label)
     .filter(Boolean)

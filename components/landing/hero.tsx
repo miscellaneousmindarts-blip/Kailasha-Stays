@@ -2,7 +2,9 @@ import Image from "next/image";
 import { ArrowDown } from "lucide-react";
 
 import { ShareButton, PhoneLink, WhatsAppLink } from "@/components/landing/actions";
+import { HeroVideo } from "@/components/landing/hero-video";
 import { BLUR_DATA_URL } from "@/lib/images";
+import { isVideoPath } from "@/lib/media";
 import type { ResolvedHero } from "@/lib/homepage";
 
 /**
@@ -45,17 +47,21 @@ export function Hero({
   return (
     <section id="hero" className="relative isolate">
       {resolved.image ? (
-        <Image
-          src={resolved.image.url}
-          alt={resolved.image.alt}
-          fill
-          sizes="100vw"
-          priority
-          fetchPriority="high"
-          placeholder="blur"
-          blurDataURL={BLUR_DATA_URL}
-          className="-z-10 object-cover"
-        />
+        isVideoPath(resolved.image.url) ? (
+          <HeroVideo src={resolved.image.url} alt={resolved.image.alt} />
+        ) : (
+          <Image
+            src={resolved.image.url}
+            alt={resolved.image.alt}
+            fill
+            sizes="100vw"
+            priority
+            fetchPriority="high"
+            placeholder="blur"
+            blurDataURL={BLUR_DATA_URL}
+            className="-z-10 object-cover"
+          />
+        )
       ) : (
         <div className="bg-surface-subtle absolute inset-0 -z-10" />
       )}

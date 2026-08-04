@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 
 import { listAllProperties } from "@/lib/admin/queries";
 import { imageUrl } from "@/lib/images";
+import { pickCover } from "@/lib/media";
 import { money } from "@/lib/format";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -38,7 +39,7 @@ export default async function AdminListingsPage() {
       ) : (
         <ul className="border-border divide-border mt-6 divide-y rounded-lg border">
           {properties.map((p) => {
-            const cover = p.property_images.find((i) => i.is_cover) ?? p.property_images[0];
+            const cover = pickCover(p.property_images);
             const src = imageUrl(cover?.storage_path);
             return (
               <li key={p.id}>

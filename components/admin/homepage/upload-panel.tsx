@@ -6,6 +6,7 @@ import { Loader2, Upload } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useMediaLibrary } from "@/components/admin/homepage/media-library-context";
+import { MEDIA_ACCEPT } from "@/lib/media";
 import type { HomepageImage } from "@/lib/types/database";
 
 /**
@@ -67,7 +68,7 @@ export function UploadPanel({
         <input
           ref={fileRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/avif"
+          accept={MEDIA_ACCEPT}
           className="sr-only"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -80,7 +81,7 @@ export function UploadPanel({
           className="hover:bg-surface-subtle pressable flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-md text-sm font-medium"
         >
           <Upload className="text-text-muted size-5" aria-hidden="true" />
-          Upload a photo
+          Upload a photo or video
         </button>
       </div>
     );
@@ -89,13 +90,23 @@ export function UploadPanel({
   return (
     <div className="border-border space-y-3 rounded-md border p-3">
       <div className="flex gap-3">
-        {/* Plain <img>: a local blob: preview, never something next/image can optimise. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={preview ?? undefined}
-          alt=""
-          className="bg-surface-subtle size-20 shrink-0 rounded-md object-cover"
-        />
+        {/* Plain <img>/<video>: a local blob: preview, never something next/image can optimise. */}
+        {file.type.startsWith("video/") ? (
+          <video
+            src={preview ?? undefined}
+            muted
+            playsInline
+            preload="metadata"
+            className="bg-surface-subtle size-20 shrink-0 rounded-md object-cover"
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={preview ?? undefined}
+            alt=""
+            className="bg-surface-subtle size-20 shrink-0 rounded-md object-cover"
+          />
+        )}
         <div className="min-w-0 flex-1 space-y-2">
           <div className="space-y-1">
             <Label htmlFor="upload-title" className="text-xs">

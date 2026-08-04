@@ -4,12 +4,10 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { checkMediaFile } from "@/lib/media";
 import type { HomepageImage } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
-
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 function revalidateHomepage() {
   revalidatePath("/admin/homepage");
@@ -33,21 +31,17 @@ export async function uploadHomepageImage(
 ): Promise<ActionResult & { image?: HomepageImage }> {
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
-    return { error: "Choose a photo to upload." };
+    return { error: "Choose a photo or video to upload." };
   }
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    return { error: "Photos must be JPEG, PNG, WebP or AVIF." };
-  }
-  if (file.size > MAX_IMAGE_BYTES) {
-    return { error: "Photos must be under 10MB." };
-  }
+
+  const check = checkMediaFile(file);
+  if (check.error) return { error: check.error };
 
   const title = String(formData.get("title") ?? "").trim() || null;
   const alt = String(formData.get("alt") ?? "").trim() || null;
 
   const supabase = await createClient();
-  const ext = file.type.split("/")[1] ?? "jpg";
-  const path = `${randomUUID()}.${ext}`;
+  const path = `${randomUUID()}.${check.ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from("homepage-media")

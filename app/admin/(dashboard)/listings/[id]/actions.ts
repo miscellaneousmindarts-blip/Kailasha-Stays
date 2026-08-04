@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePublicProperties } from "@/lib/admin/revalidate";
 import { AMENITY_KEYS } from "@/lib/amenities";
 import { BLOCK_TYPES, blockSchemas, isKnownBlockType } from "@/lib/blocks";
+import { checkMediaFile, isVideoPath } from "@/lib/media";
 import { slugify } from "@/lib/slug";
 import type {
   Property,
@@ -470,27 +471,20 @@ export async function duplicateProperty(
 // Photos
 // ---------------------------------------------------------------------------
 
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-
 export async function uploadPropertyImage(
   propertyId: string,
   formData: FormData,
 ): Promise<ActionResult & { image?: PropertyImage }> {
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
-    return { error: "Choose a photo to upload." };
-  }
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    return { error: "Photos must be JPEG, PNG, WebP or AVIF." };
-  }
-  if (file.size > MAX_IMAGE_BYTES) {
-    return { error: "Photos must be under 10MB." };
+    return { error: "Choose a photo or video to upload." };
   }
 
+  const check = checkMediaFile(file);
+  if (check.error) return { error: check.error };
+
   const supabase = await createClient();
-  const ext = file.type.split("/")[1] ?? "jpg";
-  const path = `${propertyId}/${randomUUID()}.${ext}`;
+  const path = `${propertyId}/${randomUUID()}.${check.ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from("property-images")
@@ -510,7 +504,10 @@ export async function uploadPropertyImage(
       property_id: propertyId,
       storage_path: path,
       alt: alt || null,
-      is_cover: (count ?? 0) === 0,
+      // A video can never be the cover — the cover is what the listings grid,
+      // the property card and the OpenGraph tag render, and all three need a
+      // still. So the first upload only claims the slot if it's a photo.
+      is_cover: !check.isVideo && (count ?? 0) === 0,
       sort_order: count ?? 0,
     })
     .select("*")
@@ -544,6 +541,19 @@ export async function setCoverImage(
   imageId: string,
 ): Promise<ActionResult> {
   const supabase = await createClient();
+
+  // The cover feeds the listings grid, the property card and the OpenGraph
+  // tag, none of which can render a moving picture — refuse at the action,
+  // not just by hiding the button.
+  const { data: target } = await supabase
+    .from("property_images")
+    .select("storage_path")
+    .eq("id", imageId)
+    .maybeSingle();
+  if (target && isVideoPath(target.storage_path)) {
+    return { error: "A video can't be the cover — pick a photo." };
+  }
+
   await supabase
     .from("property_images")
     .update({ is_cover: false })

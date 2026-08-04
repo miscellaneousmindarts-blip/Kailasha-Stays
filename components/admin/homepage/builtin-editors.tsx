@@ -119,7 +119,13 @@ export function HeroEditor({ content, onSave, pending, error, saved }: EditorPro
         </div>
       </div>
 
-      <MediaPicker value={imageId} onChange={setImageId} label="Background photo" />
+      <MediaPicker
+        value={imageId}
+        onChange={setImageId}
+        label="Background photo or video"
+        hint="A video plays muted on a loop behind the headline. Visitors who've asked for reduced motion see its first frame instead."
+        allowVideo
+      />
 
       <div>
         <p className="mb-2 text-sm font-medium">Chips under the buttons</p>

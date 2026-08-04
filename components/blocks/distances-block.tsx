@@ -52,13 +52,22 @@ const LAYOUTS: Record<number, { className: string; size: "lg" | "sm" }[]> = {
   ],
 };
 
-/** Rows the container height needs for count's tallest tile — drives auto-rows so row-span tiles compute correctly. */
+/**
+ * Row height per count — a MINIMUM via minmax(), not a fixed size. A fixed
+ * auto-rows value clips nothing on its own, but a tile whose content (a
+ * two-line label, a wide figure) needs more room than that fixed track
+ * still grows to fit it — grid doesn't stretch a fixed-length track for a
+ * tall item, so the tile's own box spills past its track and overlaps
+ * whatever sits in the row below. minmax(min, auto) keeps the same compact
+ * height when content fits, and lets the row grow instead of the tile
+ * overflowing when it doesn't.
+ */
 const AUTO_ROWS: Record<number, string> = {
   1: "",
   2: "",
-  3: "auto-rows-[150px] md:auto-rows-[170px]",
-  4: "auto-rows-[130px] md:auto-rows-[135px]",
-  5: "auto-rows-[140px] md:auto-rows-[160px]",
+  3: "auto-rows-[minmax(150px,auto)] md:auto-rows-[minmax(170px,auto)]",
+  4: "auto-rows-[minmax(130px,auto)] md:auto-rows-[minmax(135px,auto)]",
+  5: "auto-rows-[minmax(140px,auto)] md:auto-rows-[minmax(160px,auto)]",
 };
 
 export function DistancesBlock({ content }: { content: BlockContent<"distances"> }) {

@@ -7,9 +7,16 @@ import { Check, Loader2, Plus, Upload, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { imageUrl } from "@/lib/images";
+import { isVideoPath } from "@/lib/media";
 import { uploadPropertyImage } from "@/app/admin/(dashboard)/listings/[id]/actions";
 import type { PropertyImage } from "@/lib/types/database";
 
+/**
+ * Stills only, here and in the grid below. These pickers feed the photo
+ * layouts — a bento distance tile, the gallery grid, the single-photo block
+ * — whose whole design is a still composition. Listing videos live in the
+ * Photos tab and render in the property gallery.
+ */
 const ALLOWED_TYPES = "image/jpeg,image/png,image/webp,image/avif";
 
 /**
@@ -211,7 +218,7 @@ export function PropertyMediaPicker({
             <Plus className="text-text-muted size-4" aria-hidden="true" />
           </button>
 
-          {pool.map((img) => {
+          {pool.filter((img) => !isVideoPath(img.storage_path)).map((img) => {
             const src = imageUrl(img.storage_path);
             const selected = value === img.storage_path;
             return (

@@ -7,6 +7,7 @@ import { Check, Plus, X } from "lucide-react";
 import { useMediaLibrary } from "@/components/admin/homepage/media-library-context";
 import { UploadPanel } from "@/components/admin/homepage/upload-panel";
 import { homepageImageUrl } from "@/lib/images";
+import { isVideoPath } from "@/lib/media";
 
 /**
  * Picks one image for one field, from the shared homepage media library —
@@ -20,6 +21,7 @@ export function MediaPicker({
   label,
   hint,
   emptyLabel,
+  allowVideo = false,
 }: {
   value: string | null;
   onChange: (id: string | null) => void;
@@ -27,9 +29,17 @@ export function MediaPicker({
   hint?: string;
   /** Shown when nothing is chosen and there's a code-level fallback worth naming. */
   emptyLabel?: string;
+  /**
+   * Opt-in, because most homepage image fields are still-photo layouts — a
+   * host portrait, a map landmark tile, a review avatar — that a clip would
+   * simply break. Only the hero, which renders a full-bleed background,
+   * turns this on.
+   */
+  allowVideo?: boolean;
 }) {
   const { pool } = useMediaLibrary();
   const [uploading, setUploading] = useState(false);
+  const choices = allowVideo ? pool : pool.filter((c) => !isVideoPath(c.storage_path));
 
   return (
     <div className="space-y-2">
@@ -69,10 +79,11 @@ export function MediaPicker({
             <Plus className="text-text-muted size-5" aria-hidden="true" />
           </button>
 
-          {pool.map((choice) => {
+          {choices.map((choice) => {
             const src = homepageImageUrl(choice.storage_path);
             const selected = value === choice.id;
-            const title = choice.title || choice.alt || "Untitled photo";
+            const isVideo = isVideoPath(choice.storage_path);
+            const title = choice.title || choice.alt || (isVideo ? "Untitled video" : "Untitled photo");
             return (
               <button
                 key={choice.id}
@@ -86,7 +97,22 @@ export function MediaPicker({
                 }`}
               >
                 {src ? (
-                  <Image src={src} alt="" fill sizes="120px" className="object-cover" />
+                  isVideo ? (
+                    <video
+                      src={src}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="absolute inset-0 size-full object-cover"
+                    />
+                  ) : (
+                    <Image src={src} alt="" fill sizes="120px" className="object-cover" />
+                  )
+                ) : null}
+                {isVideo ? (
+                  <span className="pointer-events-none absolute bottom-0.5 left-0.5 rounded-full bg-[rgba(10,10,10,0.65)] px-1.5 text-[10px] font-medium text-white">
+                    Video
+                  </span>
                 ) : null}
                 {selected ? (
                   <span className="bg-primary text-primary-foreground absolute top-1 right-1 flex size-5 items-center justify-center rounded-full">

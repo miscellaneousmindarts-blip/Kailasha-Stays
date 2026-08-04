@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useMediaLibrary } from "@/components/admin/homepage/media-library-context";
 import { UploadPanel } from "@/components/admin/homepage/upload-panel";
 import { homepageImageUrl } from "@/lib/images";
+import { isVideoPath } from "@/lib/media";
 import type { HomepageImage } from "@/lib/types/database";
 
 function LibraryCard({ image }: { image: HomepageImage }) {
@@ -52,7 +53,25 @@ function LibraryCard({ image }: { image: HomepageImage }) {
   return (
     <div className="border-border overflow-hidden rounded-lg border">
       <div className="bg-surface-subtle relative aspect-[4/3]">
-        {src ? <Image src={src} alt="" fill sizes="240px" className="object-cover" /> : null}
+        {src ? (
+          isVideoPath(src) ? (
+            <video
+              src={src}
+              muted
+              playsInline
+              controls
+              preload="metadata"
+              className="absolute inset-0 size-full object-cover"
+            />
+          ) : (
+            <Image src={src} alt="" fill sizes="240px" className="object-cover" />
+          )
+        ) : null}
+        {isVideoPath(src) ? (
+          <span className="pointer-events-none absolute right-2 bottom-2 rounded-full bg-[rgba(10,10,10,0.6)] px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
+            Video
+          </span>
+        ) : null}
         {image.is_placeholder ? (
           <span className="bg-warning/95 text-warning-foreground absolute top-2 left-2 rounded-full px-2 py-0.5 text-[11px] font-medium">
             Sample photo
