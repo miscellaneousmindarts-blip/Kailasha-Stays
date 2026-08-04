@@ -1,10 +1,10 @@
 "use server";
 
-import { nanoid } from "nanoid";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { createDirectBooking } from "@/lib/admin/create-booking";
 import type { EnquiryStatus } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
@@ -51,62 +51,18 @@ export async function convertEnquiryToBooking(
   const guests = Number(formData.get("guests") ?? enquiry.guests);
   const totalAmount = Number(formData.get("total_amount") ?? 0);
 
-  if (!(checkOut > checkIn)) {
-    return { error: "Check-out must be after check-in." };
-  }
-
-  const token = nanoid(12);
-  const tokenExpires = new Date(checkOut);
-  tokenExpires.setDate(tokenExpires.getDate() + 7);
-
-  const { data: booking, error: bookingError } = await supabase
-    .from("bookings")
-    .insert({
-      property_id: enquiry.property_id,
-      enquiry_id: enquiry.id,
-      source: "direct",
-      guest_name: enquiry.name,
-      phone: enquiry.phone,
-      guests,
-      check_in: checkIn,
-      check_out: checkOut,
-      status: "confirmed",
-      total_amount: Number.isFinite(totalAmount) ? totalAmount : 0,
-      portal_token: token,
-      token_expires_at: tokenExpires.toISOString(),
-    })
-    .select("id")
-    .single();
-
-  if (bookingError) {
-    if (bookingError.code === "23P01") {
-      return {
-        error:
-          "Those dates overlap with an existing booking for this property.",
-      };
-    }
-    return { error: bookingError.message };
-  }
-
-  if (enquiry.addon_ids?.length) {
-    const { data: addons } = await supabase
-      .from("addon_services")
-      .select("id, name, price")
-      .in("id", enquiry.addon_ids);
-
-    if (addons?.length) {
-      await supabase.from("booking_addons").insert(
-        addons.map((a) => ({
-          booking_id: booking.id,
-          addon_service_id: a.id,
-          name: a.name,
-          price: a.price ?? 0,
-          qty: 1,
-          status: "requested" as const,
-        })),
-      );
-    }
-  }
+  const result = await createDirectBooking(supabase, {
+    propertyId: enquiry.property_id,
+    enquiryId: enquiry.id,
+    guestName: enquiry.name,
+    phone: enquiry.phone,
+    guests,
+    checkIn,
+    checkOut,
+    totalAmount,
+    addonIds: enquiry.addon_ids ?? [],
+  });
+  if (result.error) return { error: result.error };
 
   await supabase
     .from("enquiries")
@@ -116,5 +72,5 @@ export async function convertEnquiryToBooking(
   revalidatePath("/admin/enquiries");
   revalidatePath("/admin/bookings");
   revalidatePath("/admin/calendar");
-  redirect(`/admin/bookings/${booking.id}`);
+  redirect(`/admin/bookings/${result.bookingId}`);
 }

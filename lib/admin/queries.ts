@@ -246,6 +246,35 @@ export async function listAddonsForProperty(
   return (all ?? []).map((a) => ({ ...a, enabled: enabledIds.has(a.id) }));
 }
 
+export type PropertyAddonOption = Pick<
+  AddonService,
+  "id" | "name" | "description" | "price" | "price_unit"
+>;
+
+/**
+ * Every property's currently-active add-ons, keyed by property id — same
+ * "small dataset, fetched whole" shape as listPropertyPricing, for a form
+ * where the property is chosen client-side and the add-on list has to update
+ * instantly alongside it (the manual-booking form).
+ */
+export async function listAddonsByProperty(): Promise<Record<string, PropertyAddonOption[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("property_addon_services")
+    .select("property_id, addon_services!inner(id, name, description, price, price_unit)")
+    .eq("addon_services.active", true);
+  if (error) throw new Error(`Could not load add-ons: ${error.message}`);
+
+  const byProperty: Record<string, PropertyAddonOption[]> = {};
+  for (const row of (data ?? []) as unknown as {
+    property_id: string;
+    addon_services: PropertyAddonOption;
+  }[]) {
+    (byProperty[row.property_id] ??= []).push(row.addon_services);
+  }
+  return byProperty;
+}
+
 // -----------------------------------------------------------------------------
 // Calendar
 // -----------------------------------------------------------------------------
