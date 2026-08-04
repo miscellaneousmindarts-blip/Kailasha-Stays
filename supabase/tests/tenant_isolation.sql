@@ -69,7 +69,7 @@ begin
   insert into public.property_private (tenant_id, property_id, wifi_password)
     values (a_tenant, a_prop, 'a-secret'), (b_tenant, b_prop, 'b-secret');
   insert into public.property_contacts (tenant_id, property_id, name, phone)
-    values (a_tenant, a_prop, 'A caretaker', '1'), (b_tenant, b_prop, 'B caretaker', '2');
+    values (a_tenant, a_prop, 'A caretaker', '9800000001'), (b_tenant, b_prop, 'B caretaker', '9800000002');
   insert into public.property_images (tenant_id, property_id, storage_path)
     values (a_tenant, a_prop, 'a/1.jpg'), (b_tenant, b_prop, 'b/1.jpg');
   insert into public.property_sections (tenant_id, property_id, type, content)
@@ -88,9 +88,9 @@ begin
   insert into public.property_addon_services (tenant_id, property_id, addon_service_id)
     values (a_tenant, a_prop, a_addon), (b_tenant, b_prop, b_addon);
   insert into public.enquiries (tenant_id, property_id, name, phone, check_in, check_out)
-    values (a_tenant, a_prop, 'A guest', '1', '2099-03-01', '2099-03-03') returning id into a_enq;
+    values (a_tenant, a_prop, 'A guest', '9800000001', '2099-03-01', '2099-03-03') returning id into a_enq;
   insert into public.enquiries (tenant_id, property_id, name, phone, check_in, check_out)
-    values (b_tenant, b_prop, 'B guest', '2', '2099-03-01', '2099-03-03') returning id into b_enq;
+    values (b_tenant, b_prop, 'B guest', '9800000002', '2099-03-01', '2099-03-03') returning id into b_enq;
   insert into public.bookings (tenant_id, property_id, guest_name, check_in, check_out)
     values (a_tenant, a_prop, 'A guest', '2099-04-01', '2099-04-03') returning id into a_book;
   insert into public.bookings (tenant_id, property_id, guest_name, check_in, check_out)
@@ -206,14 +206,17 @@ begin
     null;
   end;
 
-  -- (c) re-parent one of A's own rows onto B (the WITH CHECK path)
+  -- (c) re-parent one of A's own rows onto B (the WITH CHECK path).
+  -- Either outcome counts as blocked: RLS should refuse it first, but the
+  -- composite FK would also refuse it, since the property's children still
+  -- point at tenant A.
   begin
     update public.properties set tenant_id = b_tenant where tenant_id = a_tenant;
     get diagnostics n = row_count;
     if n > 0 then
       violations := violations || 'properties: A moved its own row into B''s tenant';
     end if;
-  exception when insufficient_privilege or check_violation then
+  exception when insufficient_privilege or check_violation or foreign_key_violation then
     null;
   end;
 
