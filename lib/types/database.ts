@@ -49,6 +49,8 @@ export type SiteSettings = {
 };
 
 export type Property = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   slug: string;
   title: string;
@@ -83,6 +85,8 @@ export type Property = {
 };
 
 export type PropertyPrivate = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   property_id: string;
   exact_address: string | null;
   exact_gmaps_url: string | null;
@@ -94,6 +98,8 @@ export type PropertyPrivate = {
 };
 
 export type PropertyContact = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   property_id: string;
   name: string;
@@ -104,6 +110,8 @@ export type PropertyContact = {
 };
 
 export type PropertyImage = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   property_id: string;
   storage_path: string;
@@ -115,6 +123,8 @@ export type PropertyImage = {
 };
 
 export type PropertySection = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   property_id: string;
   title: string | null;
@@ -135,6 +145,8 @@ export type PropertySection = {
  * §1 for why that changed.
  */
 export type HomepageSection = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   key: string;
   kind: "builtin" | "custom";
@@ -158,6 +170,8 @@ export type HomepageSection = {
  * lib/images.ts passes the latter straight through.
  */
 export type HomepageImage = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   storage_path: string;
   /** For screen readers and search. Never rendered as visible text. */
@@ -172,6 +186,8 @@ export type HomepageImage = {
 
 /** One shared catalog — which properties offer a given item lives in PropertyAddonService, not here. */
 export type AddonService = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   name: string;
   description: string | null;
@@ -183,11 +199,15 @@ export type AddonService = {
 
 /** Presence of a row means the addon is offered on that property — no separate flag to fall out of sync. */
 export type PropertyAddonService = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   property_id: string;
   addon_service_id: string;
 };
 
 export type Enquiry = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   property_id: string;
   name: string;
@@ -202,6 +222,8 @@ export type Enquiry = {
 };
 
 export type Booking = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   property_id: string;
   enquiry_id: string | null;
@@ -222,6 +244,8 @@ export type Booking = {
 };
 
 export type BookingAddon = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   booking_id: string;
   addon_service_id: string | null;
@@ -233,6 +257,8 @@ export type BookingAddon = {
 };
 
 export type Payment = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   booking_id: string;
   amount: number;
@@ -243,6 +269,8 @@ export type Payment = {
 };
 
 export type GuestDocument = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   booking_id: string;
   guest_name: string | null;
@@ -252,6 +280,8 @@ export type GuestDocument = {
 };
 
 export type CalendarSource = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   property_id: string;
   platform: CalendarPlatform;
@@ -263,6 +293,8 @@ export type CalendarSource = {
 };
 
 export type ExternalEvent = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   property_id: string;
   source_id: string;
@@ -278,6 +310,8 @@ export type ExternalEvent = {
  * Half-open: end_date is the first night NOT covered.
  */
 export type RatePeriod = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
   id: string;
   property_id: string;
   label: string | null;

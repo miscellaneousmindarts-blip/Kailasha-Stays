@@ -407,12 +407,13 @@ function ShellInner({
       setAddError(result.error);
       return;
     }
-    if (result.id) {
+    if (result.id && result.tenantId) {
       // Land it just above the pinned closing section, matching the server's placement.
       const closeIndex = sections.findIndex((s) => s.pin === "last");
       const insertAt = closeIndex === -1 ? sections.length : closeIndex;
       const newRow: HomepageSection = {
         id: result.id,
+        tenant_id: result.tenantId,
         key: `${type}_new`,
         kind: "custom",
         type,

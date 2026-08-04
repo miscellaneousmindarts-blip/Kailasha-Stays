@@ -180,7 +180,9 @@ export async function updateBuiltinSection(
   return { success: true };
 }
 
-export async function addCustomSection(type: string): Promise<ActionResult & { id?: string }> {
+export async function addCustomSection(
+  type: string,
+): Promise<ActionResult & { id?: string; tenantId?: string }> {
   if (!isLayoutType(type)) return { error: "Unknown layout." };
 
   const supabase = await createClient();
@@ -212,12 +214,14 @@ export async function addCustomSection(type: string): Promise<ActionResult & { i
       pin: null,
       sort_order: sortOrder,
     })
-    .select("id")
+    // tenant_id is filled in by a database trigger, and the builder's
+    // optimistic row needs the real value rather than a guess.
+    .select("id,tenant_id")
     .single();
 
   if (error) return { error: friendly(error) };
   revalidateBuilder();
-  return { success: true, id: data.id };
+  return { success: true, id: data.id, tenantId: data.tenant_id };
 }
 
 /** Content arrives as JSON from the layout editor and is schema-checked here. */
