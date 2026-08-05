@@ -35,6 +35,7 @@ const PRIMARY = publicEnv.primaryTenantSlug;
 function isGlobalPath(pathname: string): boolean {
   return (
     pathname.startsWith("/admin") ||
+    pathname.startsWith("/superadmin") ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/stay") ||
     pathname.startsWith("/_next") ||

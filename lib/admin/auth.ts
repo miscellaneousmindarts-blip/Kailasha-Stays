@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
+import { readActingTenantId } from "@/lib/impersonation";
 import type { TenantRole, TenantStatus } from "@/lib/types/database";
 
 export type AdminTenant = {
@@ -20,6 +21,8 @@ export type AdminContext = {
   tenant: AdminTenant;
   role: TenantRole;
   isSuperadmin: boolean;
+  /** True when a superadmin is acting as a tenant that isn't their own. */
+  isImpersonating: boolean;
 };
 
 /**
@@ -61,9 +64,37 @@ export const requireTenant = cache(async (): Promise<AdminContext> => {
 
   if (!adminRow) notFound();
 
-  // Which tenant this admin is acting on. Phase B6 adds impersonation, where
-  // a superadmin picks a tenant and this reads that choice from a signed
-  // cookie instead; until then it is simply the account's own membership.
+  // ── Impersonation ──────────────────────────────────────────────────────
+  // The cookie is only ever consulted for a superadmin, and the flag is read
+  // from the database above on every request — never from the cookie itself.
+  // That is what makes the cookie safe to leave unsigned: forging it gains a
+  // non-superadmin nothing, because this branch never runs for them. See
+  // lib/impersonation.ts.
+  if (adminRow.is_superadmin) {
+    const actingTenantId = await readActingTenantId();
+    if (actingTenantId) {
+      const { data: acting } = await supabase
+        .from("tenants")
+        .select("id, slug, name, status")
+        .eq("id", actingTenantId)
+        .maybeSingle();
+
+      // A stale cookie (tenant since deleted) falls through to the admin's
+      // own tenant rather than erroring — the target is gone, so the honest
+      // result is "you are back to being yourself", not a broken panel.
+      if (acting) {
+        return {
+          supabase,
+          user,
+          tenant: acting as AdminTenant,
+          role: "owner",
+          isSuperadmin: true,
+          isImpersonating: true,
+        };
+      }
+    }
+  }
+
   const { data: membership, error } = await supabase
     .from("tenant_members")
     .select("role, tenants(id, slug, name, status)")
@@ -89,6 +120,7 @@ export const requireTenant = cache(async (): Promise<AdminContext> => {
     tenant,
     role: membership.role as TenantRole,
     isSuperadmin: adminRow.is_superadmin,
+    isImpersonating: false,
   };
 });
 

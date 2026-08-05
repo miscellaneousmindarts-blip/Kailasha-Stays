@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
       },
       {
+        source: "/superadmin/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+      {
         source: "/stay/:path*",
         headers: [
           { key: "X-Robots-Tag", value: "noindex, nofollow" },

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, Shield } from "lucide-react";
 
 import { signOut } from "@/app/admin/(dashboard)/actions";
 import {
@@ -15,9 +15,14 @@ import {
 
 export function AdminShell({
   userEmail,
+  tenantName,
+  isSuperadmin,
   children,
 }: {
   userEmail: string;
+  /** Which business this session is acting on — only ambiguous once there's more than one. */
+  tenantName: string;
+  isSuperadmin: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -26,7 +31,8 @@ export function AdminShell({
     <div className="flex min-h-dvh">
       {/* Desktop sidebar — every destination, grouped by how often it's used. */}
       <aside className="border-border hidden w-64 shrink-0 flex-col border-r p-4 lg:flex">
-        <p className="px-2 py-2 font-semibold">Admin</p>
+        <p className="px-2 pt-2 font-semibold">Admin</p>
+        <p className="text-text-muted truncate px-2 pb-2 text-sm">{tenantName}</p>
 
         <nav className="mt-3 flex flex-col gap-5">
           {NAV_GROUPS.map((group) => (
@@ -58,6 +64,15 @@ export function AdminShell({
         </nav>
 
         <div className="border-border mt-auto border-t pt-3">
+          {isSuperadmin ? (
+            <Link
+              href="/superadmin"
+              className="hover:bg-surface-subtle pressable mb-1 flex h-11 items-center gap-3 rounded-md px-3 font-medium"
+            >
+              <Shield className="size-5" aria-hidden="true" />
+              Platform
+            </Link>
+          ) : null}
           <p className="text-text-muted truncate px-2 text-sm">{userEmail}</p>
           <form action={signOut}>
             <button

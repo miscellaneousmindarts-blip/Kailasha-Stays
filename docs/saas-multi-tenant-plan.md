@@ -25,8 +25,9 @@ Decisions locked with the owner before writing this:
 | B3a — tenant-aware public queries | **Done** | none needed |
 | B3b — routing (`/s/{tenant}`, proxy) | **Done**, verified against a real 2nd tenant | none needed |
 | B4 — admin scoping | **Done** | none needed |
-| B5 — white-label branding | **Done, migrations not yet run** | `0015`, `0016` |
-| B6 onward | Not started | — |
+| B5 — white-label branding | **Done** | `0015`, `0016` |
+| B6 — superadmin console + impersonation | **Done, migration not yet run** | `0017` |
+| B7 onward | Not started | — |
 
 B3 was split in two because the routing half is the only part that can take
 the live site down, and it was much safer once the data layer underneath was
@@ -96,6 +97,35 @@ bridges instead of blocking on phases that come after it:
 Neither survived: `getPrimaryTenantId()` is now only used by the routes that
 genuinely have no tenant in the URL (`/stay/[token]`, the apex sitemap), and
 `getCurrentTenantId()` was deleted outright in B4.
+
+### What B6 built, and why the impersonation cookie isn't signed
+
+`/superadmin` is a separate route tree gated by `requireSuperadmin()`, with
+its queries in `lib/superadmin/queries.ts` — deliberately the one module that
+spans tenants, kept apart from `lib/admin/queries.ts` (which is always
+single-tenant) so the split itself documents the rule. A cross-tenant query
+under `lib/admin/` is a bug; here it's the point.
+
+**Impersonation** sets an `acting_tenant` cookie that `requireTenant()` reads
+— but ONLY after re-reading `admin_users.is_superadmin` from the database for
+the session's own user. The cookie names a tenant; it does not assert
+permission to act on it. Forging it gains a non-superadmin nothing, because
+the branch that reads it never executes for them. That's why it's httpOnly +
+sameSite rather than signed: signing would protect the integrity of a value
+whose integrity grants nothing. **If it ever starts carrying a claim the
+server doesn't independently re-check — a role, an expiry — it must be
+signed.**
+
+This is also where B4 pays off: because every admin query already filters by
+`tenant.id` from `requireTenant()`, impersonation needed no changes to any of
+them. One resolution point moved, ~50 call sites followed.
+
+`impersonation_log` (0017) is append-only by policy — superadmin-only SELECT
+and INSERT, one narrow UPDATE for stamping `ended_at` on your own open row,
+and **no DELETE policy at all**. It logs the session, not each write during
+it; per-mutation logging would mean threading a writer through ~40 actions
+for little gain over "X had access to Y between 14:02 and 14:19" while there
+is one superadmin. Assertion 5 of the isolation test covers it.
 
 ### What B5 built
 

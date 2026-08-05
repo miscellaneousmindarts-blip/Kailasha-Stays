@@ -382,6 +382,21 @@ export type Tenant = {
 
 export type TenantRole = "owner" | "staff";
 
+/**
+ * One superadmin support session against one tenant. Append-only by policy
+ * (0017) — there is no delete path, and the only permitted update is stamping
+ * ended_at on your own open row.
+ */
+export type ImpersonationLog = {
+  id: string;
+  actor_id: string;
+  actor_email: string | null;
+  tenant_id: string;
+  tenant_slug: string;
+  started_at: string;
+  ended_at: string | null;
+};
+
 export type TenantMember = {
   tenant_id: string;
   user_id: string;
@@ -444,6 +459,18 @@ export type Database = {
         [
           {
             foreignKeyName: "tenant_members_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      impersonation_log: Table<
+        ImpersonationLog,
+        [
+          {
+            foreignKeyName: "impersonation_log_tenant_id_fkey";
             columns: ["tenant_id"];
             isOneToOne: false;
             referencedRelation: "tenants";

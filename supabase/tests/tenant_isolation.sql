@@ -14,6 +14,7 @@
 -- permanent, even when it fails. Re-runnable as often as you like.
 --
 -- PASS looks like:  NOTICE: tenant isolation: PASS (17 tables, 0 violations)
+-- (preceded by read/write/integrity/anon/impersonation-log PASS notices)
 -- FAIL raises an exception naming every table that leaked.
 -- =============================================================================
 
@@ -339,6 +340,81 @@ begin
   end if;
 
   raise notice 'public (anon) access: PASS';
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Assertion 5 — the impersonation audit log is superadmin-only, append-only
+--
+-- An audit trail that the people it audits can read, edit or erase isn't one.
+-- These users are deliberately NOT in admin_users, so is_superadmin() is
+-- false for them — which is exactly the case the policies in 0017 have to
+-- hold against.
+-- -----------------------------------------------------------------------------
+
+do $$
+declare
+  a_tenant uuid; a_user uuid;
+  n int;
+  violations text[] := '{}';
+  v_log_id uuid;
+begin
+  select z.a_tenant, z.a_user into a_tenant, a_user from zz_iso z;
+
+  -- Seeded as postgres (RLS bypassed) so there is definitely a row to hide.
+  insert into public.impersonation_log (actor_id, actor_email, tenant_id, tenant_slug)
+  values ('00000000-0000-4000-8000-0000000000ff', 'someone@example.com', a_tenant, 'zz-isolation-a')
+  returning id into v_log_id;
+
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims', json_build_object('sub', a_user)::text, true);
+
+  select count(*) into n from public.impersonation_log;
+  if n <> 0 then
+    violations := violations || format('a non-superadmin read %s audit row(s)', n);
+  end if;
+
+  begin
+    insert into public.impersonation_log (actor_id, actor_email, tenant_id, tenant_slug)
+    values (a_user, 'attacker@example.com', a_tenant, 'zz-isolation-a');
+    violations := violations || 'a non-superadmin inserted an audit row';
+  exception when insufficient_privilege then
+    null;
+  end;
+
+  begin
+    update public.impersonation_log set actor_email = 'rewritten' where id = v_log_id;
+    get diagnostics n = row_count;
+    if n > 0 then
+      violations := violations || 'a non-superadmin rewrote an audit row';
+    end if;
+  exception when insufficient_privilege then
+    null;
+  end;
+
+  begin
+    delete from public.impersonation_log where id = v_log_id;
+    get diagnostics n = row_count;
+    if n > 0 then
+      violations := violations || 'a non-superadmin deleted an audit row';
+    end if;
+  exception when insufficient_privilege then
+    null;
+  end;
+
+  perform set_config('role', 'postgres', true);
+
+  -- No DELETE policy exists at all, so even a superadmin cannot erase history
+  -- through the app. Confirm the row survived everything above.
+  select count(*) into n from public.impersonation_log where id = v_log_id;
+  if n <> 1 then
+    violations := violations || 'the seeded audit row did not survive';
+  end if;
+
+  if array_length(violations, 1) > 0 then
+    raise exception E'IMPERSONATION LOG CHECK FAILED:\n  %', array_to_string(violations, E'\n  ');
+  end if;
+
+  raise notice 'impersonation log: PASS';
 end $$;
 
 do $$ begin
