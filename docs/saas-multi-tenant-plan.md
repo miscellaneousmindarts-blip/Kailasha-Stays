@@ -25,7 +25,8 @@ Decisions locked with the owner before writing this:
 | B3a — tenant-aware public queries | **Done** | none needed |
 | B3b — routing (`/s/{tenant}`, proxy) | **Done**, verified against a real 2nd tenant | none needed |
 | B4 — admin scoping | **Done** | none needed |
-| B5 onward | Not started | — |
+| B5 — white-label branding | **Done, migrations not yet run** | `0015`, `0016` |
+| B6 onward | Not started | — |
 
 B3 was split in two because the routing half is the only part that can take
 the live site down, and it was much safer once the data layer underneath was
@@ -36,10 +37,11 @@ pass a different value.
 
 - ~~The admin's "View live" link~~ — **done in B4**, now built from the
   admin's own tenant base path.
-- **The guest portal's branding** (`/stay/[token]`) is the primary tenant's,
-  not the booking's. Correct while there is one tenant. Fixing it needs
-  `tenant_id` on the `get_booking_by_token` bundle, which belongs with
-  **B5**'s white-label work so the logo and brand fields land together.
+- ~~The guest portal's branding~~ — **done in B5.** get_booking_by_token's
+  'settings' object (already scoped to the booking's tenant since B2) was
+  widened with the branding columns, so the portal's header/footer/brand
+  color/tab title all read from the booking's own tenant now, not the
+  primary one.
 
 Also worth knowing: `notFound()` inside a property page returns 200 in dev
 rather than 404. Verified identical before and after B3b, so it is
@@ -94,6 +96,36 @@ bridges instead of blocking on phases that come after it:
 Neither survived: `getPrimaryTenantId()` is now only used by the routes that
 genuinely have no tenant in the URL (`/stay/[token]`, the apex sitemap), and
 `getCurrentTenantId()` was deleted outright in B4.
+
+### What B5 built
+
+Five new site_settings columns (`0015`): `logo_path`, `favicon_path`,
+`brand_color`, `legal_name`, `footer_note`. logo/favicon are plain columns
+holding a homepage-media path — NOT rows in homepage_images — because a logo
+isn't a photo a section picks from, it's a fixed singleton slot with its own
+upload/remove action; putting it in the shared library would surface it in
+every section's photo picker for no reason.
+
+`brand_color` is one hex field in the admin, not four. `lib/brand-color.ts`
+derives the hover/tint/ring shades the app's CSS tokens need from that one
+value — otherwise a new brand color would mix with the ORIGINAL terracotta's
+hardcoded hover/tint and every button's hover state would look broken, not
+branded. `PublicSiteBranding` (`lib/types/database.ts`) narrows
+SiteHeader/SiteFooter's prop type to only what they render, which is what let
+the guest portal build branding straight from the RPC bundle instead of
+needing a full SiteSettings object.
+
+Favicon uses Next's `metadata.icons.icon` rather than a dynamic route —
+omitted entirely (not pointed at a fallback) when unset, so the file-based
+`/app/favicon.ico` convention stays in charge for a tenant with no favicon
+of their own.
+
+`0016` widens get_booking_by_token's 'settings' projection by six columns —
+same tenant-scoped join B2 already fixed, just returning more of that row.
+`getBookingBundle` gained a `cache()` wrapper (per-request de-dup only, not
+a caching layer — the layout now needs the bundle for chrome alongside the
+page's existing call for content) so that widening didn't cost a second RPC
+round trip per request.
 
 ### What B4 established, and the rule the remaining phases follow
 

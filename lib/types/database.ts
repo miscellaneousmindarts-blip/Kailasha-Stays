@@ -46,8 +46,38 @@ export type SiteSettings = {
   maps_url: string | null;
   instagram_url: string | null;
   facebook_url: string | null;
+  /** homepage-media bucket path. Null falls back to business_name as text. */
+  logo_path: string | null;
+  /** homepage-media bucket path. Null falls back to the app default /favicon.ico. */
+  favicon_path: string | null;
+  /** Hex #rrggbb. Null keeps the default terracotta theme. */
+  brand_color: string | null;
+  /** Registered entity name, for the footer's fine print — shown nowhere else. */
+  legal_name: string | null;
+  footer_note: string | null;
   updated_at: string;
 };
+
+/**
+ * What SiteHeader/SiteFooter actually render — a Pick rather than the full
+ * SiteSettings, because the guest portal builds this straight from the
+ * get_booking_by_token RPC's 'settings' object (the booking's own tenant),
+ * which was never going to carry hotel_room_rate or cancel_days alongside
+ * it. Every full SiteSettings object already satisfies this structurally, so
+ * every existing caller keeps working unchanged.
+ */
+export type PublicSiteBranding = Pick<
+  SiteSettings,
+  | "business_name"
+  | "whatsapp_number"
+  | "logo_path"
+  | "address"
+  | "contact_phone"
+  | "contact_email"
+  | "footer_note"
+  | "legal_name"
+  | "brand_color"
+>;
 
 export type Property = {
   /** Owning tenant. Set by a database trigger from the parent row / caller. */

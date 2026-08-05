@@ -1,7 +1,9 @@
+import Image from "next/image";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 
-import type { SiteSettings } from "@/lib/types/database";
+import { homepageImageUrl } from "@/lib/images";
+import type { PublicSiteBranding } from "@/lib/types/database";
 
 /**
  * Sticky public header. Deliberately contains no link to /admin — the owner
@@ -11,19 +13,36 @@ export function SiteHeader({
   settings,
   basePath,
 }: {
-  settings: SiteSettings;
+  settings: PublicSiteBranding;
   /** "" for the tenant served at the bare domain, "/s/{slug}" otherwise. */
   basePath: string;
 }) {
+  const logoSrc = homepageImageUrl(settings.logo_path);
+
   return (
     <header className="border-border sticky top-0 z-40 border-b bg-[rgba(255,255,255,0.85)] backdrop-blur-md">
       <div className="container-page flex h-16 items-center justify-between gap-3">
         <Link
           href={basePath || "/"}
-          className="min-w-0 truncate text-lg font-semibold tracking-tight"
+          className="min-w-0 shrink-0"
           aria-label={`${settings.business_name} — home`}
         >
-          {settings.business_name}
+          {logoSrc ? (
+            <span className="relative block h-9 w-[160px]">
+              <Image
+                src={logoSrc}
+                alt={settings.business_name}
+                fill
+                sizes="160px"
+                priority
+                className="object-contain object-left"
+              />
+            </span>
+          ) : (
+            <span className="block truncate text-lg font-semibold tracking-tight">
+              {settings.business_name}
+            </span>
+          )}
         </Link>
 
         <nav className="flex shrink-0 items-center gap-1 sm:gap-2">

@@ -1,17 +1,21 @@
 import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
 
-import type { SiteSettings } from "@/lib/types/database";
+import type { PublicSiteBranding } from "@/lib/types/database";
 
 export function SiteFooter({
   settings,
   basePath,
 }: {
-  settings: SiteSettings;
+  settings: PublicSiteBranding;
   /** "" for the tenant served at the bare domain, "/s/{slug}" otherwise. */
   basePath: string;
 }) {
   const year = new Date().getFullYear();
+  // The legal fine print names whichever entity the owner actually
+  // registered under, if it differs from the public-facing business name —
+  // most tenants leave this blank and the public name is used for both.
+  const legalName = settings.legal_name || settings.business_name;
 
   return (
     <footer className="bg-surface-subtle border-border mt-16 border-t">
@@ -52,7 +56,10 @@ export function SiteFooter({
       </div>
 
       <div className="container-page border-border text-text-muted border-t py-6 text-sm">
-        © {year} {settings.business_name}
+        <p>
+          © {year} {legalName}
+        </p>
+        {settings.footer_note ? <p className="mt-1">{settings.footer_note}</p> : null}
       </div>
     </footer>
   );

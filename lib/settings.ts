@@ -29,19 +29,24 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   maps_url: null,
   instagram_url: null,
   facebook_url: null,
+  logo_path: null,
+  favicon_path: null,
+  brand_color: null,
+  legal_name: null,
+  footer_note: null,
   updated_at: new Date(0).toISOString(),
 };
 
 /**
  * A tenant's site_settings row — business name, WhatsApp number, contact
- * details. Owned by the admin panel, never by environment variables.
+ * details, branding. Owned by the admin panel, never by environment
+ * variables.
  *
- * `tenantId` is optional only because SiteHeader and SiteFooter render from
- * the shared public layout, which has no tenant param until phase B3b moves
- * the public routes under /s/[tenant]. Every caller that CAN name its tenant
- * should — falling back to the primary tenant is right for exactly one
- * tenant and wrong for the second one, so the default is a bridge, not a
- * feature.
+ * `tenantId` is optional because two routes genuinely have no tenant in the
+ * URL to resolve one from: /stay/[token] (a booking link handed to a guest
+ * directly, unprefixed on purpose — see B5's note on why its branding isn't
+ * yet the booking's own tenant) and the apex sitemap. Every other caller
+ * passes its resolved tenant explicitly.
  *
  * `cache` de-duplicates this across a single render pass, so a page can call it
  * from several components without extra round trips.

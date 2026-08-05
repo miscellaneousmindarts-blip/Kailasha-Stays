@@ -70,6 +70,21 @@ export type MediaCheck =
   | { error?: undefined; ext: string; isVideo: boolean };
 
 /**
+ * Images only — for the singleton brand assets (logo, favicon), which are
+ * never sensibly a video. Shares its size/type rules with checkMediaFile()
+ * rather than being a special case with its own limits.
+ */
+export function checkImageFile(file: File): MediaCheck {
+  if (!(IMAGE_MIME_TYPES as readonly string[]).includes(file.type)) {
+    return { error: "Must be a JPEG, PNG, WebP or AVIF image." };
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return { error: "Must be under 10MB." };
+  }
+  return { ext: mediaExtension(file.type), isVideo: false };
+}
+
+/**
  * Validates an uploaded file's type and size in one place. Videos get a
  * larger budget than photos because even a short, well-compressed 1080p clip
  * runs past what a photo should ever need.

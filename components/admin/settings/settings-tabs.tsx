@@ -6,9 +6,10 @@ import { SectionTabs } from "@/components/admin/section-tabs";
 import { ContactSettingsForm } from "@/components/admin/settings/contact-settings-form";
 import { BookingPolicyForm } from "@/components/admin/settings/booking-policy-form";
 import { StayDefaultsForm } from "@/components/admin/settings/stay-defaults-form";
+import { BrandSettingsForm } from "@/components/admin/settings/brand-settings-form";
 import type { SiteSettings } from "@/lib/types/database";
 
-const TABS = ["Business details", "Booking policy", "Stay defaults"] as const;
+const TABS = ["Business details", "Brand", "Booking policy", "Stay defaults"] as const;
 type Tab = (typeof TABS)[number];
 
 /**
@@ -36,6 +37,16 @@ export function SettingsTabs({ settings }: { settings: SiteSettings }) {
               and the guest portal.
             </p>
             <ContactSettingsForm settings={settings} />
+          </>
+        ) : null}
+
+        {tab === "Brand" ? (
+          <>
+            <p className="text-text-muted mb-5 max-w-xl text-sm">
+              Your logo, favicon and accent color — what makes the site look
+              like yours instead of a template.
+            </p>
+            <BrandSettingsForm settings={settings} />
           </>
         ) : null}
 

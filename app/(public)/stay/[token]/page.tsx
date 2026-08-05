@@ -15,10 +15,25 @@ import { getSiteSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Your stay",
-  robots: { index: false, follow: false },
-};
+/**
+ * Per-booking rather than static: without this, every tenant's guest portal
+ * tab carried the root layout's "| Stays in Vrindavan" suffix — a stray
+ * white-label leak on the one page an already-confirmed guest actually
+ * looks at by name. Falls back to the bare title for a token that doesn't
+ * resolve, since there's no tenant to name at that point.
+ */
+export async function generateMetadata(
+  props: PageProps<"/stay/[token]">,
+): Promise<Metadata> {
+  const { token } = await props.params;
+  const bundle = await getBookingBundle(token);
+  const businessName = bundle?.settings?.business_name;
+
+  return {
+    title: businessName ? `Your stay | ${businessName}` : "Your stay",
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function GuestPortalPage(
   props: PageProps<"/stay/[token]">,

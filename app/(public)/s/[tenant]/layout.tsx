@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { brandColorStyle } from "@/lib/brand-color";
+import { homepageImageUrl } from "@/lib/images";
 import { getSiteSettings } from "@/lib/settings";
 import { getTenantBySlug, tenantBasePath } from "@/lib/tenant";
 
@@ -23,11 +25,18 @@ export async function generateMetadata({
   if (!tenant) return {};
 
   const settings = await getSiteSettings(tenant.id);
+  const faviconUrl = homepageImageUrl(settings.favicon_path);
+
   return {
     title: {
       default: settings.business_name,
       template: `%s | ${settings.business_name}`,
     },
+    // Omitted entirely when unset, rather than pointed at a fallback URL —
+    // that leaves Next's file-based /app/favicon.ico convention in charge,
+    // which is exactly the right default for a tenant with no favicon of
+    // their own.
+    ...(faviconUrl ? { icons: { icon: faviconUrl } } : {}),
   };
 }
 
@@ -51,7 +60,12 @@ export default async function TenantLayout({
   const basePath = tenantBasePath(tenant.slug);
 
   return (
-    <>
+    // `contents` keeps this div out of the box tree entirely (no layout
+    // effect — body's own flex column still applies directly to the header/
+    // main/footer below), while still giving the brand-color CSS custom
+    // properties a scope to cascade from into every descendant that reads
+    // them, including the skip link right below.
+    <div style={brandColorStyle(settings.brand_color)} className="contents">
       <a
         href="#main"
         className="bg-primary text-primary-foreground focus:ring-ring sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:px-4 focus:py-2"
@@ -63,6 +77,6 @@ export default async function TenantLayout({
         {children}
       </div>
       <SiteFooter settings={settings} basePath={basePath} />
-    </>
+    </div>
   );
 }

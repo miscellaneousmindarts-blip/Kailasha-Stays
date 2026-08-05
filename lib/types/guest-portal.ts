@@ -71,5 +71,11 @@ export type GuestBookingBundle = {
     contact_phone: string | null;
     contact_email: string | null;
     response_note: string | null;
+    address: string | null;
+    logo_path: string | null;
+    favicon_path: string | null;
+    brand_color: string | null;
+    legal_name: string | null;
+    footer_note: string | null;
   } | null;
 };
