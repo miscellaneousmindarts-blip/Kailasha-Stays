@@ -26,6 +26,7 @@ export const VIDEO_MIME_TYPES = ["video/mp4", "video/webm"] as const;
 
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+export const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
 /** For an <input type="file"> accept attribute. */
 export const MEDIA_ACCEPT = [...IMAGE_MIME_TYPES, ...VIDEO_MIME_TYPES].join(",");
@@ -37,6 +38,7 @@ const EXTENSIONS: Record<string, string> = {
   "image/avif": "avif",
   "video/mp4": "mp4",
   "video/webm": "webm",
+  "application/pdf": "pdf",
 };
 
 const VIDEO_EXTENSIONS = ["mp4", "webm"];
@@ -82,6 +84,20 @@ export function checkImageFile(file: File): MediaCheck {
     return { error: "Must be under 10MB." };
   }
   return { ext: mediaExtension(file.type), isVideo: false };
+}
+
+/**
+ * A PDF only — for the room-service menu upload, which is never sensibly an
+ * image or video.
+ */
+export function checkPdfFile(file: File): MediaCheck {
+  if (file.type !== "application/pdf") {
+    return { error: "Must be a PDF." };
+  }
+  if (file.size > MAX_PDF_BYTES) {
+    return { error: "Must be under 10MB." };
+  }
+  return { ext: "pdf", isVideo: false };
 }
 
 /**

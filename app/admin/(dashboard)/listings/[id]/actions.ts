@@ -8,7 +8,7 @@ import { requireTenant } from "@/lib/admin/auth";
 import { revalidatePublicProperties } from "@/lib/admin/revalidate";
 import { AMENITY_KEYS } from "@/lib/amenities";
 import { BLOCK_TYPES, blockSchemas, isKnownBlockType } from "@/lib/blocks";
-import { checkMediaFile, isVideoPath } from "@/lib/media";
+import { checkMediaFile, checkPdfFile, isVideoPath } from "@/lib/media";
 import { slugify } from "@/lib/slug";
 import type {
   Property,
@@ -87,6 +87,7 @@ const NULLABLE_TEXT_FIELDS = [
   "gmaps_url",
   "airbnb_url",
   "booking_com_url",
+  "room_service_link",
 ] as const;
 
 // max_guests/bedrooms/beds/bathrooms are NOT NULL columns with defaults.
@@ -556,6 +557,85 @@ export async function deletePropertyImage(
     .delete()
     .eq("id", imageId);
   if (error) return { error: error.message };
+
+  revalidateEditor(propertyId);
+  return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// Room service menu — a PDF, uploaded to its own bucket (property-documents)
+// since it isn't a photo/video. Single slot per property, same
+// upload-replaces-the-old-one pattern as the brand logo/favicon in
+// app/admin/(dashboard)/settings/brand-actions.ts. The link half of the menu
+// (room_service_link) goes through the generic updateProperty() above —
+// it's just another nullable text column.
+// ---------------------------------------------------------------------------
+
+export async function uploadRoomServiceMenu(
+  propertyId: string,
+  formData: FormData,
+): Promise<ActionResult & { path?: string }> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a PDF." };
+
+  const check = checkPdfFile(file);
+  if (check.error) return { error: check.error };
+
+  const { supabase, tenant } = await requireTenant();
+
+  const { data: current } = await supabase
+    .from("properties")
+    .select("room_service_pdf_path")
+    .eq("tenant_id", tenant.id)
+    .eq("id", propertyId)
+    .maybeSingle();
+  const previousPath = current?.room_service_pdf_path ?? null;
+
+  const path = `${propertyId}/menu-${randomUUID()}.${check.ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from("property-documents")
+    .upload(path, file, { contentType: file.type });
+  if (uploadError) return { error: uploadError.message };
+
+  const { error: updateError } = await supabase
+    .from("properties")
+    .update({ room_service_pdf_path: path })
+    .eq("tenant_id", tenant.id)
+    .eq("id", propertyId);
+  if (updateError) {
+    await supabase.storage.from("property-documents").remove([path]);
+    return { error: updateError.message };
+  }
+
+  if (previousPath) {
+    await supabase.storage.from("property-documents").remove([previousPath]);
+  }
+
+  revalidateEditor(propertyId);
+  return { success: true, path };
+}
+
+export async function removeRoomServiceMenu(propertyId: string): Promise<ActionResult> {
+  const { supabase, tenant } = await requireTenant();
+
+  const { data: current } = await supabase
+    .from("properties")
+    .select("room_service_pdf_path")
+    .eq("tenant_id", tenant.id)
+    .eq("id", propertyId)
+    .maybeSingle();
+  const path = current?.room_service_pdf_path ?? null;
+
+  const { error } = await supabase
+    .from("properties")
+    .update({ room_service_pdf_path: null })
+    .eq("tenant_id", tenant.id)
+    .eq("id", propertyId);
+  if (error) return { error: error.message };
+
+  if (path) {
+    await supabase.storage.from("property-documents").remove([path]);
+  }
 
   revalidateEditor(propertyId);
   return { success: true };

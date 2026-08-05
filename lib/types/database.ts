@@ -110,6 +110,10 @@ export type Property = {
   gmaps_url: string | null;
   airbnb_url: string | null;
   booking_com_url: string | null;
+  /** External URL to a room-service menu. Independent of room_service_pdf_path. */
+  room_service_link: string | null;
+  /** property-documents bucket path to an uploaded PDF menu. Independent of room_service_link. */
+  room_service_pdf_path: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

@@ -24,6 +24,8 @@ export type GuestBookingBundle = {
     check_out_time: string | null;
     house_rules: string | null;
     max_guests: number;
+    room_service_link: string | null;
+    room_service_pdf_path: string | null;
     images: { storage_path: string; alt: string | null }[];
   } | null;
   private: {
@@ -64,7 +66,12 @@ export type GuestBookingBundle = {
     due: number;
     payments: { amount: number; method: string | null; paid_at: string }[];
   };
-  documents: { guest_name: string | null; doc_type: string; uploaded_at: string }[];
+  documents: {
+    id: string;
+    guest_name: string | null;
+    doc_type: string;
+    uploaded_at: string;
+  }[];
   settings: {
     business_name: string;
     whatsapp_number: string | null;

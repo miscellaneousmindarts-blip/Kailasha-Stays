@@ -7,6 +7,7 @@ import { WifiSection } from "@/components/guest-portal/wifi-section";
 import { ContactsSection } from "@/components/guest-portal/contacts-section";
 import { AddonsSection } from "@/components/guest-portal/addons-section";
 import { BillingSection } from "@/components/guest-portal/billing-section";
+import { RoomServiceSection } from "@/components/guest-portal/room-service-section";
 import { DocumentsSection } from "@/components/guest-portal/documents-section";
 import { HouseRulesFooter } from "@/components/guest-portal/house-rules-footer";
 import { InvalidToken } from "@/components/guest-portal/invalid-token";
@@ -49,11 +50,12 @@ export default async function GuestPortalPage(
   return (
     <main className="container-page max-w-2xl py-6 md:py-10">
       {/* Priority order: confirmed (in the header) → where to go → upload ID
-          → pay → everything else. */}
+          → pay → room service → everything else. */}
       <PortalHeader bundle={bundle} />
       <GettingThereSection bundle={bundle} />
       <DocumentsSection token={token} bundle={bundle} />
       <BillingSection bundle={bundle} />
+      <RoomServiceSection bundle={bundle} />
       <WifiSection bundle={bundle} />
       <ContactsSection bundle={bundle} />
       <AddonsSection token={token} bundle={bundle} />

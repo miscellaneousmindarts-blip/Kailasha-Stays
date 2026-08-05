@@ -2,6 +2,7 @@ import { publicEnv } from "@/lib/env";
 
 const PUBLIC_PREFIX = `${publicEnv.supabaseUrl}/storage/v1/object/public/property-images/`;
 const HOMEPAGE_MEDIA_PREFIX = `${publicEnv.supabaseUrl}/storage/v1/object/public/homepage-media/`;
+const PROPERTY_DOCUMENTS_PREFIX = `${publicEnv.supabaseUrl}/storage/v1/object/public/property-documents/`;
 
 /**
  * Public URL for a photo in the property-images bucket.
@@ -30,6 +31,13 @@ export function homepageImageUrl(storagePath: string | null | undefined): string
   if (storagePath.startsWith("http")) return storagePath;
   if (storagePath.startsWith("/")) return storagePath;
   return HOMEPAGE_MEDIA_PREFIX + storagePath;
+}
+
+/** Public URL for the PDF in the property-documents bucket (the room-service menu). */
+export function propertyDocumentUrl(storagePath: string | null | undefined): string | null {
+  if (!storagePath) return null;
+  if (storagePath.startsWith("http")) return storagePath;
+  return PROPERTY_DOCUMENTS_PREFIX + storagePath;
 }
 
 /**
