@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireTenant } from "@/lib/admin/auth";
 import { checkMediaFile } from "@/lib/media";
 import type { HomepageImage } from "@/lib/types/database";
 
@@ -40,7 +40,7 @@ export async function uploadHomepageImage(
   const title = String(formData.get("title") ?? "").trim() || null;
   const alt = String(formData.get("alt") ?? "").trim() || null;
 
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const path = `${randomUUID()}.${check.ext}`;
 
   const { error: uploadError } = await supabase.storage
@@ -50,7 +50,7 @@ export async function uploadHomepageImage(
 
   const { data, error: insertError } = await supabase
     .from("homepage_images")
-    .insert({ storage_path: path, title, alt, is_placeholder: false })
+    .insert({ tenant_id: tenant.id, storage_path: path, title, alt, is_placeholder: false })
     .select("*")
     .single();
   if (insertError) return { error: friendly(insertError) };
@@ -65,10 +65,11 @@ export async function updateHomepageImageMeta(
   title: string,
   alt: string,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { error } = await supabase
     .from("homepage_images")
     .update({ title: title.trim() || null, alt: alt.trim() || null })
+    .eq("tenant_id", tenant.id)
     .eq("id", id);
 
   if (error) return { error: friendly(error) };
@@ -84,7 +85,7 @@ export async function updateHomepageImageMeta(
  * image field.
  */
 export async function deleteHomepageImage(id: string, storagePath: string): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
 
   const { data: usageCount, error: usageError } = await supabase.rpc("homepage_image_usage", {
     image_id: id,
@@ -96,7 +97,7 @@ export async function deleteHomepageImage(id: string, storagePath: string): Prom
     };
   }
 
-  const { error: dbError } = await supabase.from("homepage_images").delete().eq("id", id);
+  const { error: dbError } = await supabase.from("homepage_images").delete().eq("tenant_id", tenant.id).eq("id", id);
   if (dbError) return { error: friendly(dbError) };
 
   // Storage cleanup is best-effort: a /public seed path has no object to
@@ -110,10 +111,11 @@ export async function deleteHomepageImage(id: string, storagePath: string): Prom
 }
 
 export async function readHomepageImages(): Promise<HomepageImage[] | null> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("homepage_images")
     .select("*")
+    .eq("tenant_id", tenant.id)
     .order("created_at", { ascending: false });
 
   if (error) return null;

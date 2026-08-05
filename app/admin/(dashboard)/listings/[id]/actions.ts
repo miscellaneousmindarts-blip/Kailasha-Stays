@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireTenant } from "@/lib/admin/auth";
 import { revalidatePublicProperties } from "@/lib/admin/revalidate";
 import { AMENITY_KEYS } from "@/lib/amenities";
 import { BLOCK_TYPES, blockSchemas, isKnownBlockType } from "@/lib/blocks";
@@ -22,6 +22,24 @@ import type {
 } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
+
+/**
+ * ── Tenant scoping in this file ──────────────────────────────────────────
+ *
+ * Mutations here act on rows that hang off a parent (a property, a booking),
+ * and they are reached by a unique id or by their parent's id. They rely on
+ * RLS plus the composite foreign keys from 0012, which together make a
+ * cross-tenant write structurally impossible: the policy refuses any row
+ * outside current_tenant_ids(), and a child physically cannot carry a
+ * tenant_id different from its parent's.
+ *
+ * What does NOT rely on RLS alone, and is filtered by tenant.id explicitly:
+ * writes to top-level rows (properties, addon_services, homepage_sections,
+ * homepage_images, site_settings), and any read or write that is not keyed by
+ * a unique id — because for a SUPERADMIN, RLS resolves to every tenant, so an
+ * unfiltered query would span all of them at once.
+ */
+
 
 function editorPath(propertyId: string) {
   return `/admin/listings/${propertyId}`;
@@ -121,10 +139,11 @@ export async function updateProperty(
     }
   }
 
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { error } = await supabase
     .from("properties")
     .update(patch)
+    .eq("tenant_id", tenant.id)
     .eq("id", propertyId);
 
   if (error) {
@@ -140,10 +159,11 @@ export async function setPropertyStatus(
   propertyId: string,
   status: PropertyStatus,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { error } = await supabase
     .from("properties")
     .update({ status })
+    .eq("tenant_id", tenant.id)
     .eq("id", propertyId);
 
   if (error) return { error: error.message };
@@ -153,11 +173,12 @@ export async function setPropertyStatus(
 }
 
 export async function deleteProperty(propertyId: string) {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
 
   const { data: images } = await supabase
     .from("property_images")
     .select("storage_path")
+    .eq("tenant_id", tenant.id)
     .eq("property_id", propertyId);
   if (images?.length) {
     await supabase.storage
@@ -168,6 +189,7 @@ export async function deleteProperty(propertyId: string) {
   const { error } = await supabase
     .from("properties")
     .delete()
+    .eq("tenant_id", tenant.id)
     .eq("id", propertyId);
 
   if (error) {
@@ -248,7 +270,8 @@ function stripImageRefs(value: unknown): unknown {
 
 /** First free slug derived from `title` — `x`, then `x-2`, `x-3`, … */
 async function uniquePropertySlug(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof requireTenant>>["supabase"],
+  tenantId: string,
   title: string,
 ): Promise<string> {
   const base = slugify(title) || "property";
@@ -257,6 +280,7 @@ async function uniquePropertySlug(
     const { data: existing } = await supabase
       .from("properties")
       .select("id")
+      .eq("tenant_id", tenantId)
       .eq("slug", slug)
       .maybeSingle();
     if (!existing) return slug;
@@ -274,11 +298,12 @@ export async function duplicateProperty(
   if (!newTitle) return { error: "Give the new listing a title." };
   if (newTitle.length > 160) return { error: "Keep the title under 160 characters." };
 
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
 
   const { data: source, error: readError } = await supabase
     .from("properties")
     .select("*")
+    .eq("tenant_id", tenant.id)
     .eq("id", propertyId)
     .maybeSingle();
   if (readError) return { error: readError.message };
@@ -298,7 +323,7 @@ export async function duplicateProperty(
     .insert({
       ...carriedOver,
       title: newTitle,
-      slug: await uniquePropertySlug(supabase, newTitle),
+      slug: await uniquePropertySlug(supabase, tenant.id, newTitle),
       status: "draft",
     })
     .select("id")
@@ -483,7 +508,7 @@ export async function uploadPropertyImage(
   const check = checkMediaFile(file);
   if (check.error) return { error: check.error };
 
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const path = `${propertyId}/${randomUUID()}.${check.ext}`;
 
   const { error: uploadError } = await supabase.storage
@@ -523,7 +548,7 @@ export async function deletePropertyImage(
   imageId: string,
   storagePath: string,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   await supabase.storage.from("property-images").remove([storagePath]);
 
   const { error } = await supabase
@@ -540,7 +565,7 @@ export async function setCoverImage(
   propertyId: string,
   imageId: string,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
 
   // The cover feeds the listings grid, the property card and the OpenGraph
   // tag, none of which can render a moving picture — refuse at the action,
@@ -575,7 +600,7 @@ export async function updateImageAlt(
   imageId: string,
   alt: string,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase
     .from("property_images")
     .update({ alt: alt.trim() || null })
@@ -594,7 +619,7 @@ export async function updateImageTag(
   const trimmed = tag.trim();
   if (trimmed.length > 40) return { error: "Keep tags under 40 characters." };
 
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase
     .from("property_images")
     .update({ tag: trimmed || null })
@@ -613,7 +638,7 @@ async function moveInOrderedList(
   itemId: string,
   direction: "up" | "down",
 ) {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { data: rows } = await supabase
     .from(table)
     .select("id, sort_order")
@@ -647,7 +672,7 @@ export async function reorderImages(
   propertyId: string,
   orderedImageIds: string[],
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { data: existing } = await supabase
     .from("property_images")
     .select("id")
@@ -686,7 +711,7 @@ export async function addContact(
   const phone = strField(formData, "phone");
   if (!name || !phone) return { error: "Name and phone are required." };
 
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { count } = await supabase
     .from("property_contacts")
     .select("id", { count: "exact", head: true })
@@ -715,7 +740,7 @@ export async function updateContact(
   const phone = strField(formData, "phone");
   if (!name || !phone) return { error: "Name and phone are required." };
 
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase
     .from("property_contacts")
     .update({
@@ -735,7 +760,7 @@ export async function deleteContact(
   propertyId: string,
   contactId: string,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase
     .from("property_contacts")
     .delete()
@@ -762,7 +787,7 @@ export async function updatePropertyPrivate(
   propertyId: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase.from("property_private").upsert(
     {
       property_id: propertyId,
@@ -793,7 +818,7 @@ export async function addSection(
 ): Promise<ActionResult & { id?: string }> {
   if (!isKnownBlockType(type)) return { error: "Unknown block type." };
 
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { count } = await supabase
     .from("property_sections")
     .select("id", { count: "exact", head: true })
@@ -824,7 +849,7 @@ export async function updateSectionMeta(
   sectionId: string,
   patch: { title?: string | null; audience?: SectionAudience; visible?: boolean },
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase
     .from("property_sections")
     .update(patch)
@@ -850,7 +875,7 @@ export async function updateSectionContent(
     return { error: "That section's content isn't valid yet." };
   }
 
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase
     .from("property_sections")
     .update({ content: parsed.data })
@@ -865,7 +890,7 @@ export async function deleteSection(
   propertyId: string,
   sectionId: string,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase
     .from("property_sections")
     .delete()
@@ -906,7 +931,7 @@ export async function addRatePeriod(
     return { error: "Enter a direct price for these dates." };
   }
 
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase.from("rate_periods").insert({
     property_id: propertyId,
     label: label || null,
@@ -935,7 +960,7 @@ export async function deleteRatePeriod(
   propertyId: string,
   ratePeriodId: string,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase
     .from("rate_periods")
     .delete()
@@ -957,7 +982,7 @@ export async function setPropertyAddonEnabled(
   addonServiceId: string,
   enabled: boolean,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
 
   const { error } = enabled
     ? await supabase

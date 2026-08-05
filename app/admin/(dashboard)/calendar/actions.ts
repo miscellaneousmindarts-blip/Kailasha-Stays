@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireTenant } from "@/lib/admin/auth";
 import {
   listCalendarBookings,
   listCalendarExternalEvents,
@@ -11,6 +11,24 @@ import {
 import type { ExternalEvent } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
+
+/**
+ * ── Tenant scoping in this file ──────────────────────────────────────────
+ *
+ * Mutations here act on rows that hang off a parent (a property, a booking),
+ * and they are reached by a unique id or by their parent's id. They rely on
+ * RLS plus the composite foreign keys from 0012, which together make a
+ * cross-tenant write structurally impossible: the policy refuses any row
+ * outside current_tenant_ids(), and a child physically cannot carry a
+ * tenant_id different from its parent's.
+ *
+ * What does NOT rely on RLS alone, and is filtered by tenant.id explicitly:
+ * writes to top-level rows (properties, addon_services, homepage_sections,
+ * homepage_images, site_settings), and any read or write that is not keyed by
+ * a unique id — because for a SUPERADMIN, RLS resolves to every tenant, so an
+ * unfiltered query would span all of them at once.
+ */
+
 
 /** Read action, callable directly from the client calendar as the month changes. */
 export async function getMonthEvents(
@@ -37,7 +55,7 @@ export async function addManualBlock(
     return { error: "Check-out must be after check-in." };
   }
 
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase.from("bookings").insert({
     property_id: propertyId,
     source: "blocked",
@@ -61,7 +79,7 @@ export async function addManualBlock(
 }
 
 export async function removeManualBlock(bookingId: string): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase
     .from("bookings")
     .delete()

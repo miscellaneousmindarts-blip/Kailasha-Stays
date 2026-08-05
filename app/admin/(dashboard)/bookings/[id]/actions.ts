@@ -3,10 +3,28 @@
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireTenant } from "@/lib/admin/auth";
 import type { AddonStatus, BookingStatus } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
+
+/**
+ * ── Tenant scoping in this file ──────────────────────────────────────────
+ *
+ * Mutations here act on rows that hang off a parent (a property, a booking),
+ * and they are reached by a unique id or by their parent's id. They rely on
+ * RLS plus the composite foreign keys from 0012, which together make a
+ * cross-tenant write structurally impossible: the policy refuses any row
+ * outside current_tenant_ids(), and a child physically cannot carry a
+ * tenant_id different from its parent's.
+ *
+ * What does NOT rely on RLS alone, and is filtered by tenant.id explicitly:
+ * writes to top-level rows (properties, addon_services, homepage_sections,
+ * homepage_images, site_settings), and any read or write that is not keyed by
+ * a unique id — because for a SUPERADMIN, RLS resolves to every tenant, so an
+ * unfiltered query would span all of them at once.
+ */
+
 
 function revalidateBooking(bookingId: string) {
   revalidatePath(`/admin/bookings/${bookingId}`);
@@ -20,7 +38,7 @@ function revalidateBooking(bookingId: string) {
 export async function getDocumentSignedUrl(
   storagePath: string,
 ): Promise<ActionResult & { url?: string }> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { data, error } = await supabase.storage
     .from("guest-docs")
     .createSignedUrl(storagePath, 60);
@@ -32,7 +50,7 @@ export async function updateBookingDetails(
   bookingId: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const guestName = String(formData.get("guest_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const guests = Number(formData.get("guests"));
@@ -59,7 +77,7 @@ export async function setBookingStatus(
   bookingId: string,
   status: BookingStatus,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase
     .from("bookings")
     .update({ status })
@@ -72,7 +90,7 @@ export async function setBookingStatus(
 export async function regeneratePortalToken(
   bookingId: string,
 ): Promise<ActionResult & { token?: string }> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { data: booking } = await supabase
     .from("bookings")
     .select("check_out")
@@ -107,7 +125,7 @@ export async function addBookingAddon(
   const qty = Number(formData.get("qty")) || 1;
   if (!name) return { error: "Enter a name for the add-on." };
 
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase.from("booking_addons").insert({
     booking_id: bookingId,
     name,
@@ -126,7 +144,7 @@ export async function setBookingAddonStatus(
   addonRowId: string,
   status: AddonStatus,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase
     .from("booking_addons")
     .update({ status })
@@ -141,7 +159,7 @@ export async function deleteBookingAddon(
   bookingId: string,
   addonRowId: string,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase
     .from("booking_addons")
     .delete()
@@ -168,7 +186,7 @@ export async function addPayment(
   const note = String(formData.get("note") ?? "").trim();
   const paidAt = String(formData.get("paid_at") ?? "").trim();
 
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase.from("payments").insert({
     booking_id: bookingId,
     amount,
@@ -186,7 +204,7 @@ export async function deletePayment(
   bookingId: string,
   paymentId: string,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase.from("payments").delete().eq("id", paymentId);
   if (error) return { error: error.message };
 

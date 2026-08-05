@@ -6,6 +6,8 @@ import {
   listAddonsForProperty,
 } from "@/lib/admin/queries";
 import { PropertyEditor } from "@/components/admin/property-editor";
+import { requireTenant } from "@/lib/admin/auth";
+import { tenantBasePath } from "@/lib/tenant";
 
 export default async function EditListingPage(
   props: PageProps<"/admin/listings/[id]">,
@@ -13,10 +15,18 @@ export default async function EditListingPage(
   const { id } = await props.params;
   const property = await getPropertyForEdit(id);
   if (!property) notFound();
-  const [addons, settings] = await Promise.all([
+  const [addons, settings, { tenant }] = await Promise.all([
     listAddonsForProperty(id),
     getSiteSettingsAdmin(),
+    requireTenant(),
   ]);
 
-  return <PropertyEditor property={property} addons={addons} settings={settings} />;
+  return (
+    <PropertyEditor
+      property={property}
+      addons={addons}
+      settings={settings}
+      basePath={tenantBasePath(tenant.slug)}
+    />
+  );
 }

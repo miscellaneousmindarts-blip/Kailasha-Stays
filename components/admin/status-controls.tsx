@@ -21,11 +21,14 @@ const STATUS_STYLES: Record<PropertyStatus, string> = {
 export function StatusControls({
   propertyId,
   slug,
+  basePath,
   title,
   status,
 }: {
   propertyId: string;
   slug: string;
+  /** "" for the tenant served at the bare domain, "/s/{slug}" otherwise. */
+  basePath: string;
   title: string;
   status: PropertyStatus;
 }) {
@@ -56,7 +59,7 @@ export function StatusControls({
 
       {status === "published" ? (
         <Link
-          href={`/properties/${slug}`}
+          href={`${basePath}/properties/${slug}`}
           target="_blank"
           rel="noopener noreferrer"
           className="border-border hover:bg-surface-subtle pressable flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium"

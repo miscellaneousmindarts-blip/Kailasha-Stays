@@ -24,7 +24,8 @@ Decisions locked with the owner before writing this:
 | B2 — site_settings per tenant | **Done** | `0014` |
 | B3a — tenant-aware public queries | **Done** | none needed |
 | B3b — routing (`/s/{tenant}`, proxy) | **Done**, verified against a real 2nd tenant | none needed |
-| B4 onward | Not started | — |
+| B4 — admin scoping | **Done** | none needed |
+| B5 onward | Not started | — |
 
 B3 was split in two because the routing half is the only part that can take
 the live site down, and it was much safer once the data layer underneath was
@@ -33,10 +34,8 @@ pass a different value.
 
 ### Two things B3b is carrying that later phases must retire
 
-- **The admin's "View live" link** (`components/admin/status-controls.tsx`)
-  still points at a bare `/properties/{slug}`. Correct for the primary
-  tenant, wrong for anyone else. **B4** resolves the admin's tenant properly
-  via `requireTenant()`, which is where this gets its base path.
+- ~~The admin's "View live" link~~ — **done in B4**, now built from the
+  admin's own tenant base path.
 - **The guest portal's branding** (`/stay/[token]`) is the primary tenant's,
   not the booking's. Correct while there is one tenant. Fixing it needs
   `tenant_id` on the `get_booking_by_token` bundle, which belongs with
@@ -92,9 +91,37 @@ bridges instead of blocking on phases that come after it:
   This picks the signed-in admin's first (today: only) membership row.
   **B4's `requireTenant()` replaces every caller of this.**
 
-Neither is a design decision to preserve — both exist because the phases that
-would make them unnecessary haven't been built yet. Do not add new call
-sites; add the real thing once B3/B4 land instead.
+Neither survived: `getPrimaryTenantId()` is now only used by the routes that
+genuinely have no tenant in the URL (`/stay/[token]`, the apex sitemap), and
+`getCurrentTenantId()` was deleted outright in B4.
+
+### What B4 established, and the rule the remaining phases follow
+
+`requireTenant()` (`lib/admin/auth.ts`) replaces `requireAdmin()` as the entry
+point for anything touching tenant data. It returns `{ supabase, user,
+tenant, role, isSuperadmin }`, and B6's impersonation slots in by changing
+where `tenant` comes from — a signed cookie instead of the account's own
+membership — with no call site changing.
+
+**The reason this phase was not merely defence in depth:** RLS scopes to
+`current_tenant_ids()`, which for a superadmin is *every* tenant. The seeded
+account IS a superadmin. So an unscoped admin query would not have been
+"protected by RLS anyway" — it would have returned every tenant's rows the
+moment a second tenant existed. `reorderSections` was the sharpest case: it
+read all sections and renumbered them, which would have silently rewritten
+another tenant's homepage order.
+
+The scoping rule, applied consistently:
+
+- **Explicitly filtered by `tenant.id`:** every read, every write to a
+  top-level row (properties, addon_services, homepage_sections,
+  homepage_images, site_settings), and anything not keyed by a unique id.
+- **Left to RLS + the composite FKs from 0012:** mutations on child rows
+  (images, contacts, sections, rate periods, payments, booking add-ons)
+  reached by a unique id or their parent's id. A child physically cannot
+  carry a tenant_id different from its parent's, so there is no cross-tenant
+  write to prevent. This is documented at the top of the three action files
+  it applies to, so it doesn't read as an oversight.
 
 ---
 

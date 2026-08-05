@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireTenant } from "@/lib/admin/auth";
 import type {
   AddonService,
   Booking,
@@ -37,12 +37,13 @@ export type AdminPropertyRow = Pick<
 
 /** Every property regardless of status — the admin listings table. */
 export async function listAllProperties(): Promise<AdminPropertyRow[]> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("properties")
     .select(
       "id, slug, title, status, area, city, base_price, currency, sort_order, updated_at, property_images(storage_path, is_cover)",
     )
+    .eq("tenant_id", tenant.id)
     .order("sort_order")
     .order("created_at");
 
@@ -61,12 +62,13 @@ export type PropertyForEdit = Property & {
 export async function getPropertyForEdit(
   id: string,
 ): Promise<PropertyForEdit | null> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("properties")
     .select(
       "*, property_images(*), property_sections(*), property_contacts(*), property_private(*), rate_periods(*)",
     )
+    .eq("tenant_id", tenant.id)
     .eq("id", id)
     .maybeSingle();
 
@@ -98,10 +100,11 @@ export async function getPropertyForEdit(
 
 /** Every add-on regardless of property scope — used to resolve enquiry.addon_ids by id. */
 export async function listAllAddonServices(): Promise<AddonService[]> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("addon_services")
     .select("*")
+    .eq("tenant_id", tenant.id)
     .order("sort_order");
   if (error) throw new Error(`Could not load add-ons: ${error.message}`);
   return data ?? [];
@@ -111,10 +114,11 @@ export async function listAllAddonServices(): Promise<AddonService[]> {
 export type PropertyOption = Pick<Property, "id" | "title" | "slug">;
 
 export async function listPropertyOptions(): Promise<PropertyOption[]> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("properties")
     .select("id, title, slug")
+    .eq("tenant_id", tenant.id)
     .order("sort_order")
     .order("title");
   if (error) throw new Error(`Could not load properties: ${error.message}`);
@@ -130,10 +134,11 @@ export type EnquiryRow = Enquiry & { properties: { title: string } | null };
 export async function listEnquiries(
   status?: EnquiryStatus,
 ): Promise<EnquiryRow[]> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   let query = supabase
     .from("enquiries")
     .select("*, properties(title)")
+    .eq("tenant_id", tenant.id)
     .order("created_at", { ascending: false });
   if (status) query = query.eq("status", status);
 
@@ -143,10 +148,11 @@ export async function listEnquiries(
 }
 
 export async function getEnquiry(id: string): Promise<EnquiryRow | null> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("enquiries")
     .select("*, properties(title)")
+    .eq("tenant_id", tenant.id)
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`Could not load enquiry: ${error.message}`);
@@ -154,10 +160,11 @@ export async function getEnquiry(id: string): Promise<EnquiryRow | null> {
 }
 
 export async function countNewEnquiries(): Promise<number> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { count, error } = await supabase
     .from("enquiries")
     .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenant.id)
     .eq("status", "new");
   if (error) throw new Error(`Could not count enquiries: ${error.message}`);
   return count ?? 0;
@@ -176,10 +183,11 @@ export async function listBookings(filter?: {
   status?: BookingStatus;
   when?: "upcoming" | "past";
 }): Promise<BookingRow[]> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   let query = supabase
     .from("bookings")
     .select("*, properties(title, slug)")
+    .eq("tenant_id", tenant.id)
     .order("check_in", { ascending: filter?.when !== "past" });
 
   if (filter?.propertyId) query = query.eq("property_id", filter.propertyId);
@@ -203,12 +211,13 @@ export type BookingForEdit = Booking & {
 export async function getBookingForEdit(
   id: string,
 ): Promise<BookingForEdit | null> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("bookings")
     .select(
       "*, properties(title, slug, max_guests), booking_addons(*), payments(*), guest_documents(*)",
     )
+    .eq("tenant_id", tenant.id)
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`Could not load booking: ${error.message}`);
@@ -228,13 +237,18 @@ export async function getBookingForEdit(
 export async function listAddonsForProperty(
   propertyId: string,
 ): Promise<(AddonService & { enabled: boolean })[]> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const [{ data: all, error: allError }, { data: enabled, error: enabledError }] =
     await Promise.all([
-      supabase.from("addon_services").select("*").order("sort_order"),
+      supabase
+        .from("addon_services")
+        .select("*")
+        .eq("tenant_id", tenant.id)
+        .order("sort_order"),
       supabase
         .from("property_addon_services")
         .select("addon_service_id")
+        .eq("tenant_id", tenant.id)
         .eq("property_id", propertyId),
     ]);
   if (allError) throw new Error(`Could not load add-ons: ${allError.message}`);
@@ -258,10 +272,11 @@ export type PropertyAddonOption = Pick<
  * instantly alongside it (the manual-booking form).
  */
 export async function listAddonsByProperty(): Promise<Record<string, PropertyAddonOption[]>> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("property_addon_services")
     .select("property_id, addon_services!inner(id, name, description, price, price_unit)")
+    .eq("tenant_id", tenant.id)
     .eq("addon_services.active", true);
   if (error) throw new Error(`Could not load add-ons: ${error.message}`);
 
@@ -289,10 +304,11 @@ export async function listCalendarBookings(
   rangeStart: string,
   rangeEnd: string,
 ): Promise<CalendarBooking[]> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("bookings")
     .select("id, guest_name, check_in, check_out, source, status")
+    .eq("tenant_id", tenant.id)
     .eq("property_id", propertyId)
     .neq("status", "cancelled")
     .lt("check_in", rangeEnd)
@@ -306,10 +322,11 @@ export async function listCalendarExternalEvents(
   rangeStart: string,
   rangeEnd: string,
 ): Promise<ExternalEvent[]> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("external_events")
     .select("*")
+    .eq("tenant_id", tenant.id)
     .eq("property_id", propertyId)
     .lt("start_date", rangeEnd)
     .gt("end_date", rangeStart);
@@ -327,7 +344,7 @@ export type UpcomingStay = Pick<
 > & { properties: { title: string } | null };
 
 export async function listUpcomingStays(days = 7): Promise<UpcomingStay[]> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const today = new Date();
   const until = new Date(today.getTime() + days * 86_400_000);
   const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -335,6 +352,7 @@ export async function listUpcomingStays(days = 7): Promise<UpcomingStay[]> {
   const { data, error } = await supabase
     .from("bookings")
     .select("id, guest_name, check_in, check_out, source, properties(title)")
+    .eq("tenant_id", tenant.id)
     .neq("status", "cancelled")
     .or(
       `and(check_in.gte.${iso(today)},check_in.lte.${iso(until)}),and(check_out.gte.${iso(today)},check_out.lte.${iso(until)})`,
@@ -349,27 +367,24 @@ export async function listUpcomingStays(days = 7): Promise<UpcomingStay[]> {
 // Settings
 // -----------------------------------------------------------------------------
 
-/**
- * Relies on RLS (site_settings_admin_all) to scope this to the caller's own
- * tenant, rather than filtering by tenant_id explicitly — safe for a read
- * because every admin belongs to exactly one tenant today. A superadmin
- * viewing more than one tenant's data at once is what phase B4's
- * requireTenant() exists to make explicit; until then this, like every other
- * admin query in this file, implicitly means "my tenant's".
- */
 export async function getSiteSettingsAdmin(): Promise<SiteSettings> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("site_settings").select("*").maybeSingle();
+  const { supabase, tenant } = await requireTenant();
+  const { data, error } = await supabase
+    .from("site_settings")
+    .select("*")
+    .eq("tenant_id", tenant.id)
+    .maybeSingle();
   if (error) throw new Error(`Could not load settings: ${error.message}`);
   if (!data) throw new Error("site_settings row is missing.");
   return data;
 }
 
 export async function listAllCalendarSources(): Promise<CalendarSource[]> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("calendar_sources")
     .select("*")
+    .eq("tenant_id", tenant.id)
     .order("created_at");
   if (error) throw new Error(`Could not load calendar sources: ${error.message}`);
   return data ?? [];
@@ -390,10 +405,11 @@ export type SyncWarning = Pick<
 const STALE_SYNC_HOURS = 26;
 
 export async function listSyncWarnings(): Promise<SyncWarning[]> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("calendar_sources")
     .select("id, platform, last_status, last_error, last_synced_at, created_at, properties(title)")
+    .eq("tenant_id", tenant.id)
     .order("created_at");
   if (error) throw new Error(`Could not load calendar sources: ${error.message}`);
 
@@ -421,10 +437,11 @@ export type PropertyPricing = {
  *  whole rather than per-enquiry so the admin's conversion form can quote a
  *  stay instantly as soon as dates are picked. */
 export async function listPropertyPricing(): Promise<Record<string, PropertyPricing>> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("properties")
-    .select("id, currency, base_price, airbnb_base_price, rate_periods(*)");
+    .select("id, currency, base_price, airbnb_base_price, rate_periods(*)")
+    .eq("tenant_id", tenant.id);
   if (error) throw new Error(`Could not load pricing: ${error.message}`);
 
   const byId: Record<string, PropertyPricing> = {};

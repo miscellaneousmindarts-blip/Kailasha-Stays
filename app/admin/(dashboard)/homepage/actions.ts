@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentTenantId } from "@/lib/admin/tenant";
+import { requireTenant } from "@/lib/admin/auth";
 import {
   blankLayout,
   builtinSchemas,
@@ -34,10 +33,11 @@ function friendly(error: { code?: string; message: string }): string {
 }
 
 export async function updateSectionVisibility(id: string, visible: boolean): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("homepage_sections")
     .update({ visible })
+    .eq("tenant_id", tenant.id)
     .eq("id", id)
     // Refuse at the query, not just in the UI — belt and suspenders against
     // a crafted request for a row the outline's own drag/toggle guards would
@@ -61,10 +61,11 @@ export async function updateSectionVisibility(id: string, visible: boolean): Pro
  * bypassed, not that the user made a normal mistake.
  */
 export async function reorderSections(orderedIds: string[]): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data: rows, error: readError } = await supabase
     .from("homepage_sections")
-    .select("id,pin");
+    .select("id,pin")
+    .eq("tenant_id", tenant.id);
   if (readError) return { error: friendly(readError) };
   if (!rows) return { error: "Couldn't read the section order." };
 
@@ -83,7 +84,11 @@ export async function reorderSections(orderedIds: string[]): Promise<ActionResul
   }
 
   const updates = orderedIds.map((id, index) =>
-    supabase.from("homepage_sections").update({ sort_order: index * 10 }).eq("id", id),
+    supabase
+      .from("homepage_sections")
+      .update({ sort_order: index * 10 })
+      .eq("tenant_id", tenant.id)
+      .eq("id", id),
   );
   const results = await Promise.all(updates);
   const failed = results.find((r) => r.error);
@@ -142,10 +147,11 @@ export async function updateBuiltinSection(
     };
   }
 
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { error } = await supabase
     .from("homepage_sections")
     .update({ content: parsed.data })
+    .eq("tenant_id", tenant.id)
     .eq("id", id)
     .eq("kind", "builtin");
 
@@ -170,7 +176,7 @@ export async function updateBuiltinSection(
       const { error: settingsError } = await supabase
         .from("site_settings")
         .update(patch)
-        .eq("tenant_id", await getCurrentTenantId(supabase));
+        .eq("tenant_id", tenant.id);
       // The section content already saved, so report the settings failure
       // rather than pretending the whole save succeeded.
       if (settingsError) return { error: settingsError.message };
@@ -186,10 +192,11 @@ export async function addCustomSection(
 ): Promise<ActionResult & { id?: string; tenantId?: string }> {
   if (!isLayoutType(type)) return { error: "Unknown layout." };
 
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data: rows, error: readError } = await supabase
     .from("homepage_sections")
     .select("key,sort_order,pin")
+    .eq("tenant_id", tenant.id)
     .order("sort_order", { ascending: true });
   if (readError) return { error: friendly(readError) };
 
@@ -244,10 +251,11 @@ export async function updateCustomSection(
     };
   }
 
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { error } = await supabase
     .from("homepage_sections")
     .update({ title: title?.trim() || null, content: parsed.data })
+    .eq("tenant_id", tenant.id)
     .eq("id", id)
     .eq("kind", "custom");
 
@@ -257,10 +265,11 @@ export async function updateCustomSection(
 }
 
 export async function deleteCustomSection(id: string): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { error } = await supabase
     .from("homepage_sections")
     .delete()
+    .eq("tenant_id", tenant.id)
     .eq("id", id)
     .eq("kind", "custom");
 
@@ -271,10 +280,11 @@ export async function deleteCustomSection(id: string): Promise<ActionResult> {
 
 /** Read for the builder page. Returns null when the migration isn't applied. */
 export async function readHomepageSections(): Promise<HomepageSection[] | null> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("homepage_sections")
     .select("id,key,kind,type,title,content,visible,locked,can_hide,pin,sort_order,updated_at")
+    .eq("tenant_id", tenant.id)
     .order("sort_order", { ascending: true });
 
   if (error) return null;

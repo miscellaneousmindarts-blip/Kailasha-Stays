@@ -2,10 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
 import { syncCalendarSource } from "@/lib/admin/ical-sync";
 import { revalidatePublicProperties } from "@/lib/admin/revalidate";
-import { getCurrentTenantId } from "@/lib/admin/tenant";
+import { requireTenant } from "@/lib/admin/auth";
 import type { CalendarPlatform } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
@@ -32,7 +31,7 @@ export async function updateSiteSettings(formData: FormData): Promise<ActionResu
     return { error: "Enter a valid contact email." };
   }
 
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { error } = await supabase
     .from("site_settings")
     .update({
@@ -46,7 +45,7 @@ export async function updateSiteSettings(formData: FormData): Promise<ActionResu
       instagram_url: String(formData.get("instagram_url") ?? "").trim() || null,
       facebook_url: String(formData.get("facebook_url") ?? "").trim() || null,
     })
-    .eq("tenant_id", await getCurrentTenantId(supabase));
+    .eq("tenant_id", tenant.id);
 
   if (error) return { error: error.message };
   revalidateSettings();
@@ -62,14 +61,14 @@ export async function updateStayDefaults(formData: FormData): Promise<ActionResu
     return { error: "Enter valid times for both fields." };
   }
 
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { error } = await supabase
     .from("site_settings")
     .update({
       default_check_in_time: checkIn,
       default_check_out_time: checkOut,
     })
-    .eq("tenant_id", await getCurrentTenantId(supabase));
+    .eq("tenant_id", tenant.id);
 
   if (error) return { error: error.message };
   revalidateSettings();
@@ -125,7 +124,7 @@ export async function updateBookingPolicy(formData: FormData): Promise<ActionRes
     return { error: "Advance must be a percentage between 0 and 100." };
   }
 
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { error } = await supabase
     .from("site_settings")
     .update({
@@ -137,7 +136,7 @@ export async function updateBookingPolicy(formData: FormData): Promise<ActionRes
       cancel_days: cancelDays,
       advance_pct: advancePct,
     })
-    .eq("tenant_id", await getCurrentTenantId(supabase));
+    .eq("tenant_id", tenant.id);
 
   if (error) return { error: error.message };
   revalidateSettings();
@@ -153,7 +152,7 @@ export async function addCalendarSource(
   if (!icalUrl) return { error: "Paste the iCal URL from the platform." };
   if (!/^https?:\/\//i.test(icalUrl)) return { error: "That doesn't look like a URL." };
 
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const { error } = await supabase.from("calendar_sources").insert({
     property_id: propertyId,
     platform,
@@ -166,8 +165,8 @@ export async function addCalendarSource(
 }
 
 export async function deleteCalendarSource(sourceId: string): Promise<ActionResult> {
-  const supabase = await createClient();
-  const { error } = await supabase.from("calendar_sources").delete().eq("id", sourceId);
+  const { supabase, tenant } = await requireTenant();
+  const { error } = await supabase.from("calendar_sources").delete().eq("tenant_id", tenant.id).eq("id", sourceId);
   if (error) return { error: error.message };
 
   revalidatePath("/admin/settings");
@@ -205,10 +204,11 @@ export async function addAddonService(formData: FormData): Promise<ActionResult>
 
   const priceUnit = String(formData.get("price_unit") ?? "").trim();
 
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { count } = await supabase
     .from("addon_services")
-    .select("id", { count: "exact", head: true });
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenant.id);
 
   const { error } = await supabase.from("addon_services").insert({
     name,
@@ -234,7 +234,7 @@ export async function updateAddonService(
   const price = priceRaw === "" ? null : Number(priceRaw);
   if (price !== null && !Number.isFinite(price)) return { error: "Enter a valid price." };
 
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { error } = await supabase
     .from("addon_services")
     .update({
@@ -244,6 +244,7 @@ export async function updateAddonService(
       price_unit: String(formData.get("price_unit") ?? "").trim() || "per booking",
       active: formData.get("active") === "on",
     })
+    .eq("tenant_id", tenant.id)
     .eq("id", addonId);
   if (error) return { error: error.message };
 
@@ -252,8 +253,8 @@ export async function updateAddonService(
 }
 
 export async function deleteAddonService(addonId: string): Promise<ActionResult> {
-  const supabase = await createClient();
-  const { error } = await supabase.from("addon_services").delete().eq("id", addonId);
+  const { supabase, tenant } = await requireTenant();
+  const { error } = await supabase.from("addon_services").delete().eq("tenant_id", tenant.id).eq("id", addonId);
   if (error) return { error: error.message };
 
   revalidateAddons();
@@ -264,10 +265,11 @@ export async function moveAddonService(
   addonId: string,
   direction: "up" | "down",
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { data: rows } = await supabase
     .from("addon_services")
     .select("id, sort_order")
+    .eq("tenant_id", tenant.id)
     .order("sort_order");
 
   if (!rows) return { error: "Not found." };

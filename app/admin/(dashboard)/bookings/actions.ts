@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireTenant } from "@/lib/admin/auth";
 import { createDirectBooking } from "@/lib/admin/create-booking";
 
 export type ActionResult = { error?: string; success?: boolean };
@@ -36,7 +36,7 @@ export async function createManualBooking(
     };
   }
 
-  const supabase = await createClient();
+  const { supabase } = await requireTenant();
   const result = await createDirectBooking(supabase, {
     propertyId,
     guestName,

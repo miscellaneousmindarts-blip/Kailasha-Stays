@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireTenant } from "@/lib/admin/auth";
 import { createDirectBooking } from "@/lib/admin/create-booking";
 import type { EnquiryStatus } from "@/lib/types/database";
 
@@ -13,10 +13,11 @@ export async function setEnquiryStatus(
   enquiryId: string,
   status: EnquiryStatus,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
   const { error } = await supabase
     .from("enquiries")
     .update({ status })
+    .eq("tenant_id", tenant.id)
     .eq("id", enquiryId);
   if (error) return { error: error.message };
 
@@ -37,11 +38,12 @@ export async function convertEnquiryToBooking(
   enquiryId: string,
   formData: FormData,
 ): Promise<ActionResult & { bookingId?: string }> {
-  const supabase = await createClient();
+  const { supabase, tenant } = await requireTenant();
 
   const { data: enquiry, error: enquiryError } = await supabase
     .from("enquiries")
     .select("*")
+    .eq("tenant_id", tenant.id)
     .eq("id", enquiryId)
     .single();
   if (enquiryError || !enquiry) return { error: "Enquiry not found." };
