@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Loader2, LogIn } from "lucide-react";
+import { ExternalLink, Loader2, LogIn, Mail } from "lucide-react";
 
+import { Input } from "@/components/ui/input";
 import { useSaveAction } from "@/components/admin/use-save-action";
-import { setTenantStatus, startImpersonation } from "@/app/superadmin/actions";
+import { inviteOwner, setTenantStatus, startImpersonation } from "@/app/superadmin/actions";
 import { TENANT_STATUSES, type TenantRow } from "@/lib/superadmin/types";
 import { tenantBasePath } from "@/lib/tenant";
 import type { TenantStatus } from "@/lib/types/database";
@@ -19,6 +20,9 @@ const STATUS_STYLES: Record<TenantStatus, string> = {
 
 function TenantRowItem({ tenant }: { tenant: TenantRow }) {
   const statusAction = useSaveAction(setTenantStatus);
+  const inviteAction = useSaveAction(inviteOwner);
+  const [invitingOwner, setInvitingOwner] = useState(false);
+  const [ownerEmail, setOwnerEmail] = useState("");
   const [confirming, setConfirming] = useState(false);
   // startImpersonation redirects on success, so it's called directly rather
   // than through useSaveAction — same pattern as deleteProperty. Reaching the
@@ -88,6 +92,17 @@ function TenantRowItem({ tenant }: { tenant: TenantRow }) {
             ))}
           </select>
 
+          {!tenant.owners.length && !invitingOwner ? (
+            <button
+              type="button"
+              onClick={() => setInvitingOwner(true)}
+              className="border-border hover:bg-surface-subtle pressable flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium"
+            >
+              <Mail className="size-3.5" aria-hidden="true" />
+              Invite owner
+            </button>
+          ) : null}
+
           {confirming ? (
             <span className="flex items-center gap-2">
               <button
@@ -129,9 +144,50 @@ function TenantRowItem({ tenant }: { tenant: TenantRow }) {
         </p>
       ) : null}
 
-      {statusAction.error || impersonateError ? (
+      {invitingOwner ? (
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const ok = await inviteAction.runAndWait(tenant.id, ownerEmail);
+            if (ok) {
+              setOwnerEmail("");
+              setInvitingOwner(false);
+            }
+          }}
+          className="mt-3 flex flex-wrap items-center gap-2"
+        >
+          <Input
+            type="email"
+            value={ownerEmail}
+            onChange={(e) => setOwnerEmail(e.target.value)}
+            required
+            placeholder="owner@example.com"
+            aria-label={`Owner email for ${tenant.name}`}
+            className="h-9 max-w-xs"
+          />
+          <button
+            type="submit"
+            disabled={inviteAction.pending}
+            className="bg-primary text-primary-foreground hover:bg-primary-hover pressable flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium disabled:opacity-60"
+          >
+            {inviteAction.pending ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+            ) : null}
+            Send invite
+          </button>
+          <button
+            type="button"
+            onClick={() => setInvitingOwner(false)}
+            className="hover:bg-surface-subtle pressable flex h-9 items-center rounded-md px-3 text-sm font-medium"
+          >
+            Cancel
+          </button>
+        </form>
+      ) : null}
+
+      {statusAction.error || impersonateError || inviteAction.error ? (
         <p role="alert" className="text-danger mt-2 text-sm">
-          {statusAction.error || impersonateError}
+          {statusAction.error || impersonateError || inviteAction.error}
         </p>
       ) : null}
     </li>

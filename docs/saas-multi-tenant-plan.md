@@ -10,7 +10,7 @@ Decisions locked with the owner before writing this:
 |---|---|
 | Public URL scheme | **Path prefix now** (`/s/{tenant}`), designed so subdomains drop in later without a rewrite |
 | Onboarding | **Superadmin invites only** — no public signup |
-| Access gate | Tenant must be **paid** (portal payment) **or manually marked paid** by superadmin before the admin panel unlocks |
+| Access gate | Tenant must be **manually marked paid** by superadmin before the admin panel unlocks (payment portal deferred — see B7) |
 | Branding | **Full white-label** — logo, footer, contact details, metadata. No "Kailasha Stays" visible to another owner's guests |
 | Per-tenant theming | Content and branding only. All tenants share the same components/layouts |
 
@@ -26,8 +26,9 @@ Decisions locked with the owner before writing this:
 | B3b — routing (`/s/{tenant}`, proxy) | **Done**, verified against a real 2nd tenant | none needed |
 | B4 — admin scoping | **Done** | none needed |
 | B5 — white-label branding | **Done** | `0015`, `0016` |
-| B6 — superadmin console + impersonation | **Done, migration not yet run** | `0017` |
-| B7 onward | Not started | — |
+| B6 — superadmin console + impersonation | **Done** | `0017` |
+| B7 — invites + manual payment gate | **Done** (portal payment deferred, see below) | none needed |
+| B8 onward | Not started | — |
 
 B3 was split in two because the routing half is the only part that can take
 the live site down, and it was much safer once the data layer underneath was
@@ -424,31 +425,45 @@ What still needs building:
 - `impersonation_log` table: who, which tenant, when, and every mutating
   action taken while impersonating.
 
-## B7. Invites + payment gate
+## B7. Invites + payment gate — done, manual payment only
 
 **Tenant lifecycle:** `invited → awaiting_payment → active` (with `suspended`
 / `cancelled` as terminal-ish states).
 
-1. Superadmin creates the tenant and invites the owner's email. Use Supabase's
-   `auth.admin.inviteUserByEmail` (service role, server-only) — this is the
-   one place email exists, and Supabase handles delivery, so no email vendor
-   is needed.
-2. The invite link lands on set-password, then on a **billing screen**, not
-   the dashboard.
-3. Payment, two routes:
-   - **Portal**: Razorpay Checkout (INR, correct for an India-based business;
-     Stripe does not support Indian recurring cards well). Webhook route
-     verifies signature and flips the tenant to `active`.
-   - **Manual**: superadmin marks paid — for bank transfer / UPI / cash, which
-     is realistically how the first customers will pay.
-4. `subscriptions` table: `tenant_id`, `provider`, `external_id`, `status`,
-   `current_period_end`, `amount`, `currency`.
-5. **The gate**: the admin layout redirects any tenant that isn't `active` to
-   the billing page, allowing only billing and sign-out. Their **public site
-   also stops serving** (404 or a neutral holding page) when `suspended` or
-   `cancelled` — otherwise there's no leverage for non-payment.
+Shipped, scoped down from the original plan on the owner's call: **the
+Razorpay portal and the `subscriptions` table are deferred**, not built. There
+is no automated payment path yet — every activation is a superadmin marking a
+tenant paid by hand. Revisit the portal once there's enough onboarding volume
+that manual confirmation becomes the bottleneck; nothing here blocks adding
+it later (`setTenantStatus` and the gate below don't care *why* a tenant is
+`active`, only that it is).
 
-Superadmin is exempt from the gate.
+What exists:
+
+1. Superadmin creates the tenant and optionally invites the owner's email in
+   the same form (`app/superadmin/actions.ts`'s `createTenant` /
+   `inviteOwner`). Uses Supabase's `auth.admin.inviteUserByEmail` (service
+   role, server-only) — this is the one place email exists, and Supabase
+   handles delivery, so no email vendor is needed. The invite also writes the
+   `admin_users` and `tenant_members` rows, which is what actually grants
+   panel access — previously those rows only ever existed by hand in the SQL
+   editor.
+2. The invite link lands on the existing recovery flow
+   (`/admin/auth/confirm` → `/admin/reset-password`) to set a password, then
+   at `/admin`, which the gate below immediately redirects to `/admin/billing`
+   since a freshly invited tenant isn't `active` yet.
+3. Manual payment: the status dropdown already built in B6 (`setTenantStatus`)
+   *is* the manual-mark-paid mechanism — no separate action or table needed
+   for this scope.
+4. **The gate**: `app/admin/(dashboard)/layout.tsx` redirects any non-active,
+   non-superadmin tenant to `/admin/billing` (outside the dashboard route
+   group, so no redirect loop), which shows status-specific copy and a
+   sign-out button — no other admin page is reachable. Their **public site
+   also stops serving** when not `active` — `getTenantBySlug()` has only ever
+   resolved `status = 'active'` tenants, since B3b.
+
+Superadmin is exempt from the gate, including while impersonating — acting on
+a non-active tenant's behalf is exactly what impersonation is for.
 
 ## B8. Storage isolation
 

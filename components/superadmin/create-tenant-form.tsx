@@ -13,6 +13,7 @@ export function CreateTenantForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [ownerEmail, setOwnerEmail] = useState("");
 
   // Shown as a preview only — the server derives and de-duplicates the real
   // slug, so this can be a rough guess without risking a mismatch.
@@ -31,6 +32,7 @@ export function CreateTenantForm() {
         if (ok) {
           setName("");
           setSlug("");
+          setOwnerEmail("");
           formRef.current?.reset();
         }
       }}
@@ -60,6 +62,23 @@ export function CreateTenantForm() {
             className="h-11"
           />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="owner_email">Owner email (optional)</Label>
+        <Input
+          id="owner_email"
+          name="owner_email"
+          type="email"
+          value={ownerEmail}
+          onChange={(e) => setOwnerEmail(e.target.value)}
+          placeholder="owner@example.com"
+          className="h-11"
+        />
+        <p className="text-text-muted text-xs">
+          Sends them an invite to set a password and sign in. Leave blank to add an owner later
+          from the tenant&apos;s row.
+        </p>
       </div>
 
       <p className="text-text-muted text-sm">
