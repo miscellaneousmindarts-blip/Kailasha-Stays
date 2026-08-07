@@ -11,6 +11,7 @@ import {
   readActingTenantId,
   setActingTenantId,
 } from "@/lib/impersonation";
+import { isReservedLabel } from "@/lib/hosts";
 import { slugify } from "@/lib/slug";
 import type { TenantStatus } from "@/lib/types/database";
 
@@ -81,6 +82,13 @@ export async function createTenant(formData: FormData): Promise<ActionResult> {
   const requested = String(formData.get("slug") ?? "").trim();
   const base = slugify(requested || name);
   if (!base) return { error: "That name doesn't produce a usable URL — set a slug manually." };
+
+  // The slug becomes a subdomain, so a reserved label here would claim a
+  // hostname the platform itself needs — `www` most of all. lib/hosts.ts
+  // refuses to route these; this refuses to create them.
+  if (isReservedLabel(base)) {
+    return { error: `"${base}" is reserved for the platform — choose a different slug.` };
+  }
 
   const { supabase } = await requireSuperadmin();
 

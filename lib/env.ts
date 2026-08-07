@@ -36,6 +36,26 @@ export const publicEnv = {
    * lib/tenant.ts.
    */
   primaryTenantSlug: process.env.NEXT_PUBLIC_PRIMARY_TENANT_SLUG || "kailasha-stays",
+  /**
+   * Domains under which a tenant is reachable at {slug}.{domain}.
+   *
+   * A LIST, not a constant, from the very first commit that uses it — adding
+   * a second platform domain later is then a config change rather than a
+   * refactor of every place that asks "is this host one of ours".
+   */
+  platformDomains: (process.env.NEXT_PUBLIC_PLATFORM_DOMAINS ?? "")
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean),
+  /**
+   * The single host that serves /admin and /superadmin.
+   *
+   * Deliberately one host for all tenants: per-subdomain admin would need an
+   * auth cookie scoped to the parent domain, which the browser then attaches
+   * to EVERY tenant subdomain — one compromised tenant site would receive
+   * other operators' sessions. See docs/saas-multi-tenant-plan.md, C1.
+   */
+  adminHost: (process.env.NEXT_PUBLIC_ADMIN_HOST ?? "").trim().toLowerCase(),
 };
 
 export const serverEnv = {

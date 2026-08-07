@@ -1,32 +1,35 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { updateSession } from "@/lib/supabase/middleware";
+import { resolveHost } from "@/lib/hosts";
 import { publicEnv } from "@/lib/env";
 
 /**
  * Two jobs, in this order:
  *
- *   1. Map an incoming URL to the tenant whose site it belongs to.
+ *   1. Map an incoming request to the tenant whose site it belongs to.
  *   2. Refresh the Supabase auth cookie (Server Components can't write
  *      cookies, so without this a session would silently expire mid-visit).
  *
  * ── On the tenant mapping ────────────────────────────────────────────────
  *
- * Public pages live at /s/{tenant}/... internally. The primary tenant is
- * ALSO served at the bare domain, and that is not a convenience — every
- * indexed URL on kailasha-stays.vercel.app is a bare one, so the apex has to
- * keep answering exactly as it did. That is why it is a REWRITE (the URL the
- * visitor and Google see never changes) and not a redirect.
+ * Public pages live at /s/{tenant}/... internally, and there are now two
+ * ways in:
  *
- * The prefixed form of the primary tenant then has to go away, or the same
- * page would be reachable at two URLs and split its own ranking. So
- * /s/{primary}/... 301s to the bare path. That cannot loop: the rewrite is
- * internal and never re-enters the proxy, and the redirect strips the very
- * prefix that triggers it.
+ *   HOST   {slug}.deogharbnb.space/properties/x  → rewrite to /s/{slug}/...
+ *   PATH   deogharbnb.space/s/{slug}/properties/x → served as-is
  *
- * When a real domain arrives (B10), subdomain and custom-domain resolution
- * slot in as extra branches here — the route tree and everything downstream
- * already speak /s/{tenant}, so nothing else has to move.
+ * The host route is the destination (phase C1). The path route is what
+ * exists today and keeps working unchanged — including the apex rewrite that
+ * keeps every indexed kailasha-stays.vercel.app URL byte-identical. Phase C3
+ * is what retires the path form and 301s it to the host form; until then
+ * both serve, so this phase can ship without moving a live site.
+ *
+ * That is also why a tenant host serves /s/{slug}/... without redirecting:
+ * links in the static HTML still carry the prefix until C3 flips
+ * tenantBasePath() to "", and redirecting every one of them would put a 301
+ * in front of every internal navigation for no gain. The duplicate-URL
+ * question those two paths raise is answered by canonical tags in C2.
  */
 
 const PRIMARY = publicEnv.primaryTenantSlug;
@@ -61,8 +64,69 @@ function isTenantPath(pathname: string): boolean {
   );
 }
 
+/**
+ * A request arriving on {slug}.{platformDomain}.
+ *
+ * The slug is not verified here — see lib/hosts.ts for why. An invented
+ * subdomain rewrites into /s/{slug}, where the tenant layout resolves it and
+ * 404s. A suspended tenant takes the same path, because getTenantBySlug()
+ * only ever resolves active ones.
+ */
+function proxyTenantHost(request: NextRequest, slug: string) {
+  const { pathname, search } = request.nextUrl;
+
+  // The admin panel lives on exactly one host, so an auth cookie is never
+  // scoped to a domain that every tenant subdomain shares. 308 rather than
+  // 301: it preserves the method, so a POST that lands here (a stale form,
+  // a Server Action) is redirected rather than silently downgraded to GET.
+  if (pathname.startsWith("/admin") || pathname.startsWith("/superadmin")) {
+    if (publicEnv.adminHost) {
+      return NextResponse.redirect(
+        new URL(`${pathname}${search}`, `https://${publicEnv.adminHost}`),
+        308,
+      );
+    }
+  }
+
+  // Infrastructure, the API and the guest portal are host-agnostic: they
+  // resolve their own tenant (from a booking token, or not at all) and must
+  // not be rewritten into a tenant's page tree.
+  //
+  // /sitemap.xml and /robots.txt pass through to the platform-level ones for
+  // now, which is wrong for a tenant host — C2 makes them per-tenant. It is
+  // not exploitable in the meantime because no subdomain resolves in
+  // production until the wildcard certificate exists.
+  if (isGlobalPath(pathname)) {
+    return updateSession(request);
+  }
+
+  // Links still carry /s/{slug} until C3; serve them here rather than
+  // bouncing every internal navigation through a redirect.
+  if (pathname === `/s/${slug}` || pathname.startsWith(`/s/${slug}/`)) {
+    return updateSession(request);
+  }
+
+  if (isTenantPath(pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/s/${slug}${pathname === "/" ? "" : pathname}`;
+    return updateSession(request, () => NextResponse.rewrite(url));
+  }
+
+  return updateSession(request);
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+
+  const resolution = resolveHost(request.headers.get("host"));
+  if (resolution.kind === "tenant") {
+    return proxyTenantHost(request, resolution.slug);
+  }
+
+  // ── Everything below is the pre-C1 path-based behaviour, unchanged ──────
+  // Reached by the vercel.app deployment host, localhost, and the platform
+  // domain itself. Phase C4 gives the platform apex its own landing page;
+  // until then it serves the primary tenant exactly as it does today.
 
   if (!isGlobalPath(pathname)) {
     // The primary tenant is canonical at the bare path, so its prefixed form
