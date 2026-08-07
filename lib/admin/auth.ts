@@ -13,6 +13,8 @@ export type AdminTenant = {
   slug: string;
   name: string;
   status: TenantStatus;
+  /** Needed so the admin's "View live" link points at the tenant's real site. */
+  canonical_host: string | null;
 };
 
 export type AdminContext = {
@@ -75,7 +77,7 @@ export const requireTenant = cache(async (): Promise<AdminContext> => {
     if (actingTenantId) {
       const { data: acting } = await supabase
         .from("tenants")
-        .select("id, slug, name, status")
+        .select("id, slug, name, status, canonical_host")
         .eq("id", actingTenantId)
         .maybeSingle();
 
@@ -97,7 +99,7 @@ export const requireTenant = cache(async (): Promise<AdminContext> => {
 
   const { data: membership, error } = await supabase
     .from("tenant_members")
-    .select("role, tenants(id, slug, name, status)")
+    .select("role, tenants(id, slug, name, status, canonical_host)")
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();

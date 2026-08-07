@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useSaveAction } from "@/components/admin/use-save-action";
 import { inviteOwner, setTenantStatus, startImpersonation } from "@/app/superadmin/actions";
 import { TENANT_STATUSES, type TenantRow } from "@/lib/superadmin/types";
-import { tenantBasePath } from "@/lib/tenant";
+import { tenantSiteUrl } from "@/lib/tenant";
 import type { TenantStatus } from "@/lib/types/database";
 
 const STATUS_STYLES: Record<TenantStatus, string> = {
@@ -40,8 +40,9 @@ function TenantRowItem({ tenant }: { tenant: TenantRow }) {
     }
   }
 
-  const basePath = tenantBasePath(tenant.slug);
-  const publicHref = basePath || "/";
+  // Absolute, not a base path: once a tenant is on its own host, a relative
+  // link from the console would point at the console's host instead of theirs.
+  const publicHref = tenantSiteUrl(tenant) || "/";
 
   return (
     <li className="p-4">

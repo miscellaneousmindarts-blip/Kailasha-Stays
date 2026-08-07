@@ -18,8 +18,7 @@ import { CustomSection } from "@/components/landing/custom-sections";
 import { getLandingBase, finalizePropertyImages, waContext } from "@/lib/landing";
 import { getHomepageContent } from "@/lib/homepage";
 import { landingJsonLd } from "@/lib/landing-schema";
-import { publicEnv } from "@/lib/env";
-import { getTenantBySlug, tenantBasePath } from "@/lib/tenant";
+import { getTenantBySlug, tenantBasePath, tenantSiteUrl } from "@/lib/tenant";
 import { getSiteSettings } from "@/lib/settings";
 
 /**
@@ -68,7 +67,7 @@ export async function generateMetadata(
   const tenant = await getTenantBySlug(slug);
   if (!tenant) return {};
 
-  const basePath = tenantBasePath(tenant.slug);
+  const basePath = tenantBasePath(tenant);
   const canonical = basePath || "/";
 
   if (basePath === "") {
@@ -97,7 +96,7 @@ export default async function Home(props: PageProps<"/s/[tenant]">) {
   const { tenant: tenantSlug } = await props.params;
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) notFound();
-  const basePath = tenantBasePath(tenant.slug);
+  const basePath = tenantBasePath(tenant);
 
   const base = await getLandingBase(tenant.id);
   const content = await getHomepageContent(tenant.id, base.settings, base.properties, base.primary);
@@ -129,7 +128,7 @@ export default async function Home(props: PageProps<"/s/[tenant]">) {
     settings,
     properties,
     faq: faqItems,
-    siteUrl: publicEnv.siteUrl,
+    siteUrl: tenantSiteUrl(tenant),
     heroImage,
     googleRating: proofResolved?.stats.googleRating ?? null,
     googleCount: proofResolved?.stats.googleCount ?? 0,

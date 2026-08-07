@@ -107,13 +107,12 @@ export function resolveHost(rawHost: string | null | undefined): HostResolution 
 }
 
 /**
- * The host a tenant's site lives on, for building absolute URLs.
- *
- * Derived rather than stored, for now: phase C2 adds a `canonical_host`
- * column so a tenant can bring its own domain, and this becomes that
- * column's fallback rather than the only answer.
+ * The subdomain a tenant would get by default under the first configured
+ * platform domain. A *proposal*, not the answer — where a tenant's site
+ * actually is canonical is `tenants.canonical_host`, and until that column
+ * is set the tenant is still served the old way. See lib/tenant.ts.
  */
-export function tenantHost(slug: string): string | null {
+export function defaultTenantHost(slug: string): string | null {
   const domain = publicEnv.platformDomains[0];
   return domain ? `${slug}.${domain}` : null;
 }

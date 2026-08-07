@@ -28,7 +28,7 @@ export default async function PropertiesPage(
   const tenant = await getTenantBySlug(slug);
   if (!tenant) notFound();
 
-  const basePath = tenantBasePath(tenant.slug);
+  const basePath = tenantBasePath(tenant);
   const properties = await listProperties(tenant.id);
 
   return (

@@ -379,6 +379,12 @@ export type Tenant = {
   name: string;
   /** Reserved for the custom-domain phase. Null until then. */
   custom_domain: string | null;
+  /**
+   * The one hostname this tenant's site is canonical at. Null means it is
+   * still served at NEXT_PUBLIC_SITE_URL under its /s/{slug} prefix — see
+   * tenantOrigin() / tenantBasePath() in lib/tenant.ts.
+   */
+  canonical_host: string | null;
   status: TenantStatus;
   created_at: string;
   updated_at: string;

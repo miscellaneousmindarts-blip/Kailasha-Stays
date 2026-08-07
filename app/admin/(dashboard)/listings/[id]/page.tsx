@@ -26,7 +26,7 @@ export default async function EditListingPage(
       property={property}
       addons={addons}
       settings={settings}
-      basePath={tenantBasePath(tenant.slug)}
+      basePath={tenantBasePath(tenant)}
     />
   );
 }

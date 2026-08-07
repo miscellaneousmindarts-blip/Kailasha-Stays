@@ -1,13 +1,26 @@
 import type { MetadataRoute } from "next";
 
 import { listPropertiesForSitemap } from "@/lib/queries";
-import { publicEnv } from "@/lib/env";
-import { getPrimaryTenantId } from "@/lib/tenant";
+import { getTenantForRequestHost } from "@/lib/host-tenant";
+import { tenantSiteUrl } from "@/lib/tenant";
+
+/**
+ * Per-host: {slug}.deogharbnb.space/sitemap.xml lists that tenant's pages at
+ * that tenant's URLs. Anything else falls back to the primary tenant, which
+ * is what the apex and the vercel.app host serve.
+ *
+ * Dynamic rather than static because it reads the request's host. That is a
+ * fair trade for two crawler-facing routes; the property pages that actually
+ * carry traffic stay statically generated.
+ */
+export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = publicEnv.siteUrl;
-  const tenantId = await getPrimaryTenantId();
-  const properties = tenantId ? await listPropertiesForSitemap(tenantId) : [];
+  const tenant = await getTenantForRequestHost();
+  if (!tenant) return [];
+
+  const base = tenantSiteUrl(tenant);
+  const properties = await listPropertiesForSitemap(tenant.id);
 
   return [
     { url: base, changeFrequency: "monthly", priority: 1 },

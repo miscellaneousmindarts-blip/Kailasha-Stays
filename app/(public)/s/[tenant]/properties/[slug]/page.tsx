@@ -37,7 +37,7 @@ export async function generateMetadata(
     title: property.title,
     description,
     alternates: {
-      canonical: `${tenantBasePath(tenant.slug)}/properties/${property.slug}`,
+      canonical: `${tenantBasePath(tenant)}/properties/${property.slug}`,
     },
     openGraph: {
       title: property.title,

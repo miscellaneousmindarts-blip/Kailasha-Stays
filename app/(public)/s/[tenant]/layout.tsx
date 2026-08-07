@@ -6,7 +6,7 @@ import { SiteHeader } from "@/components/site-header";
 import { brandColorStyle } from "@/lib/brand-color";
 import { homepageImageUrl } from "@/lib/images";
 import { getSiteSettings } from "@/lib/settings";
-import { getTenantBySlug, tenantBasePath } from "@/lib/tenant";
+import { getTenantBySlug, tenantBasePath, tenantOrigin } from "@/lib/tenant";
 
 /**
  * Overrides the root layout's hardcoded "%s | Stays in Vrindavan" title
@@ -28,6 +28,12 @@ export async function generateMetadata({
   const faviconUrl = homepageImageUrl(settings.favicon_path);
 
   return {
+    // Every relative canonical and OG URL under this tenant resolves against
+    // this. Without it Next falls back to the deployment URL, which is how
+    // deogharbnb.space ended up serving canonical tags naming
+    // kailasha-stays.vercel.app — telling Google the new domain was a
+    // duplicate of the old one.
+    metadataBase: new URL(tenantOrigin(tenant)),
     title: {
       default: settings.business_name,
       template: `%s | ${settings.business_name}`,
@@ -57,7 +63,7 @@ export default async function TenantLayout({
   if (!tenant) notFound();
 
   const settings = await getSiteSettings(tenant.id);
-  const basePath = tenantBasePath(tenant.slug);
+  const basePath = tenantBasePath(tenant);
 
   return (
     // `contents` keeps this div out of the box tree entirely (no layout
