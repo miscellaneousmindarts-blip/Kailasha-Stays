@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/admin/(dashboard)/actions";
@@ -21,6 +22,12 @@ export default async function NoTenantPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Reachable directly, not only via requireTenant()'s redirect — without
+  // this, a signed-out visitor would see "account not linked" instead of
+  // the true reason (they're not signed in at all), matching /admin/billing
+  // and every other page in this group.
+  if (!user) redirect("/admin/login");
+
   return (
     <main className="bg-surface-subtle flex min-h-dvh items-center justify-center p-6">
       <div className="bg-background shadow-card w-full max-w-sm rounded-lg p-8 text-center">
@@ -29,9 +36,7 @@ export default async function NoTenantPage() {
           This account isn&apos;t linked to a business on the platform. If
           this is unexpected, contact the platform admin.
         </p>
-        {user?.email ? (
-          <p className="text-text-muted mt-6 text-xs">Signed in as {user.email}.</p>
-        ) : null}
+        <p className="text-text-muted mt-6 text-xs">Signed in as {user.email}.</p>
         <form action={signOut} className="mt-4">
           <button
             type="submit"
