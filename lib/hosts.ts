@@ -58,6 +58,16 @@ export const RESERVED_LABELS = new Set([
 /** Mirrors the slug CHECK constraint on public.tenants (0011_tenants.sql). */
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+/**
+ * A bare hostname: no scheme, no port, no path. Mirrors the
+ * tenants_canonical_host_format CHECK constraint (0019_canonical_host.sql)
+ * exactly, so a value the app rejects here would have been rejected there
+ * too — the superadmin edit form validates against this rather than letting
+ * a bad value round-trip to Postgres for a less legible error.
+ */
+export const HOSTNAME_RE =
+  /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+
 export type HostResolution =
   /** A tenant's own site. `slug` still has to exist and be active. */
   | { kind: "tenant"; slug: string }

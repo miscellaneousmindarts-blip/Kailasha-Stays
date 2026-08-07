@@ -106,12 +106,15 @@ export const requireTenant = cache(async (): Promise<AdminContext> => {
 
   if (error) throw new Error(`Could not resolve tenant: ${error.message}`);
   if (!membership?.tenants) {
-    // Reachable only by an admin_users row with no tenant_members row, which
-    // 0011 never creates. Fail loudly rather than falling back to "some
-    // tenant" — that is how one operator ends up editing another's site.
-    throw new Error(
-      "This admin account is not a member of any tenant. Add a tenant_members row for it.",
-    );
+    // Reachable by an admin_users row with no tenant_members row — a pure
+    // superadmin who was never made an owner of any business, or (since
+    // phase C5) an owner whose tenant was hard-deleted from under them.
+    // Neither is "some tenant" territory (that is how one operator ends up
+    // editing another's site), but neither deserves an unhandled throw
+    // either. A superadmin belongs at /superadmin, which is genuinely their
+    // home; anyone else gets a page that explains what happened.
+    if (adminRow.is_superadmin) redirect("/superadmin");
+    redirect("/admin/no-tenant");
   }
 
   const tenant = membership.tenants as unknown as AdminTenant;

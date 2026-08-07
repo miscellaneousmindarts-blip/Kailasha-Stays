@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSaveAction } from "@/components/admin/use-save-action";
 import { createTenant } from "@/app/superadmin/actions";
+import { publicEnv } from "@/lib/env";
 
 export function CreateTenantForm() {
   const action = useSaveAction(createTenant);
@@ -22,6 +23,7 @@ export function CreateTenantForm() {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "…";
+  const platformDomain = publicEnv.platformDomains[0];
 
   return (
     <form
@@ -82,8 +84,12 @@ export function CreateTenantForm() {
       </div>
 
       <p className="text-text-muted text-sm">
-        Their site will be at <code className="bg-surface-subtle rounded px-1 py-0.5">/s/{previewSlug}</code>
-        . A number is appended if that&apos;s already taken.
+        Their site will be at{" "}
+        <code className="bg-surface-subtle rounded px-1 py-0.5">
+          {platformDomain ? `${previewSlug}.${platformDomain}` : `/s/${previewSlug}`}
+        </code>
+        . A number is appended if that&apos;s already taken. Changeable later from Edit
+        details.
       </p>
 
       {action.error ? (
