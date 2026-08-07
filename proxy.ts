@@ -171,6 +171,14 @@ export async function proxy(request: NextRequest) {
     return proxyTenantHost(request, resolution.slug);
   }
 
+  // The platform domain itself (and any reserved label under it, e.g. www).
+  // No rewrite: served as-is, straight to app/(platform)/** — phase C4. This
+  // is what stops the apex still quietly serving the primary tenant now that
+  // it has a landing page of its own.
+  if (resolution.kind === "platform") {
+    return updateSession(request);
+  }
+
   const normalized = normalizeHost(host);
   const legacy = publicEnv.legacyHostRedirects.find(([from]) => from === normalized);
   if (legacy) {
@@ -178,9 +186,10 @@ export async function proxy(request: NextRequest) {
   }
 
   // ── Everything below is the pre-C1 path-based behaviour, unchanged ──────
-  // Reached by the vercel.app deployment host, localhost, and the platform
-  // domain itself. Phase C4 gives the platform apex its own landing page;
-  // until then it serves the primary tenant exactly as it does today.
+  // Reached only by "unknown" hosts now — the vercel.app deployment host and
+  // localhost. Both still serve the primary tenant at bare paths; the
+  // platform domain stopped taking this branch the moment it got a landing
+  // page of its own, above.
 
   if (!isGlobalPath(pathname)) {
     // The primary tenant is canonical at the bare path, so its prefixed form

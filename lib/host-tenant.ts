@@ -19,15 +19,22 @@ import { publicEnv } from "@/lib/env";
  * lib/tenant.ts, where a page could reach for it by accident and silently
  * drop that page — and every page under it — out of static generation.
  *
- * Falls back to the primary tenant for the platform apex, the vercel.app
- * host and localhost, which is exactly what those hosts serve today.
+ * Null on the platform domain itself (phase C4) — it is not any tenant's
+ * site, and had it kept falling back to the primary tenant here, its
+ * sitemap.xml and robots.txt would have gone on advertising a DIFFERENT
+ * site's URLs as their own, which is worse than the empty/generic answer
+ * sitemap.ts and robots.ts each already fall back to for null.
+ *
+ * Still falls back to the primary tenant for the vercel.app host and
+ * localhost — that is exactly what those hosts serve today (only the
+ * platform domain got its own identity in C4).
  */
 export async function getTenantForRequestHost(): Promise<PublicTenant | null> {
   const host = (await headers()).get("host");
   const resolution = resolveHost(host);
 
-  const slug =
-    resolution.kind === "tenant" ? resolution.slug : publicEnv.primaryTenantSlug;
+  if (resolution.kind === "tenant") return getTenantBySlug(resolution.slug);
+  if (resolution.kind === "platform") return null;
 
-  return getTenantBySlug(slug);
+  return getTenantBySlug(publicEnv.primaryTenantSlug);
 }
