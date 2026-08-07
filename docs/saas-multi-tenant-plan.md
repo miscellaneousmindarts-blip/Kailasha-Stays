@@ -550,3 +550,182 @@ product-surface. B1, B3, B7 and B8 are where things break badly if rushed.
    superadmin-only.
 5. **Scope creep into per-tenant theming.** Branding is logo/colour/copy.
    Custom layouts per tenant is a different product — resist it.
+
+---
+
+# Part C — Host-based tenancy, on real domains
+
+Supersedes **B10**. The path-prefix scheme from B3b was always explicitly a
+placeholder for this; the resolver, the route tree and every internal link
+were built so that host resolution could slot in without moving anything
+downstream. This is that phase, brought forward because a real domain now
+exists.
+
+Decisions locked with the owner before writing this:
+
+| Decision | Choice |
+|---|---|
+| Apex `deogharbnb.space` | **Platform landing page.** Kailasha Stays becomes a tenant like any other, at its own subdomain |
+| Tenant addressing | `{slug}.deogharbnb.space`, wildcard cert on the Vercel project |
+| Multiple platform domains | Supported from the start — the resolver takes a **list**, not a constant |
+| Admin location | **One shared host** (`deogharbnb.space/admin`). Tenant subdomains serve public pages only |
+| Tenant removal | **Archive by default**, hard delete behind a type-to-confirm gate |
+
+## The live bug this starts from
+
+`deogharbnb.space` already serves the site, but every absolute URL it emits
+still names `kailasha-stays.vercel.app` — the canonical tag, the sitemap
+entries, the sitemap reference in `robots.txt`, and every `url` in the
+landing page's JSON-LD. Google is being told, on every page of the new
+domain, that the real version lives somewhere else.
+
+The failure mode is at least the *safe* one (the new domain is ignored
+rather than competing with the old), but it means the domain accrues nothing
+until Part C lands. It is the reason C2 is not deferrable.
+
+## Why the Host header does not reach the pages
+
+The obvious implementation — read `Host` in the layout, derive everything
+from it — would quietly destroy static generation. `/s/[tenant]/properties/
+[slug]` is SSG with `revalidate = 300`; calling `headers()` anywhere in that
+tree forces every tenant's every property page to render per request.
+
+So the rule for Part C is: **the request's host decides routing, and nothing
+else.** Which host is canonical for a tenant is a property of the *tenant
+row*, read from the database at build/revalidate time like any other tenant
+field. A page's HTML then doesn't depend on how the visitor arrived, only on
+whose site it is — which is what keeps it cacheable.
+
+## C1. Host → tenant resolution
+
+**Prerequisite (owner action):** add `*.deogharbnb.space` as a domain on the
+Vercel project. DNS is already authoritative on `ns1.vercel-dns.com`, so the
+wildcard certificate issues automatically. Verified today: subdomains resolve
+but the TLS handshake fails, because no certificate covers them yet.
+
+New env, plural by design:
+
+```
+PLATFORM_DOMAINS=deogharbnb.space          # comma-separated; add more freely
+ADMIN_HOST=deogharbnb.space                # the one host that serves /admin
+```
+
+`proxy.ts` gains a host branch ahead of its existing path branch:
+
+1. **Reserved label** (`www`, `admin`, `api`, `app`, `mail`, `static`, …) →
+   never a tenant. Enforced in the proxy *and* rejected at tenant creation,
+   because a tenant whose slug is `www` would otherwise take the site down.
+2. **`{label}.{d}` for any `d` in PLATFORM_DOMAINS** → rewrite tenant paths to
+   `/s/{label}/…`. Pure string work: **no database call in middleware.** The
+   existing `/s/[tenant]/layout.tsx` already resolves the slug and 404s an
+   unknown or non-active tenant, so the validation is free.
+3. **Exactly a platform domain (apex)** → the platform landing group (C4).
+4. **Anything else** → `resolveCustomDomain(host)`, a stub returning null
+   today. This is the seam custom domains attach to later; it is the only
+   branch that would ever need a lookup, and it is the rare one.
+
+Consequence worth stating plainly: once every tenant is on its own host,
+`tenantBasePath()` returns `""` for **all** of them, and the "primary tenant
+is special" branch that B3b needed disappears. `/s/{slug}` survives only as
+the internal rewrite target and as a legacy URL that 301s (C3).
+
+### Why /admin is not on tenant subdomains
+
+Serving `/admin` per subdomain needs either a separate login per tenant, or
+an auth cookie scoped to `.deogharbnb.space` — and that cookie is then sent
+to *every* tenant subdomain. One compromised or malicious tenant site would
+receive other operators' session cookies. `httpOnly` does not help; it stops
+JavaScript reading the cookie, not the browser attaching it.
+
+So tenant hosts serve public pages and `/stay/[token]` only. `/admin` and
+`/superadmin` on a tenant host 301 to `ADMIN_HOST`. One auth cookie, one
+Supabase redirect allowlist entry, no cross-tenant cookie surface — and the
+property still holds when custom domains arrive, which is when it would
+otherwise become genuinely dangerous.
+
+## C2. Canonical host and absolute URLs
+
+Schema:
+
+```sql
+alter table public.tenants add column canonical_host text unique;
+```
+
+Nullable, with `tenantCanonicalHost(tenant)` falling back to
+`{slug}.{DEFAULT_PLATFORM_DOMAIN}`. A new tenant needs no configuration; a
+tenant that later brings its own domain gets an explicit override, and there
+is exactly one place that answers "what is this tenant's real address".
+
+Then `publicEnv.siteUrl` — today a single constant behind canonical tags,
+sitemap, robots, JSON-LD, portal links, iCal URLs and auth redirects — splits
+along the line it should always have had:
+
+| Surface | Base |
+|---|---|
+| canonical, sitemap, robots, JSON-LD, OG | **tenant's** canonical origin |
+| guest portal link `/stay/{token}` | **tenant's** canonical origin (guest-facing, branded) |
+| admin auth redirects, iCal export URLs | `ADMIN_HOST` (stable, allowlisted) |
+
+- Set `metadataBase` in the tenant layout — Next then resolves the existing
+  relative `alternates.canonical` values against it, so canonical and OG both
+  become correct without touching each page.
+- `sitemap.ts` / `robots.ts` move under the tenant segment so each host
+  serves its own, reached by the same proxy rewrite as everything else. The
+  apex keeps a platform-level pair of its own.
+- `/stay/[token]` must be allowed on tenant hosts, and `booking-detail.tsx`
+  must build its link from the booking's tenant, not from a global constant.
+
+## C3. The migration itself
+
+This is the phase that moves a live, ranking site, so it is separated from
+the mechanism that enables it.
+
+- `kailasha-stays.vercel.app/*` → `kailasha-stays.deogharbnb.space/*`, 301,
+  permanently. Not a courtesy: it is what carries the existing ranking over.
+- `deogharbnb.space/s/{slug}/*` → `{slug}.deogharbnb.space/*`, 301.
+- `www.deogharbnb.space` → apex. (Vercel currently has **www as primary** and
+  308s the apex to it — that needs inverting in the dashboard first.)
+- Owner action: Search Console properties for the new hosts, then a Change of
+  Address from the vercel.app property.
+- Verify every currently-indexed URL 301s to a 200 **before** merging.
+
+Worth deciding during this phase: `kailasha-stays.deogharbnb.space` is a
+mouthful, and the slug is editable in C5. Renaming to `kailasha` costs
+nothing *if done here*, while the redirects are being set up anyway, and
+costs a second URL migration if done later.
+
+## C4. Platform landing page
+
+A new `app/(platform)/` group with its own layout — platform branding, not
+any tenant's. Small: what the product is, what it costs, how to get listed.
+It exists because the apex now has to answer for itself, and because "list
+your homestay" is the only acquisition surface the product has.
+
+## C5. Superadmin: edit and remove tenants
+
+- **Edit**: business name, slug, canonical host override, status. Changing a
+  slug changes the customer's web address — the form has to say so plainly,
+  not just accept it.
+- **Archive** (default): status → `cancelled`. Site offline, panel locked,
+  data retained, fully reversible. This is what "remove" does.
+- **Hard delete**: behind typing the business name. `tenant_id` is
+  `on delete cascade` across all 17 tables, so this destroys properties,
+  bookings, payments and uploaded guest IDs irreversibly — the confirm copy
+  must name those, not say "are you sure".
+- **Orphaned owners**: deleting a tenant leaves its owner's `auth.users` and
+  `admin_users` rows behind, and `requireTenant()` currently *throws* for an
+  admin with no membership. Hard delete must clean up owners who belong to no
+  other tenant, and that error path needs to become a real page regardless.
+
+## C6. Superadmin UI, mobile-first
+
+The console was built desktop-first and shows it: each tenant row packs a
+status `<select>`, "View site", "Invite owner" and "Manage as" into one
+flex-wrap line that collapses into a scramble under ~500px.
+
+- Card per tenant, stacked; identity and counts read first.
+- Actions behind one overflow menu, at 44×44 minimum, 8px apart.
+- Status as a labelled control that states the current value, not a bare
+  native select.
+- Destructive actions visually and spatially separated from the rest.
+- Check the impersonation banner and admin shell at 375px in the same pass.
