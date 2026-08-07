@@ -34,6 +34,16 @@ import { publicEnv } from "@/lib/env";
 
 const PRIMARY = publicEnv.primaryTenantSlug;
 
+/**
+ * Google's site-verification file, e.g. /googlef87171f88484ef18.html —
+ * proves ownership of a specific HOST, so it has to load with a direct 200
+ * on whatever host Search Console is checking, never a redirect. The same
+ * failure mode as the /api carve-out below: a well-known, fixed-purpose path
+ * that a blanket redirect would silently break. Host-agnostic on purpose —
+ * the same requirement will apply to any tenant custom domain later.
+ */
+const GOOGLE_VERIFICATION_RE = /^\/google[a-f0-9]+\.html$/;
+
 /** Paths that are not a tenant's public site and must pass through untouched. */
 function isGlobalPath(pathname: string): boolean {
   return (
@@ -131,6 +141,9 @@ function proxyTenantHost(request: NextRequest, slug: string) {
  * The old host keeps answering /api forever. It costs nothing — it is the
  * deployment URL and cannot disappear — and it removes any need to
  * re-coordinate with third parties on someone else's schedule.
+ *
+ * The Google-verification carve-out lives above, in proxy() itself, because
+ * it has to apply before ANY host branch — not just this one.
  */
 function proxyLegacyHost(request: NextRequest, target: string) {
   const { pathname, search } = request.nextUrl;
@@ -147,6 +160,10 @@ function proxyLegacyHost(request: NextRequest, target: string) {
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+
+  if (GOOGLE_VERIFICATION_RE.test(pathname)) {
+    return updateSession(request);
+  }
 
   const host = request.headers.get("host");
   const resolution = resolveHost(host);
