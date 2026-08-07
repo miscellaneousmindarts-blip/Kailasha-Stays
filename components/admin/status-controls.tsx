@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 
 import { useSaveAction } from "@/components/admin/use-save-action";
@@ -21,14 +20,18 @@ const STATUS_STYLES: Record<PropertyStatus, string> = {
 export function StatusControls({
   propertyId,
   slug,
-  basePath,
+  siteUrl,
   title,
   status,
 }: {
   propertyId: string;
   slug: string;
-  /** "" for the tenant served at the bare domain, "/s/{slug}" otherwise. */
-  basePath: string;
+  /**
+   * Absolute root of the tenant's public site. Absolute rather than a base
+   * path because the admin panel is on a different host from the site it is
+   * editing — a relative link here would resolve against the admin host.
+   */
+  siteUrl: string;
   title: string;
   status: PropertyStatus;
 }) {
@@ -58,15 +61,15 @@ export function StatusControls({
       </span>
 
       {status === "published" ? (
-        <Link
-          href={`${basePath}/properties/${slug}`}
+        <a
+          href={`${siteUrl}/properties/${slug}`}
           target="_blank"
           rel="noopener noreferrer"
           className="border-border hover:bg-surface-subtle pressable flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium"
         >
           View live
           <ExternalLink className="size-3.5" aria-hidden="true" />
-        </Link>
+        </a>
       ) : null}
 
       {status !== "published" ? (

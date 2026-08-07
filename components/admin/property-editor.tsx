@@ -39,12 +39,12 @@ export function PropertyEditor({
   property,
   addons,
   settings,
-  basePath,
+  siteUrl,
 }: {
   property: PropertyForEdit;
   addons: (AddonService & { enabled: boolean })[];
   settings: SiteSettings;
-  basePath: string;
+  siteUrl: string;
 }) {
   const [tab, setTab] = useState<Tab>("Basics");
 
@@ -61,7 +61,7 @@ export function PropertyEditor({
         <StatusControls
           propertyId={property.id}
           slug={property.slug}
-          basePath={basePath}
+          siteUrl={siteUrl}
           title={property.title}
           status={property.status}
         />

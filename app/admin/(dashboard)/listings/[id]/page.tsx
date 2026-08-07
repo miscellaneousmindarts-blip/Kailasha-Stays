@@ -7,7 +7,7 @@ import {
 } from "@/lib/admin/queries";
 import { PropertyEditor } from "@/components/admin/property-editor";
 import { requireTenant } from "@/lib/admin/auth";
-import { tenantBasePath } from "@/lib/tenant";
+import { tenantSiteUrl } from "@/lib/tenant";
 
 export default async function EditListingPage(
   props: PageProps<"/admin/listings/[id]">,
@@ -26,7 +26,7 @@ export default async function EditListingPage(
       property={property}
       addons={addons}
       settings={settings}
-      basePath={tenantBasePath(tenant)}
+      siteUrl={tenantSiteUrl(tenant)}
     />
   );
 }

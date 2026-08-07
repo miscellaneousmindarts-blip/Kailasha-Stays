@@ -56,6 +56,19 @@ export const publicEnv = {
    * other operators' sessions. See docs/saas-multi-tenant-plan.md, C1.
    */
   adminHost: (process.env.NEXT_PUBLIC_ADMIN_HOST ?? "").trim().toLowerCase(),
+  /**
+   * Hosts a tenant used to live on, as `oldhost>newhost` pairs. Everything
+   * on the old host 301s to the same path on the new one — except /api, for
+   * reasons that cost real money if forgotten. See proxy.ts.
+   *
+   * Kept as config rather than derived from the tenant row because the proxy
+   * has no database, and because "where did this host used to point" is
+   * history, not something a current tenant row can answer.
+   */
+  legacyHostRedirects: (process.env.NEXT_PUBLIC_LEGACY_HOST_REDIRECTS ?? "")
+    .split(",")
+    .map((pair) => pair.split(">").map((h) => h.trim().toLowerCase()))
+    .filter((pair): pair is [string, string] => pair.length === 2 && Boolean(pair[0] && pair[1])),
 };
 
 export const serverEnv = {

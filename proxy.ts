@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { updateSession } from "@/lib/supabase/middleware";
-import { resolveHost } from "@/lib/hosts";
+import { normalizeHost, resolveHost } from "@/lib/hosts";
 import { publicEnv } from "@/lib/env";
 
 /**
@@ -115,12 +115,49 @@ function proxyTenantHost(request: NextRequest, slug: string) {
   return updateSession(request);
 }
 
+/**
+ * A host a tenant has moved off. Everything 301s to the same path on the new
+ * host — with one carve-out that matters more than it looks.
+ *
+ * /api is NOT redirected, permanently. Two live integrations hold URLs on
+ * the old host and neither would survive a redirect:
+ *
+ *   - pg_cron calls /api/cron/sync-calendars through pg_net, which does not
+ *     follow redirects. Calendar sync would stop, silently.
+ *   - iCal export URLs are pasted into Airbnb and Booking.com. Whether those
+ *     follow a redirect is their choice, not ours, and the failure shows up
+ *     as double bookings rather than an error.
+ *
+ * The old host keeps answering /api forever. It costs nothing — it is the
+ * deployment URL and cannot disappear — and it removes any need to
+ * re-coordinate with third parties on someone else's schedule.
+ */
+function proxyLegacyHost(request: NextRequest, target: string) {
+  const { pathname, search } = request.nextUrl;
+
+  if (pathname.startsWith("/api") || pathname.startsWith("/_next")) {
+    return updateSession(request);
+  }
+
+  return NextResponse.redirect(
+    new URL(`${pathname}${search}`, `https://${target}`),
+    301,
+  );
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
-  const resolution = resolveHost(request.headers.get("host"));
+  const host = request.headers.get("host");
+  const resolution = resolveHost(host);
   if (resolution.kind === "tenant") {
     return proxyTenantHost(request, resolution.slug);
+  }
+
+  const normalized = normalizeHost(host);
+  const legacy = publicEnv.legacyHostRedirects.find(([from]) => from === normalized);
+  if (legacy) {
+    return proxyLegacyHost(request, legacy[1]);
   }
 
   // ── Everything below is the pre-C1 path-based behaviour, unchanged ──────
