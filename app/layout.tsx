@@ -30,6 +30,16 @@ export const metadata: Metadata = {
   },
   description:
     "Comfortable, well-kept apartments for your stay in Vrindavan. Book directly with the host.",
+  // The app-wide default, reachable at every route with nothing more
+  // specific. Deliberately set through the metadata object, not the
+  // app/favicon.ico file-convention — that convention has documented
+  // priority over generateMetadata() and would win regardless of what a
+  // nested layout (e.g. the tenant layout, per-tenant favicon) returns,
+  // which is exactly why a tenant's uploaded favicon never showed: both
+  // rendered as separate <link> tags and the file-based one always took
+  // precedence. Plain metadata fields shallow-merge instead — a nested
+  // layout's `icons` cleanly replaces this one.
+  icons: { icon: "/favicon.ico" },
 };
 
 export default function RootLayout({
