@@ -55,6 +55,12 @@ function UploadPanel({
     const formData = new FormData();
     formData.set("file", file);
     formData.set("alt", alt);
+    // The whole reason this uploader exists inside a block editor rather
+    // than pointing back at the Photos tab: a landmark photo (a temple, a
+    // station) usually isn't a photo OF the property. Marking it out of the
+    // gallery is what keeps it out of the guest carousel, the Photos tab
+    // list, and the cover-image picker — see 0022_block_only_images.sql.
+    formData.set("in_gallery", "false");
     const result = await uploadPropertyImage(propertyId, formData);
     setUploading(false);
     if (result.error || !result.image) {

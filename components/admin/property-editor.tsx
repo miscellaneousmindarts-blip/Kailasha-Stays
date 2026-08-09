@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { StatusControls } from "@/components/admin/status-controls";
 import { BasicsTab } from "@/components/admin/tabs/basics-tab";
@@ -48,6 +48,16 @@ export function PropertyEditor({
 }) {
   const [tab, setTab] = useState<Tab>("Basics");
 
+  // Memoized, not filtered inline at the PhotosTab call site: PhotosTab
+  // resets its local drag-order state whenever the `images` array it
+  // receives has a new identity, so an inline `.filter()` would reset that
+  // ordering on every unrelated re-render of this component (a tab switch),
+  // not just when the images actually change.
+  const galleryImages = useMemo(
+    () => property.property_images.filter((i) => i.in_gallery),
+    [property.property_images],
+  );
+
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -94,7 +104,7 @@ export function PropertyEditor({
         ) : null}
         {tab === "Description" ? <DescriptionTab property={property} /> : null}
         {tab === "Photos" ? (
-          <PhotosTab propertyId={property.id} images={property.property_images} />
+          <PhotosTab propertyId={property.id} images={galleryImages} />
         ) : null}
         {tab === "Sections" ? (
           <SectionsTab

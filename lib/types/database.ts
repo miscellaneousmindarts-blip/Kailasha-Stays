@@ -157,6 +157,9 @@ export type PropertyImage = {
   tag: string | null;
   is_cover: boolean;
   sort_order: number;
+  /** false for a photo uploaded from inside a block editor (e.g. a distances
+   *  landmark) rather than the Photos tab — never in the guest gallery. */
+  in_gallery: boolean;
 };
 
 export type PropertySection = {

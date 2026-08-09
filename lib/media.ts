@@ -60,10 +60,18 @@ export function mediaExtension(mimeType: string): string {
  * social preview or an <img> thumbnail can't render one at all, so falling
  * back to a later photo beats an empty frame.
  */
-export function pickCover<T extends { storage_path: string; is_cover?: boolean }>(
-  images: readonly T[],
-): T | undefined {
-  const stills = images.filter((i) => !isVideoPath(i.storage_path));
+export function pickCover<
+  T extends { storage_path: string; is_cover?: boolean; in_gallery?: boolean },
+>(images: readonly T[]): T | undefined {
+  // `in_gallery !== false` rather than `=== true`: public queries are
+  // already scoped to gallery-only rows by RLS and never select the column
+  // at all, so this stays a no-op there. It only matters for the admin's
+  // own unfiltered query, where a block-only photo (a distances landmark)
+  // must never fall back into the cover slot just because it happens to be
+  // the only image on a property with no real gallery photos yet.
+  const stills = images.filter(
+    (i) => !isVideoPath(i.storage_path) && i.in_gallery !== false,
+  );
   return stills.find((i) => i.is_cover) ?? stills[0];
 }
 

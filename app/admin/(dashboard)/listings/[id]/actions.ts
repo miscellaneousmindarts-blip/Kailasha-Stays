@@ -377,6 +377,7 @@ export async function duplicateProperty(
         tag: image.tag,
         is_cover: image.is_cover,
         sort_order: image.sort_order,
+        in_gallery: image.in_gallery,
       }));
       const { error } = await supabase.from("property_images").insert(rows);
       if (error) return rollback(error.message);
@@ -510,6 +511,12 @@ export async function uploadPropertyImage(
   const check = checkMediaFile(file);
   if (check.error) return { error: check.error };
 
+  // Set by PropertyMediaPicker's uploader (only used inside the distances
+  // block editor, for a landmark photo) — everything else, including the
+  // Photos tab's own uploader, leaves this unset and gets a real gallery
+  // photo. See 0022_block_only_images.sql for why the distinction exists.
+  const inGallery = String(formData.get("in_gallery") ?? "true") !== "false";
+
   const { supabase } = await requireTenant();
   const path = `${propertyId}/${randomUUID()}.${check.ext}`;
 
@@ -518,10 +525,14 @@ export async function uploadPropertyImage(
     .upload(path, file, { contentType: file.type });
   if (uploadError) return { error: uploadError.message };
 
+  // Only counts real gallery photos — a landmark photo uploaded before any
+  // actual gallery photo exists must never claim the cover slot or the
+  // sort_order sequence a genuine first gallery photo would otherwise get.
   const { count } = await supabase
     .from("property_images")
     .select("id", { count: "exact", head: true })
-    .eq("property_id", propertyId);
+    .eq("property_id", propertyId)
+    .eq("in_gallery", true);
 
   const alt = String(formData.get("alt") ?? "").trim();
 
@@ -531,11 +542,13 @@ export async function uploadPropertyImage(
       property_id: propertyId,
       storage_path: path,
       alt: alt || null,
+      in_gallery: inGallery,
       // A video can never be the cover — the cover is what the listings grid,
       // the property card and the OpenGraph tag render, and all three need a
-      // still. So the first upload only claims the slot if it's a photo.
-      is_cover: !check.isVideo && (count ?? 0) === 0,
-      sort_order: count ?? 0,
+      // still. So the first upload only claims the slot if it's a photo, and
+      // only if it's actually a gallery photo.
+      is_cover: inGallery && !check.isVideo && (count ?? 0) === 0,
+      sort_order: inGallery ? (count ?? 0) : 0,
     })
     .select("*")
     .single();
@@ -650,14 +663,19 @@ export async function setCoverImage(
 
   // The cover feeds the listings grid, the property card and the OpenGraph
   // tag, none of which can render a moving picture — refuse at the action,
-  // not just by hiding the button.
+  // not just by hiding the button. Same for a block-only photo (e.g. a
+  // distances landmark): the Photos tab UI never shows one to click "cover"
+  // on, but the action checks anyway rather than trusting that alone.
   const { data: target } = await supabase
     .from("property_images")
-    .select("storage_path")
+    .select("storage_path, in_gallery")
     .eq("id", imageId)
     .maybeSingle();
   if (target && isVideoPath(target.storage_path)) {
     return { error: "A video can't be the cover — pick a photo." };
+  }
+  if (target && !target.in_gallery) {
+    return { error: "That photo isn't in the gallery, so it can't be the cover." };
   }
 
   await supabase
