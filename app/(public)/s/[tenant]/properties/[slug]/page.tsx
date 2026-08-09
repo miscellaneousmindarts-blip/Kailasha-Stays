@@ -220,11 +220,9 @@ export default async function PropertyPage(
             propertyTitle={property.title}
             maxGuests={property.max_guests}
             basePrice={property.base_price}
-            airbnbBasePrice={property.airbnb_base_price}
             ratePeriods={property.rate_periods}
             currency={property.currency}
-            airbnbUrl={property.airbnb_url}
-            bookingComUrl={property.booking_com_url}
+            channels={property.booking_channels}
             whatsappNumber={settings.whatsapp_number}
             addons={addons}
           />

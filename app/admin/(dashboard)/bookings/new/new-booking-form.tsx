@@ -50,7 +50,7 @@ export function NewBookingForm({
       checkIn: parseISODate(checkIn),
       checkOut: parseISODate(checkOut),
       periods: propertyPricing.rate_periods,
-      defaults: { base: propertyPricing.base_price, airbnb: propertyPricing.airbnb_base_price },
+      defaults: { base: propertyPricing.base_price },
     });
   }, [propertyPricing, datesValid, checkIn, checkOut]);
 

@@ -3,11 +3,28 @@ import { cache } from "react";
 import { createPublicClient } from "@/lib/supabase/public";
 import type {
   AddonService,
+  BookingChannel,
   Property,
   PropertyImage,
   PropertySection,
   RatePeriod,
 } from "@/lib/types/database";
+
+/**
+ * The channel fields the public site is allowed to see.
+ *
+ * Spelled out as a Pick rather than selecting `*`: booking_channels is
+ * publicly readable by design, so the narrow list is a second, reviewable
+ * statement of what "public" means for it — and it's what a future column
+ * has to be consciously added to rather than inherited into.
+ */
+export type PublicBookingChannel = Pick<
+  BookingChannel,
+  "id" | "name" | "slug" | "booking_url" | "price_mode" | "markup_pct" | "fixed_nightly" | "sort_order"
+>;
+
+const PUBLIC_CHANNEL_COLUMNS =
+  "id, name, slug, booking_url, price_mode, markup_pct, fixed_nightly, sort_order";
 
 export type PropertyCardData = Pick<
   Property,
@@ -29,6 +46,7 @@ export type PropertyDetail = Property & {
   property_images: PropertyImage[];
   property_sections: PropertySection[];
   rate_periods: RatePeriod[];
+  booking_channels: PublicBookingChannel[];
 };
 
 /**
@@ -66,7 +84,9 @@ export const getProperty = cache(
     const supabase = createPublicClient();
     const { data, error } = await supabase
       .from("properties")
-      .select("*, property_images(*), property_sections(*), rate_periods(*)")
+      .select(
+        `*, property_images(*), property_sections(*), rate_periods(*), booking_channels(${PUBLIC_CHANNEL_COLUMNS})`,
+      )
       .eq("tenant_id", tenantId)
       .eq("slug", slug)
       .eq("status", "published")
@@ -84,6 +104,11 @@ export const getProperty = cache(
         Number(b.is_cover) - Number(a.is_cover) || a.sort_order - b.sort_order,
     );
     property.property_sections = [...(property.property_sections ?? [])].sort(
+      (a, b) => a.sort_order - b.sort_order,
+    );
+    // Admin's chosen order. The booking card re-sorts by price once dates
+    // make totals comparable; this is the order for everything before that.
+    property.booking_channels = [...(property.booking_channels ?? [])].sort(
       (a, b) => a.sort_order - b.sort_order,
     );
     return property;

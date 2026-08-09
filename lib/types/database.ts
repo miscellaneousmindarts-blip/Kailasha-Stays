@@ -94,7 +94,7 @@ export type Property = {
   beds: number;
   bathrooms: number;
   base_price: number | null;
-  /** Default Airbnb nightly rate, for the side-by-side comparison. Manually kept in sync — Airbnb has no rate API. */
+  /** @deprecated Superseded by booking_channels (0021). Column kept, no longer read. */
   airbnb_base_price: number | null;
   currency: string;
   amenities: string[];
@@ -108,7 +108,9 @@ export type Property = {
   lat: number | null;
   lng: number | null;
   gmaps_url: string | null;
+  /** @deprecated Superseded by booking_channels (0021). Column kept, no longer read. */
   airbnb_url: string | null;
+  /** @deprecated Superseded by booking_channels (0021). Column kept, no longer read. */
   booking_com_url: string | null;
   /** External URL to a room-service menu. Independent of room_service_pdf_path. */
   room_service_link: string | null;
@@ -314,12 +316,43 @@ export type GuestDocument = {
   uploaded_at: string;
 };
 
+export type ChannelPriceMode = "markup" | "fixed" | "none";
+
+/**
+ * One booking platform for one listing, as the guest sees it.
+ *
+ * Publicly readable, and therefore deliberately free of secrets — the iCal
+ * feed URL for the same platform lives on calendar_sources, which only
+ * admins can read. See 0021_booking_channels.sql.
+ */
+export type BookingChannel = {
+  /** Owning tenant. Set by a database trigger from the parent row / caller. */
+  tenant_id: string;
+  id: string;
+  property_id: string;
+  name: string;
+  /** Lowercase display hint for brand styling. Not authoritative. */
+  slug: string | null;
+  booking_url: string | null;
+  price_mode: ChannelPriceMode;
+  /** Percent above the direct nightly rate, when price_mode is 'markup'. */
+  markup_pct: number | null;
+  /** Flat nightly price, when price_mode is 'fixed'. */
+  fixed_nightly: number | null;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type CalendarSource = {
   /** Owning tenant. Set by a database trigger from the parent row / caller. */
   tenant_id: string;
   id: string;
   property_id: string;
   platform: CalendarPlatform;
+  /** The booking channel this feed belongs to, when it has one (0021). */
+  channel_id: string | null;
   ical_url: string;
   last_synced_at: string | null;
   last_status: string | null;
@@ -564,6 +597,10 @@ export type Database = {
       rate_periods: Table<
         RatePeriod,
         BelongsToProperty<"rate_periods_property_id_fkey">
+      >;
+      booking_channels: Table<
+        BookingChannel,
+        BelongsToProperty<"booking_channels_property_fkey">
       >;
     };
     Views: Record<never, never>;

@@ -11,6 +11,7 @@ import { BLOCK_TYPES, blockSchemas, isKnownBlockType } from "@/lib/blocks";
 import { checkMediaFile, checkPdfFile, isVideoPath } from "@/lib/media";
 import { slugify } from "@/lib/slug";
 import type {
+  ChannelPriceMode,
   Property,
   PropertyContact,
   PropertyImage,
@@ -1078,6 +1079,303 @@ export async function setPropertyAddonEnabled(
   // after another tab changed it) hits the primary key — treat as success
   // rather than surfacing a confusing conflict error.
   if (error && error.code !== "23505") return { error: error.message };
+
+  revalidateEditor(propertyId);
+  revalidatePublicProperties();
+  return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// Booking channels
+//
+// One row per platform the listing is bookable on. The guest-facing half
+// (name, link, price) lives on booking_channels, which is publicly readable;
+// the iCal feed URL is a bearer secret and stays on calendar_sources, which
+// is not. Both are edited as one "channel" in the UI — see 0021.
+// ---------------------------------------------------------------------------
+
+const CHANNEL_PRICE_MODES: ChannelPriceMode[] = ["markup", "fixed", "none"];
+
+type ChannelFields = {
+  name: string;
+  slug: string | null;
+  booking_url: string | null;
+  price_mode: ChannelPriceMode;
+  markup_pct: number | null;
+  fixed_nightly: number | null;
+};
+
+/** Shared by add and update: validates and shapes the public half. */
+function readChannelFields(
+  formData: FormData,
+): { ok: false; error: string } | { ok: true; fields: ChannelFields } {
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { ok: false, error: "Give the platform a name." };
+  if (name.length > 60) {
+    return { ok: false, error: "Keep the name under 60 characters." };
+  }
+
+  const bookingUrl = String(formData.get("booking_url") ?? "").trim();
+  const mode = String(formData.get("price_mode") ?? "markup") as ChannelPriceMode;
+  if (!CHANNEL_PRICE_MODES.includes(mode)) {
+    return { ok: false, error: "Unknown price mode." };
+  }
+
+  const markup = numField(formData, "markup_pct");
+  const fixed = numField(formData, "fixed_nightly");
+
+  if (mode === "markup") {
+    if (markup === null || markup === undefined) {
+      return {
+        ok: false,
+        error: "Enter how much more this platform charges, as a percentage.",
+      };
+    }
+    if (markup < 0 || markup > 500) {
+      return { ok: false, error: "The markup should be between 0% and 500%." };
+    }
+  }
+  if (mode === "fixed") {
+    if (fixed === null || fixed === undefined) {
+      return { ok: false, error: "Enter this platform's nightly price." };
+    }
+    if (fixed < 0) return { ok: false, error: "The price can't be negative." };
+  }
+
+  // Mirrors the booking_channels_has_something CHECK: a channel with no link
+  // and no price would render as a dead row on the booking card.
+  if (!bookingUrl && mode === "none") {
+    return {
+      ok: false,
+      error: "Add a booking link, or a price — otherwise there's nothing to show.",
+    };
+  }
+
+  return {
+    ok: true,
+    fields: {
+      name,
+      slug: slugify(name) || null,
+      booking_url: bookingUrl || null,
+      price_mode: mode,
+      markup_pct: mode === "markup" ? (markup as number) : null,
+      fixed_nightly: mode === "fixed" ? (fixed as number) : null,
+    },
+  };
+}
+
+/**
+ * Writes the channel's iCal feed to calendar_sources, keyed by channel_id.
+ *
+ * Empty URL removes the feed. Deliberately best-effort *after* the channel
+ * itself is saved: the guest-facing row is what the booking card needs, and
+ * a bad calendar URL shouldn't block saving a working booking link.
+ */
+async function syncChannelCalendarSource(
+  supabase: Awaited<ReturnType<typeof requireTenant>>["supabase"],
+  tenantId: string,
+  propertyId: string,
+  channelId: string,
+  icalUrl: string,
+  slug: string | null,
+): Promise<string | null> {
+  const { data: existing } = await supabase
+    .from("calendar_sources")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("channel_id", channelId)
+    .maybeSingle();
+
+  if (!icalUrl) {
+    if (existing) {
+      const { error } = await supabase
+        .from("calendar_sources")
+        .delete()
+        .eq("tenant_id", tenantId)
+        .eq("id", existing.id);
+      if (error) return error.message;
+    }
+    return null;
+  }
+
+  if (!/^https?:\/\//i.test(icalUrl)) {
+    return "The calendar URL should start with http:// or https://";
+  }
+
+  // platform is the pre-0021 enum and only accepts three values; anything
+  // that isn't one of the two known feeds is 'other'. The channel's own name
+  // is what the UI actually displays.
+  const platform =
+    slug === "airbnb" ? "airbnb" : slug === "booking-com" ? "booking_com" : "other";
+
+  const { error } = existing
+    ? await supabase
+        .from("calendar_sources")
+        .update({ ical_url: icalUrl, platform })
+        .eq("tenant_id", tenantId)
+        .eq("id", existing.id)
+    : await supabase.from("calendar_sources").insert({
+        property_id: propertyId,
+        channel_id: channelId,
+        ical_url: icalUrl,
+        platform,
+      });
+
+  return error ? error.message : null;
+}
+
+export async function addBookingChannel(
+  propertyId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = readChannelFields(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  const fields = parsed.fields;
+
+  const { supabase, tenant } = await requireTenant();
+
+  const { count } = await supabase
+    .from("booking_channels")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenant.id)
+    .eq("property_id", propertyId);
+
+  const { data: channel, error } = await supabase
+    .from("booking_channels")
+    .insert({ ...fields, property_id: propertyId, sort_order: count ?? 0 })
+    .select("id")
+    .single();
+
+  if (error) return { error: error.message };
+
+  const icalError = await syncChannelCalendarSource(
+    supabase,
+    tenant.id,
+    propertyId,
+    channel.id,
+    String(formData.get("ical_url") ?? "").trim(),
+    fields.slug,
+  );
+
+  revalidateEditor(propertyId);
+  if (icalError) return { error: `Channel saved, but the calendar feed failed: ${icalError}` };
+  return { success: true };
+}
+
+export async function updateBookingChannel(
+  propertyId: string,
+  channelId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = readChannelFields(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  const fields = parsed.fields;
+
+  const { supabase, tenant } = await requireTenant();
+  const { error } = await supabase
+    .from("booking_channels")
+    .update(fields)
+    .eq("tenant_id", tenant.id)
+    .eq("id", channelId);
+
+  if (error) return { error: error.message };
+
+  const icalError = await syncChannelCalendarSource(
+    supabase,
+    tenant.id,
+    propertyId,
+    channelId,
+    String(formData.get("ical_url") ?? "").trim(),
+    fields.slug,
+  );
+
+  revalidateEditor(propertyId);
+  revalidatePublicProperties();
+  if (icalError) return { error: `Channel saved, but the calendar feed failed: ${icalError}` };
+  return { success: true };
+}
+
+export async function setBookingChannelActive(
+  propertyId: string,
+  channelId: string,
+  active: boolean,
+): Promise<ActionResult> {
+  const { supabase, tenant } = await requireTenant();
+  const { error } = await supabase
+    .from("booking_channels")
+    .update({ active })
+    .eq("tenant_id", tenant.id)
+    .eq("id", channelId);
+
+  if (error) return { error: error.message };
+  revalidateEditor(propertyId);
+  revalidatePublicProperties();
+  return { success: true };
+}
+
+export async function deleteBookingChannel(
+  propertyId: string,
+  channelId: string,
+): Promise<ActionResult> {
+  const { supabase, tenant } = await requireTenant();
+
+  // The calendar source's FK is ON DELETE SET NULL, so its feed would keep
+  // syncing with nothing pointing at it. Remove it with the channel — the
+  // admin asked for the platform to go away, not to keep a hidden feed.
+  await supabase
+    .from("calendar_sources")
+    .delete()
+    .eq("tenant_id", tenant.id)
+    .eq("channel_id", channelId);
+
+  const { error } = await supabase
+    .from("booking_channels")
+    .delete()
+    .eq("tenant_id", tenant.id)
+    .eq("id", channelId);
+
+  if (error) return { error: error.message };
+  revalidateEditor(propertyId);
+  revalidatePublicProperties();
+  return { success: true };
+}
+
+export async function reorderBookingChannel(
+  propertyId: string,
+  channelId: string,
+  direction: "up" | "down",
+): Promise<ActionResult> {
+  const { supabase, tenant } = await requireTenant();
+
+  const { data: channels } = await supabase
+    .from("booking_channels")
+    .select("id, sort_order")
+    .eq("tenant_id", tenant.id)
+    .eq("property_id", propertyId)
+    .order("sort_order");
+
+  if (!channels?.length) return { error: "Nothing to reorder." };
+
+  const index = channels.findIndex((c) => c.id === channelId);
+  const swapWith = direction === "up" ? index - 1 : index + 1;
+  if (index === -1 || swapWith < 0 || swapWith >= channels.length) {
+    return { success: true };
+  }
+
+  // Written positionally rather than by swapping the stored values: rows
+  // backfilled by 0021 can share a sort_order, and swapping equal numbers
+  // would silently do nothing.
+  const reordered = [...channels];
+  [reordered[index], reordered[swapWith]] = [reordered[swapWith], reordered[index]];
+
+  for (const [i, c] of reordered.entries()) {
+    const { error } = await supabase
+      .from("booking_channels")
+      .update({ sort_order: i })
+      .eq("tenant_id", tenant.id)
+      .eq("id", c.id);
+    if (error) return { error: error.message };
+  }
 
   revalidateEditor(propertyId);
   revalidatePublicProperties();

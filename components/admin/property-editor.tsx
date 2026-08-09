@@ -10,7 +10,7 @@ import { AddonsTab } from "@/components/admin/tabs/addons-tab";
 import { PhotosTab } from "@/components/admin/tabs/photos-tab";
 import { SectionsTab } from "@/components/admin/tabs/sections-tab";
 import { LocationTab } from "@/components/admin/tabs/location-tab";
-import { LinksTab } from "@/components/admin/tabs/links-tab";
+import { ChannelsTab } from "@/components/admin/tabs/channels-tab";
 import { RoomServiceTab } from "@/components/admin/tabs/room-service-tab";
 import { PrivateTab } from "@/components/admin/tabs/private-tab";
 import { ContactsTab } from "@/components/admin/tabs/contacts-tab";
@@ -26,7 +26,7 @@ const TABS = [
   "Photos",
   "Sections",
   "Location",
-  "Links",
+  "Booking options",
   "Room service",
   "Private info",
   "Contacts",
@@ -104,7 +104,7 @@ export function PropertyEditor({
           />
         ) : null}
         {tab === "Location" ? <LocationTab property={property} /> : null}
-        {tab === "Links" ? <LinksTab property={property} /> : null}
+        {tab === "Booking options" ? <ChannelsTab property={property} /> : null}
         {tab === "Room service" ? <RoomServiceTab property={property} /> : null}
         {tab === "Private info" ? (
           <PrivateTab propertyId={property.id} data={property.property_private} />

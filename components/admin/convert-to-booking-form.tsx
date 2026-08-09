@@ -39,7 +39,7 @@ export function ConvertToBookingForm({
       checkIn: parseISODate(checkIn),
       checkOut: parseISODate(checkOut),
       periods: pricing.rate_periods,
-      defaults: { base: pricing.base_price, airbnb: pricing.airbnb_base_price },
+      defaults: { base: pricing.base_price },
     });
   }, [checkIn, checkOut, pricing]);
 

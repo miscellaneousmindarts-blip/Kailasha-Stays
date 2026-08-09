@@ -71,23 +71,13 @@ function DefaultRatesForm({ property }: { property: PropertyForEdit }) {
           </p>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="airbnb_base_price">Airbnb price per night</Label>
-          <Input
-            id="airbnb_base_price"
-            name="airbnb_base_price"
-            type="number"
-            min={0}
-            inputMode="numeric"
-            defaultValue={property.airbnb_base_price ?? ""}
-            className="h-11"
-          />
-          <p className="text-text-muted text-xs">
-            The same stay&apos;s Airbnb cost, so guests see the saving. Leave
-            blank to hide the comparison.
-          </p>
-        </div>
       </div>
+
+      <p className="text-text-muted text-sm">
+        Prices on Airbnb and other platforms are set per platform under{" "}
+        <strong>Booking options</strong>, where each one tracks this direct price
+        automatically.
+      </p>
 
       <SaveBar pending={pending} error={error} saved={saved} />
     </form>
@@ -146,18 +136,8 @@ function RatePeriodRow({
           {formatDate(period.start_date)} – {formatDate(period.end_date)}
         </p>
         <p className="text-text-muted mt-0.5 text-sm">
-          Direct{" "}
           <span className="tabular">{money(period.direct_price, currency)}</span>
-          {period.airbnb_price !== null ? (
-            <>
-              {" · Airbnb "}
-              <span className="tabular">
-                {money(period.airbnb_price, currency)}
-              </span>
-            </>
-          ) : (
-            " · Airbnb uses the default"
-          )}
+          {" / night direct"}
         </p>
       </div>
       <button
@@ -255,20 +235,6 @@ function AddRatePeriodForm({ propertyId }: { propertyId: string }) {
             required
             className="h-11"
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="airbnb_price">Airbnb price / night</Label>
-          <Input
-            id="airbnb_price"
-            name="airbnb_price"
-            type="number"
-            min={0}
-            inputMode="numeric"
-            className="h-11"
-          />
-          <p className="text-text-muted text-xs">
-            Blank falls back to the default.
-          </p>
         </div>
       </div>
 

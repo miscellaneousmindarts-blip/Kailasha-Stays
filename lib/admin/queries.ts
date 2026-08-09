@@ -5,6 +5,7 @@ import type {
   AddonService,
   Booking,
   BookingAddon,
+  BookingChannel,
   BookingStatus,
   CalendarSource,
   Enquiry,
@@ -57,6 +58,9 @@ export type PropertyForEdit = Property & {
   property_contacts: PropertyContact[];
   property_private: PropertyPrivate | null;
   rate_periods: RatePeriod[];
+  booking_channels: BookingChannel[];
+  /** iCal feeds, joined to their channel where one exists (0021). */
+  calendar_sources: CalendarSource[];
 };
 
 export async function getPropertyForEdit(
@@ -66,7 +70,7 @@ export async function getPropertyForEdit(
   const { data, error } = await supabase
     .from("properties")
     .select(
-      "*, property_images(*), property_sections(*), property_contacts(*), property_private(*), rate_periods(*)",
+      "*, property_images(*), property_sections(*), property_contacts(*), property_private(*), rate_periods(*), booking_channels(*), calendar_sources(*)",
     )
     .eq("tenant_id", tenant.id)
     .eq("id", id)
@@ -90,6 +94,9 @@ export async function getPropertyForEdit(
   );
   property.rate_periods = [...(property.rate_periods ?? [])].sort((a, b) =>
     a.start_date.localeCompare(b.start_date),
+  );
+  property.booking_channels = [...(property.booking_channels ?? [])].sort(
+    (a, b) => a.sort_order - b.sort_order,
   );
   property.property_private = Array.isArray(property.property_private)
     ? (property.property_private[0] ?? null)

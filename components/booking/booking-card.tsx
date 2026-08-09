@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Tag } from "lucide-react";
+import { ChevronRight, Tag } from "lucide-react";
 
 import { DatePickerField } from "@/components/booking/date-picker-field";
 import { GuestStepper } from "@/components/booking/guest-stepper";
 import { BookDirectDialog } from "@/components/booking/book-direct-dialog";
 import { PriceBreakdown } from "@/components/booking/price-breakdown";
+import { CompareChannelsSheet } from "@/components/booking/compare-channels-sheet";
 import type { UnavailableRange } from "@/components/booking/availability-calendar";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/format";
 import { lowestNightlyRate, quoteStay, type Quote } from "@/lib/pricing";
-import type { AddonServiceData } from "@/lib/queries";
+import type { AddonServiceData, PublicBookingChannel } from "@/lib/queries";
 import type { RatePeriod } from "@/lib/types/database";
 
 export function BookingCard({
@@ -19,11 +20,9 @@ export function BookingCard({
   propertyTitle,
   maxGuests,
   basePrice,
-  airbnbBasePrice,
   ratePeriods,
   currency,
-  airbnbUrl,
-  bookingComUrl,
+  channels,
   whatsappNumber,
   addons,
 }: {
@@ -31,11 +30,9 @@ export function BookingCard({
   propertyTitle: string;
   maxGuests: number;
   basePrice: number | null;
-  airbnbBasePrice: number | null;
   ratePeriods: RatePeriod[];
   currency: string;
-  airbnbUrl: string | null;
-  bookingComUrl: string | null;
+  channels: PublicBookingChannel[];
   whatsappNumber: string | null;
   addons: AddonServiceData[];
 }) {
@@ -47,6 +44,7 @@ export function BookingCard({
   }>({ checkIn: null, checkOut: null });
   const [guests, setGuests] = useState(Math.min(2, maxGuests));
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   // Separate open state per instance: the desktop card and the mobile bar each
   // render their own DatePickerField, and Radix portals popover content to
   // <body> regardless of a CSS-hidden trigger — one shared flag would pop both.
@@ -68,10 +66,7 @@ export function BookingCard({
     };
   }, [propertyId]);
 
-  const defaults = useMemo(
-    () => ({ base: basePrice, airbnb: airbnbBasePrice }),
-    [basePrice, airbnbBasePrice],
-  );
+  const defaults = useMemo(() => ({ base: basePrice }), [basePrice]);
 
   const hasDates = Boolean(range.checkIn && range.checkOut);
 
@@ -82,8 +77,9 @@ export function BookingCard({
       checkOut: range.checkOut,
       periods: ratePeriods,
       defaults,
+      channels,
     });
-  }, [range.checkIn, range.checkOut, ratePeriods, defaults]);
+  }, [range.checkIn, range.checkOut, ratePeriods, defaults, channels]);
 
   const fromRate = useMemo(
     () => lowestNightlyRate(ratePeriods, defaults),
@@ -91,6 +87,12 @@ export function BookingCard({
   );
 
   const canBookDirect = hasDates && Boolean(whatsappNumber);
+
+  function openCompare() {
+    setDesktopPicker(false);
+    setMobilePicker(false);
+    setCompareOpen(true);
+  }
 
   function openBookDirect() {
     // The dialog must be the only overlay — never leave a calendar popover
@@ -133,9 +135,8 @@ export function BookingCard({
               currency={currency}
               canBookDirect={canBookDirect}
               whatsappNumber={whatsappNumber}
-              airbnbUrl={airbnbUrl}
-              bookingComUrl={bookingComUrl}
               onBookDirect={openBookDirect}
+              onCompare={openCompare}
             />
           ) : (
             <button
@@ -205,10 +206,8 @@ export function BookingCard({
               currency={currency}
               canBookDirect={canBookDirect}
               whatsappNumber={whatsappNumber}
-              airbnbUrl={airbnbUrl}
-              bookingComUrl={bookingComUrl}
               onBookDirect={openBookDirect}
-              compact
+              onCompare={openCompare}
             />
           </div>
         ) : (
@@ -260,6 +259,17 @@ export function BookingCard({
           guests={guests}
           addons={addons}
           whatsappNumber={whatsappNumber}
+        />
+      ) : null}
+
+      {quote ? (
+        <CompareChannelsSheet
+          open={compareOpen}
+          onClose={() => setCompareOpen(false)}
+          quote={quote}
+          currency={currency}
+          canBookDirect={canBookDirect}
+          onBookDirect={openBookDirect}
         />
       ) : null}
     </>
@@ -315,32 +325,37 @@ function PriceHeadline({
 }
 
 /**
- * The two priced choices, shown only once dates are known. Direct is the
- * primary action; Airbnb sits beside it carrying its own total, so the guest
- * can see the difference rather than take our word for it.
+ * What the guest actually chooses between, once dates are known.
+ *
+ * ONE primary action — book direct — and everything else behind a single
+ * comparison row. An owner can list on five platforms; five stacked
+ * full-width buttons would bury the action we most want taken and would not
+ * fit the mobile bar at all. The comparison row still leads with the number
+ * that matters (the best saving), so the case for direct is made inline and
+ * the sheet only has to back it up.
  */
 function ChannelCtas({
   quote,
   currency,
   canBookDirect,
   whatsappNumber,
-  airbnbUrl,
-  bookingComUrl,
   onBookDirect,
-  compact = false,
+  onCompare,
 }: {
   quote: Quote | null;
   currency: string;
   canBookDirect: boolean;
   whatsappNumber: string | null;
-  airbnbUrl: string | null;
-  bookingComUrl: string | null;
   onBookDirect: () => void;
-  compact?: boolean;
+  onCompare: () => void;
 }) {
   const directTotal = quote?.direct.total ?? null;
-  const airbnbTotal = quote?.airbnb.total ?? null;
-  const saving = quote?.savingVsAirbnb ?? null;
+  const saving = quote?.savingVsCheapest ?? null;
+  const channels = quote?.channels ?? [];
+
+  // The single cheapest alternative, for naming the comparison concretely —
+  // "₹1,100 more on Airbnb" beats "compare 3 options".
+  const cheapestAlt = channels.find((c) => c.total !== null) ?? null;
 
   return (
     <div className="space-y-2">
@@ -362,9 +377,9 @@ function ChannelCtas({
             </>
           ) : null}
         </button>
-      ) : !whatsappNumber ? (
+      ) : !whatsappNumber && channels.length ? (
         <p className="text-text-muted bg-surface-subtle rounded-md p-3 text-center text-sm">
-          Direct booking is being set up — please book on Airbnb.
+          Direct booking is being set up — see the other options below.
         </p>
       ) : null}
 
@@ -378,44 +393,33 @@ function ChannelCtas({
         </p>
       ) : null}
 
-      {airbnbUrl ? (
-        <a
-          href={airbnbUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="border-border hover:bg-surface-subtle pressable flex h-12 w-full items-center justify-center gap-2 rounded-md border px-4 font-medium"
+      {channels.length ? (
+        <button
+          type="button"
+          onClick={onCompare}
+          className="border-border hover:bg-surface-subtle pressable flex h-12 w-full items-center justify-between gap-2 rounded-md border px-4 text-left"
         >
-          <span>Book on Airbnb</span>
-          {airbnbTotal !== null ? (
-            <>
-              <span aria-hidden="true" className="text-text-muted">
-                ·
-              </span>
-              <span key={airbnbTotal} className="tabular value-in inline-block">
-                {money(airbnbTotal, currency)}
-              </span>
-            </>
-          ) : null}
-          <ExternalLink
-            className="text-text-muted size-4 shrink-0"
-            aria-hidden="true"
-          />
-        </a>
-      ) : null}
-
-      {bookingComUrl && !compact ? (
-        <a
-          href={bookingComUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="border-border hover:bg-surface-subtle pressable flex h-12 w-full items-center justify-center gap-2 rounded-md border px-4 font-medium"
-        >
-          Book on Booking.com
-          <ExternalLink
-            className="text-text-muted size-4 shrink-0"
-            aria-hidden="true"
-          />
-        </a>
+          <span className="min-w-0 truncate text-sm font-medium">
+            {cheapestAlt && cheapestAlt.total !== null ? (
+              <>
+                Also on {cheapestAlt.name}
+                <span className="text-text-muted">
+                  {" · "}
+                  {money(cheapestAlt.total, currency)}
+                </span>
+              </>
+            ) : (
+              <>
+                Other ways to book
+                <span className="text-text-muted"> · {channels.length}</span>
+              </>
+            )}
+          </span>
+          <span className="text-text-muted flex shrink-0 items-center gap-1 text-sm">
+            {channels.length > 1 ? `+${channels.length - 1} more` : "View"}
+            <ChevronRight className="size-4" aria-hidden="true" />
+          </span>
+        </button>
       ) : null}
     </div>
   );

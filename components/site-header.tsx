@@ -22,18 +22,23 @@ export function SiteHeader({
   return (
     <header className="border-border sticky top-0 z-40 border-b bg-[rgba(255,255,255,0.85)] backdrop-blur-md">
       <div className="container-page flex h-16 items-center justify-between gap-3">
+        {/* Allowed to shrink, and narrower below sm. With both this and the
+            nav pinned at shrink-0 the row could not fit a 320px screen, so
+            the page picked up ~20px of horizontal scroll — which also
+            widened every `fixed inset-x-0` bar to match and pushed their
+            right-hand content off-screen. */}
         <Link
           href={basePath || "/"}
-          className="min-w-0 shrink-0"
+          className="min-w-0"
           aria-label={`${settings.business_name} — home`}
         >
           {logoSrc ? (
-            <span className="relative block h-9 w-[160px]">
+            <span className="relative block h-9 w-[120px] max-w-full sm:w-[160px]">
               <Image
                 src={logoSrc}
                 alt={settings.business_name}
                 fill
-                sizes="160px"
+                sizes="(min-width: 640px) 160px, 120px"
                 priority
                 className="object-contain object-left"
               />
@@ -48,7 +53,7 @@ export function SiteHeader({
         <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
           <Link
             href={`${basePath}/properties`}
-            className="hover:bg-surface-subtle pressable flex h-11 items-center rounded-md px-3 font-medium"
+            className="hover:bg-surface-subtle pressable flex h-11 items-center rounded-md px-2 font-medium sm:px-3"
           >
             Properties
           </Link>
