@@ -206,7 +206,7 @@ export function SectionsTab({
   async function handlePick(type: BlockType) {
     setAddPending(true);
     setAddError(null);
-    const result = await addSection(propertyId, type, "public");
+    const result = await addSection(propertyId, type, BLOCK_TYPES[type].defaultAudience);
     setAddPending(false);
 
     if (result.error) {

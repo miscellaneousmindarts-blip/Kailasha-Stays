@@ -11,6 +11,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import type { SectionAudience } from "@/lib/types/database";
+
 /**
  * The block registry — the whole point of the page builder.
  *
@@ -109,55 +111,77 @@ export type BlockContent<T extends BlockType> = z.infer<(typeof blockSchemas)[T]
 /** UI metadata for the admin "Add section" picker. */
 export const BLOCK_TYPES: Record<
   BlockType,
-  { label: string; description: string; icon: LucideIcon; empty: unknown }
+  {
+    label: string;
+    description: string;
+    icon: LucideIcon;
+    empty: unknown;
+    /**
+     * Who a freshly added section of this type shows to, before the admin
+     * touches the "Show to" control. Everything defaults to "public" — a new
+     * section is marketing copy until an admin says otherwise — except
+     * distances, which is travel info a guest who already booked needs just
+     * as much as a browsing visitor, so it starts on both rather than
+     * requiring the same manual flip every time one gets added.
+     */
+    defaultAudience: SectionAudience;
+  }
 > = {
   paragraph: {
     label: "Paragraph",
     description: "A block of text, e.g. how to get here from the station.",
     icon: AlignLeft,
     empty: { text: "" },
+    defaultAudience: "public",
   },
   list: {
     label: "List",
     description: "Bullets, ticks or numbered steps.",
     icon: List,
     empty: { style: "check", items: [""] },
+    defaultAudience: "public",
   },
   key_value: {
     label: "Facts table",
     description: "Label and value pairs, plain text.",
     icon: Table2,
     empty: { rows: [{ label: "", value: "" }] },
+    defaultAudience: "public",
   },
   distances: {
     label: "Distances (photo grid)",
     description: "Nearby landmarks as a photo bento — up to 5, each with an optional photo.",
     icon: MapPin,
     empty: { items: [{ label: "", value: "", image: null }] },
+    defaultAudience: "both",
   },
   faq: {
     label: "Questions",
     description: "Expandable question and answer pairs.",
     icon: HelpCircle,
     empty: { items: [{ q: "", a: "" }] },
+    defaultAudience: "public",
   },
   image: {
     label: "Single photo",
     description: "One wide photo with an optional caption.",
     icon: ImageIcon,
     empty: { storage_path: "", alt: "" },
+    defaultAudience: "public",
   },
   gallery: {
     label: "Photo grid",
     description: "A grid of photos, e.g. the rooftop or the kitchen.",
     icon: Images,
     empty: { images: [] },
+    defaultAudience: "public",
   },
   link_list: {
     label: "Links",
     description: "Useful links, e.g. nearby restaurants on Google Maps.",
     icon: Link2,
     empty: { links: [{ label: "", url: "" }] },
+    defaultAudience: "public",
   },
 };
 
