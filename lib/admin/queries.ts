@@ -436,7 +436,6 @@ export async function listSyncWarnings(): Promise<SyncWarning[]> {
 export type PropertyPricing = {
   currency: string;
   base_price: number | null;
-  airbnb_base_price: number | null;
   rate_periods: RatePeriod[];
 };
 
@@ -447,7 +446,7 @@ export async function listPropertyPricing(): Promise<Record<string, PropertyPric
   const { supabase, tenant } = await requireTenant();
   const { data, error } = await supabase
     .from("properties")
-    .select("id, currency, base_price, airbnb_base_price, rate_periods(*)")
+    .select("id, currency, base_price, rate_periods(*)")
     .eq("tenant_id", tenant.id);
   if (error) throw new Error(`Could not load pricing: ${error.message}`);
 
@@ -456,7 +455,6 @@ export async function listPropertyPricing(): Promise<Record<string, PropertyPric
     byId[p.id] = {
       currency: p.currency,
       base_price: p.base_price,
-      airbnb_base_price: p.airbnb_base_price,
       rate_periods: (p.rate_periods ?? []) as RatePeriod[],
     };
   }

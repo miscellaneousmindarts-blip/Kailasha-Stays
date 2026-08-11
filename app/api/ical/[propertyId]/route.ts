@@ -35,11 +35,15 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
+  // blocks_calendar, not source: a booking recorded for portal/ID-upload
+  // purposes on a channel that already has its own iCal sync (Airbnb,
+  // Booking.com) must NOT round-trip back into that platform's own import —
+  // this feed is one of the things it can end up importing.
   const { data: bookings, error } = await supabase
     .from("bookings")
     .select("id, check_in, check_out, source")
     .eq("property_id", propertyId)
-    .in("source", ["direct", "blocked"])
+    .eq("blocks_calendar", true)
     .in("status", ["confirmed", "completed"]);
 
   if (error) {

@@ -230,6 +230,7 @@ export function AdminCalendar({ properties }: { properties: PropertyOption[] }) 
       {detail ? (
         <EventDetailModal
           event={detail}
+          propertyId={propertyId}
           onClose={() => setDetail(null)}
           onRemoved={() => {
             setDetail(null);

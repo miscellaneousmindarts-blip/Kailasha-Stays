@@ -274,6 +274,13 @@ export type Booking = {
   check_in: string;
   check_out: string;
   status: BookingStatus;
+  /**
+   * True (default): this row occupies its dates — checked by the
+   * bookings_no_overlap exclusion constraint and exported to the iCal feed.
+   * False: a record only, for a channel that already blocks the dates
+   * itself (0022_booking_calendar_block_flag.sql).
+   */
+  blocks_calendar: boolean;
   total_amount: number;
   currency: string;
   portal_token: string | null;

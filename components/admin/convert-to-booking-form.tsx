@@ -113,7 +113,11 @@ export function ConvertToBookingForm({
         />
       </div>
 
-      {quote && quote.direct.total !== null ? (
+      {/* Only shown while it's still true — see new-booking-form.tsx, which
+          this form is kept deliberately identical to. A per-night breakdown
+          that still adds up to a number the admin has since typed over is
+          misleading, not just stale. */}
+      {quote && quote.direct.total !== null && isAutoFilled ? (
         <div className="border-border rounded-md border p-3">
           <PriceBreakdown quote={quote} currency={currency} />
         </div>
@@ -137,7 +141,12 @@ export function ConvertToBookingForm({
             Auto-filled from the property&apos;s rates — edit if you agreed a
             different price.
           </p>
-        ) : suggested === null && pricing ? (
+        ) : suggested !== null ? (
+          <p className="text-text-muted text-sm">
+            Custom price — the property&apos;s rate for these dates would
+            suggest {money(suggested, currency)}.
+          </p>
+        ) : pricing ? (
           <p className="text-text-muted text-sm">
             No rate set for these dates — enter the agreed price manually.
           </p>

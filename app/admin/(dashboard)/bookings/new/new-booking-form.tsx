@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { CalendarOff, Loader2, Sparkles } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,9 +18,30 @@ import type {
   PropertyOption,
   PropertyPricing,
 } from "@/lib/admin/queries";
+import type { BookingSource } from "@/lib/types/database";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
+}
+
+const SOURCES: { value: BookingSource; label: string }[] = [
+  { value: "direct", label: "Direct" },
+  { value: "airbnb", label: "Airbnb" },
+  { value: "booking_com", label: "Booking.com" },
+  { value: "other", label: "Other platform" },
+];
+
+/**
+ * Whether a booking on this source should occupy the calendar by default.
+ *
+ * Airbnb and Booking.com normally have their own iCal sync already blocking
+ * the dates here — blocking again would be redundant, and since our own
+ * export feeds back into what an owner imports into Airbnb, a genuine
+ * double-block risk, not just a cosmetic one. A platform with no sync (or
+ * an off-platform guest) has nothing else holding the dates, so this has to.
+ */
+function defaultBlocksCalendar(source: BookingSource): boolean {
+  return source !== "airbnb" && source !== "booking_com";
 }
 
 export function NewBookingForm({
@@ -31,13 +53,47 @@ export function NewBookingForm({
   pricing: Record<string, PropertyPricing>;
   addonsByProperty: Record<string, PropertyAddonOption[]>;
 }) {
+  const params = useSearchParams();
+  const convertBlockId = params.get("convert_block_id");
+  const prefilledSource = params.get("source") as BookingSource | null;
+  const prefilledBlocks = params.get("blocks_calendar");
+
   const action = useSaveAction(createManualBooking);
 
-  const [propertyId, setPropertyId] = useState(properties[0]?.id ?? "");
-  const [checkIn, setCheckIn] = useState(todayISO());
-  const [checkOut, setCheckOut] = useState("");
+  const [propertyId, setPropertyId] = useState(
+    params.get("property_id") ?? properties[0]?.id ?? "",
+  );
+  const [checkIn, setCheckIn] = useState(params.get("check_in") ?? todayISO());
+  const [checkOut, setCheckOut] = useState(params.get("check_out") ?? "");
   const [totalAmount, setTotalAmount] = useState("");
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
+  const [source, setSource] = useState<BookingSource>(
+    prefilledSource && SOURCES.some((s) => s.value === prefilledSource)
+      ? prefilledSource
+      : "direct",
+  );
+  const [blocksCalendar, setBlocksCalendar] = useState(
+    prefilledBlocks !== null
+      ? prefilledBlocks !== "false"
+      : defaultBlocksCalendar(source),
+  );
+
+  // Converting a block: dates and property are the block's own and aren't
+  // up for negotiation here — changing them would mean this "conversion"
+  // no longer describes the row it's converting. blocks_calendar stays
+  // true too: this booking has no calendar sync of its own to lean on, it
+  // IS what's holding the dates (it was already doing that as a block).
+  const locked = Boolean(convertBlockId);
+  // Only a block conversion forces this — there's no other row standing in
+  // for the block being replaced, so it has to stay checked. Direct just
+  // defaults checked like every non-synced source; the admin can still
+  // uncheck it for whatever reason they have.
+  const blockingForced = locked;
+
+  function selectSource(next: BookingSource) {
+    setSource(next);
+    if (!locked) setBlocksCalendar(defaultBlocksCalendar(next));
+  }
 
   const propertyPricing = pricing[propertyId] ?? null;
   const addons = addonsByProperty[propertyId] ?? [];
@@ -59,7 +115,9 @@ export function NewBookingForm({
   // Keeps total_amount in sync with the suggested price as dates or the
   // property change, but only while the admin hasn't typed their own number
   // over it — same rule as convert-to-booking-form.tsx, so the two forms
-  // that create a direct booking behave identically.
+  // that create a direct booking behave identically. A management booking's
+  // agreed price is exactly as free-form as any other: this only ever
+  // proposes a starting number, never requires it.
   const [lastSuggested, setLastSuggested] = useState<number | null>(null);
   if (suggested !== lastSuggested) {
     if (totalAmount === "" || totalAmount === String(lastSuggested ?? "")) {
@@ -88,26 +146,95 @@ export function NewBookingForm({
       }}
       className="space-y-5"
     >
+      {convertBlockId ? <input type="hidden" name="convert_block_id" value={convertBlockId} /> : null}
+
       <div className="space-y-2">
         <Label htmlFor="property_id">Property</Label>
-        <select
-          id="property_id"
-          name="property_id"
-          value={propertyId}
-          onChange={(e) => {
-            setPropertyId(e.target.value);
-            setSelectedAddonIds([]);
-          }}
-          required
-          className="border-border h-11 w-full rounded-md border bg-transparent px-3"
-        >
-          {properties.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.title}
-            </option>
-          ))}
-        </select>
+        {locked ? (
+          <>
+            <p className="border-border bg-surface-subtle text-text-muted flex h-11 items-center rounded-md border px-3">
+              {properties.find((p) => p.id === propertyId)?.title ?? "This property"}
+            </p>
+            <input type="hidden" name="property_id" value={propertyId} />
+          </>
+        ) : (
+          <select
+            id="property_id"
+            name="property_id"
+            value={propertyId}
+            onChange={(e) => {
+              setPropertyId(e.target.value);
+              setSelectedAddonIds([]);
+            }}
+            required
+            className="border-border h-11 w-full rounded-md border bg-transparent px-3"
+          >
+            {properties.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
+
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Where this booking is from</legend>
+        <div className="flex flex-wrap gap-1.5">
+          {SOURCES.map((s) => (
+            <button
+              key={s.value}
+              type="button"
+              onClick={() => selectSource(s.value)}
+              aria-pressed={source === s.value}
+              className={`pressable flex h-10 items-center rounded-md border px-3 text-sm font-medium ${
+                source === s.value
+                  ? "border-primary bg-primary-tint text-primary"
+                  : "border-border hover:bg-surface-subtle"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <input type="hidden" name="source" value={source} />
+        <p className="text-text-muted text-sm">
+          {source === "direct"
+            ? "The guest booked with you directly."
+            : "Recorded here for the guest-portal link, ID upload and add-ons — the booking itself was made elsewhere."}
+        </p>
+      </fieldset>
+
+      {blockingForced ? (
+        <p className="text-text-muted flex items-center gap-1.5 text-sm">
+          <CalendarOff className="size-3.5 shrink-0" aria-hidden="true" />
+          These dates stay blocked — this is filling in who they&apos;re for.
+        </p>
+      ) : (
+        <label className="border-border flex items-start gap-3 rounded-md border p-3">
+          <input
+            type="checkbox"
+            checked={blocksCalendar}
+            onChange={(e) => setBlocksCalendar(e.target.checked)}
+            className="mt-0.5 size-4"
+          />
+          <span className="text-sm">
+            <span className="block font-medium">Block these dates here too</span>
+            <span className="text-text-muted mt-0.5 block">
+              {source === "airbnb" || source === "booking_com"
+                ? `Leave this off if ${
+                    source === "airbnb" ? "Airbnb" : "Booking.com"
+                  } already syncs its own calendar to this property — turning it on as well would double-block, and could feed back into what you import there.`
+                : "Nothing else is holding these dates, so this booking needs to."}
+            </span>
+          </span>
+        </label>
+      )}
+      <input
+        type="hidden"
+        name="blocks_calendar"
+        value={blockingForced || blocksCalendar ? "true" : "false"}
+      />
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
@@ -134,7 +261,8 @@ export function NewBookingForm({
             value={checkIn}
             onChange={(e) => setCheckIn(e.target.value)}
             required
-            className="h-11"
+            disabled={locked}
+            className="h-11 disabled:opacity-70"
           />
         </div>
         <div className="space-y-1">
@@ -146,7 +274,8 @@ export function NewBookingForm({
             value={checkOut}
             onChange={(e) => setCheckOut(e.target.value)}
             required
-            className="h-11"
+            disabled={locked}
+            className="h-11 disabled:opacity-70"
           />
         </div>
       </div>
@@ -156,7 +285,12 @@ export function NewBookingForm({
         <Input id="guests" name="guests" type="number" min={1} defaultValue={2} className="h-11" />
       </div>
 
-      {quote && quote.direct.total !== null ? (
+      {/* Only shown while it's still true — this is a per-night breakdown of
+          the SUGGESTED price, and the moment the admin types a different
+          total below, a breakdown that still adds up to the old number is
+          actively misleading rather than just stale. It reappears the
+          moment the typed amount matches the suggestion again. */}
+      {quote && quote.direct.total !== null && isAutoFilled ? (
         <div className="border-border rounded-md border p-3">
           <PriceBreakdown quote={quote} currency={currency} />
         </div>
@@ -180,7 +314,12 @@ export function NewBookingForm({
             Auto-filled from the property&apos;s rates — edit if you agreed a
             different price.
           </p>
-        ) : suggested === null && propertyPricing && datesValid ? (
+        ) : suggested !== null ? (
+          <p className="text-text-muted text-sm">
+            Custom price — the property&apos;s rate for these dates would
+            suggest {money(suggested, currency)}.
+          </p>
+        ) : propertyPricing && datesValid ? (
           <p className="text-text-muted text-sm">
             No rate set for these dates — enter the agreed price manually.
           </p>
@@ -240,7 +379,7 @@ export function NewBookingForm({
         className="bg-primary text-primary-foreground hover:bg-primary-hover pressable flex h-12 items-center justify-center gap-2 rounded-md px-5 font-medium disabled:opacity-60"
       >
         {action.pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
-        Create booking
+        {locked ? "Add guest details" : "Create booking"}
       </button>
     </form>
   );
