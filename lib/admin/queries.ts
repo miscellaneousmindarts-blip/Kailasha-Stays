@@ -209,7 +209,14 @@ export async function listBookings(filter?: {
 }
 
 export type BookingForEdit = Booking & {
-  properties: { title: string; slug: string; max_guests: number } | null;
+  properties: {
+    title: string;
+    slug: string;
+    max_guests: number;
+    currency: string;
+    base_price: number | null;
+    rate_periods: RatePeriod[];
+  } | null;
   booking_addons: BookingAddon[];
   payments: Payment[];
   guest_documents: GuestDocument[];
@@ -222,7 +229,10 @@ export async function getBookingForEdit(
   const { data, error } = await supabase
     .from("bookings")
     .select(
-      "*, properties(title, slug, max_guests), booking_addons(*), payments(*), guest_documents(*)",
+      // currency/base_price/rate_periods: not shown directly, only used to
+      // suggest a starting per-night breakdown when a booking predates
+      // itemised pricing (nightly_rates is null) and the admin opens it.
+      "*, properties(title, slug, max_guests, currency, base_price, rate_periods(*)), booking_addons(*), payments(*), guest_documents(*)",
     )
     .eq("tenant_id", tenant.id)
     .eq("id", id)

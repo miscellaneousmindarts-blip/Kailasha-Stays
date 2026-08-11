@@ -2,8 +2,9 @@ import "server-only";
 
 import { nanoid } from "nanoid";
 
+import { bookingTotal } from "@/lib/pricing";
 import type { createClient } from "@/lib/supabase/server";
-import type { BookingSource } from "@/lib/types/database";
+import type { BookingCharge, BookingSource, NightlyRateEntry } from "@/lib/types/database";
 
 export type CreateBookingParams = {
   propertyId: string;
@@ -14,7 +15,15 @@ export type CreateBookingParams = {
   guests: number;
   checkIn: string;
   checkOut: string;
-  totalAmount: number;
+  /**
+   * total_amount is always DERIVED from these two via bookingTotal() — never
+   * taken from the caller directly, so what the admin saw in the price
+   * editor while creating this booking and what gets stored can never
+   * disagree. Every creation path builds one, even a bare-minimum booking:
+   * BookingPriceEditor always seeds at least one row per night.
+   */
+  nightlyRates: NightlyRateEntry[];
+  charges: BookingCharge[];
   notes?: string | null;
   /** Where this booking actually came from. Defaults to 'direct'. */
   source?: BookingSource;
@@ -96,7 +105,8 @@ export async function createDirectBooking(
     guests,
     checkIn,
     checkOut,
-    totalAmount,
+    nightlyRates,
+    charges,
     notes,
     source = "direct",
     blocksCalendar = true,
@@ -122,7 +132,9 @@ export async function createDirectBooking(
       check_in: checkIn,
       check_out: checkOut,
       status: "confirmed",
-      total_amount: Number.isFinite(totalAmount) ? totalAmount : 0,
+      nightly_rates: nightlyRates,
+      charges,
+      total_amount: bookingTotal(nightlyRates, charges),
       notes: notes || null,
       portal_token: token,
       token_expires_at: expiresAt,

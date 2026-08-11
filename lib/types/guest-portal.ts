@@ -2,6 +2,8 @@
  *  supabase/migrations/0001_init.sql) — hand-maintained the same way as
  *  lib/types/database.ts. */
 
+import type { BookingCharge, NightlyRateEntry } from "@/lib/types/database";
+
 export type GuestBookingBundle = {
   booking: {
     id: string;
@@ -60,6 +62,9 @@ export type GuestBookingBundle = {
   }[];
   billing: {
     base: number;
+    /** Null: this booking was never itemised — `base` is a plain figure. */
+    nightly_rates: NightlyRateEntry[] | null;
+    charges: BookingCharge[];
     addons_total: number;
     total: number;
     paid: number;

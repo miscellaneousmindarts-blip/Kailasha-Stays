@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { requireTenant } from "@/lib/admin/auth";
+import { parseBookingPricingInput } from "@/lib/admin/booking-pricing-input";
 import { createDirectBooking } from "@/lib/admin/create-booking";
 import type { EnquiryStatus } from "@/lib/types/database";
 
@@ -51,7 +52,9 @@ export async function convertEnquiryToBooking(
   const checkIn = String(formData.get("check_in") ?? enquiry.check_in);
   const checkOut = String(formData.get("check_out") ?? enquiry.check_out);
   const guests = Number(formData.get("guests") ?? enquiry.guests);
-  const totalAmount = Number(formData.get("total_amount") ?? 0);
+
+  const pricing = parseBookingPricingInput(formData, checkIn, checkOut);
+  if (!pricing.ok) return { error: pricing.error };
 
   const result = await createDirectBooking(supabase, {
     propertyId: enquiry.property_id,
@@ -61,7 +64,8 @@ export async function convertEnquiryToBooking(
     guests,
     checkIn,
     checkOut,
-    totalAmount,
+    nightlyRates: pricing.nightlyRates,
+    charges: pricing.charges,
     addonIds: enquiry.addon_ids ?? [],
   });
   if (result.error) return { error: result.error };

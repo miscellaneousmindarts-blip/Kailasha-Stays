@@ -4,6 +4,8 @@ import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 
 import { requireTenant } from "@/lib/admin/auth";
+import { parseBookingPricingInput } from "@/lib/admin/booking-pricing-input";
+import { bookingTotal } from "@/lib/pricing";
 import type { AddonStatus, BookingStatus } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
@@ -54,7 +56,6 @@ export async function updateBookingDetails(
   const guestName = String(formData.get("guest_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const guests = Number(formData.get("guests"));
-  const totalAmount = Number(formData.get("total_amount"));
   const notes = String(formData.get("notes") ?? "").trim();
 
   const { error } = await supabase
@@ -63,8 +64,47 @@ export async function updateBookingDetails(
       guest_name: guestName || null,
       phone: phone || null,
       guests: Number.isFinite(guests) ? guests : null,
-      total_amount: Number.isFinite(totalAmount) ? totalAmount : 0,
       notes: notes || null,
+    })
+    .eq("id", bookingId);
+
+  if (error) return { error: error.message };
+  revalidateBooking(bookingId);
+  return { success: true };
+}
+
+/**
+ * Rebuilds a booking's price from BookingPriceEditor's two hidden JSON
+ * inputs — the one place total_amount changes after creation, mirroring
+ * exactly how it's derived at creation time in lib/admin/create-booking.ts.
+ *
+ * check_in/check_out come from the database, not the form: this UI never
+ * offers to change a booking's dates, so trusting whatever the client last
+ * rendered would let a stale tab silently validate a breakdown against
+ * dates that page no longer shows.
+ */
+export async function updateBookingPricing(
+  bookingId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const { supabase } = await requireTenant();
+
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("check_in, check_out")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (!booking) return { error: "Booking not found." };
+
+  const pricing = parseBookingPricingInput(formData, booking.check_in, booking.check_out);
+  if (!pricing.ok) return { error: pricing.error };
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({
+      nightly_rates: pricing.nightlyRates,
+      charges: pricing.charges,
+      total_amount: bookingTotal(pricing.nightlyRates, pricing.charges),
     })
     .eq("id", bookingId);
 

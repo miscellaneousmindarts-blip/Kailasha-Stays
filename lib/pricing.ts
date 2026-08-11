@@ -1,5 +1,10 @@
 import { addDays, isBefore, toISODate } from "@/lib/date-utils";
-import type { BookingChannel, RatePeriod } from "@/lib/types/database";
+import type {
+  BookingChannel,
+  BookingCharge,
+  NightlyRateEntry,
+  RatePeriod,
+} from "@/lib/types/database";
 
 /**
  * Nightly rates resolved per channel, shared by the public booking card and
@@ -191,4 +196,59 @@ export function lowestNightlyRate(
     ...periods.map((p) => p.direct_price),
   ].filter((v): v is number => v !== null);
   return candidates.length ? Math.min(...candidates) : null;
+}
+
+/**
+ * ── An actual booking's stored price breakdown ───────────────────────────
+ *
+ * Distinct from Quote/NightlyRate above: those ESTIMATE what a stay would
+ * cost from the property's current rates, before a booking exists. These
+ * describe what one specific booking's total actually IS, once an admin has
+ * itemised it — editable per night, plus free-form charges and discounts
+ * (0023_booking_pricing_breakdown.sql).
+ *
+ * bookingTotal() is the one place total_amount is derived from a breakdown.
+ * The admin editor's live running total and the server action that saves
+ * the row both call it, so the number shown while editing and the number
+ * that lands in the database can never disagree.
+ */
+
+export function nightlyRatesTotal(
+  nightly: readonly Pick<NightlyRateEntry, "rate">[],
+): number {
+  return nightly.reduce((sum, n) => sum + n.rate, 0);
+}
+
+export function chargesTotal(
+  charges: readonly Pick<BookingCharge, "kind" | "amount">[],
+): number {
+  return charges.reduce((sum, c) => sum + (c.kind === "discount" ? -c.amount : c.amount), 0);
+}
+
+export function bookingTotal(
+  nightly: readonly Pick<NightlyRateEntry, "rate">[],
+  charges: readonly Pick<BookingCharge, "kind" | "amount">[],
+): number {
+  return nightlyRatesTotal(nightly) + chargesTotal(charges);
+}
+
+/**
+ * Collapses consecutive equal-rate nights into one line — "₹3,200 × 4
+ * nights" instead of four identical rows. Used by read-only breakdown
+ * views (the guest portal's billing section); the admin's editor shows
+ * every night individually since editing one means addressing it directly.
+ */
+export function groupNightlyRates(
+  nightly: readonly Pick<NightlyRateEntry, "rate">[],
+): { rate: number; nights: number }[] {
+  const groups: { rate: number; nights: number }[] = [];
+  for (const n of nightly) {
+    const last = groups.at(-1);
+    if (last && last.rate === n.rate) {
+      last.nights += 1;
+    } else {
+      groups.push({ rate: n.rate, nights: 1 });
+    }
+  }
+  return groups;
 }

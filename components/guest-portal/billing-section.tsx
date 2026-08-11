@@ -1,6 +1,7 @@
 import { Receipt } from "lucide-react";
 
 import { formatDate, money } from "@/lib/format";
+import { groupNightlyRates } from "@/lib/pricing";
 import type { GuestBookingBundle } from "@/lib/types/guest-portal";
 
 export function BillingSection({ bundle }: { bundle: GuestBookingBundle }) {
@@ -12,6 +13,36 @@ export function BillingSection({ bundle }: { bundle: GuestBookingBundle }) {
         <Receipt className="text-primary size-5" aria-hidden="true" />
         Billing
       </h2>
+
+      {/* Only when the admin has itemised this booking's price — the same
+          breakdown they built, not a re-derived estimate. A booking made
+          before itemising existed just shows the plain total below, exactly
+          as it always has. */}
+      {billing.nightly_rates ? (
+        <div className="border-border mb-3 space-y-1.5 rounded-md border p-3 text-sm">
+          {groupNightlyRates(billing.nightly_rates).map((g, i) => (
+            <div key={i} className="flex items-baseline justify-between gap-3">
+              <span className="text-text-muted">
+                {money(g.rate)} × {g.nights} {g.nights === 1 ? "night" : "nights"}
+              </span>
+              <span className="tabular">{money(g.rate * g.nights)}</span>
+            </div>
+          ))}
+          {billing.charges.map((c) => (
+            <div key={c.id} className="flex items-baseline justify-between gap-3">
+              <span className="text-text-muted">{c.label}</span>
+              <span className="tabular">
+                {c.kind === "discount" ? "−" : "+"}
+                {money(c.amount)}
+              </span>
+            </div>
+          ))}
+          <div className="border-border flex items-baseline justify-between gap-3 border-t pt-1.5 font-medium">
+            <span>Stay total</span>
+            <span className="tabular">{money(billing.base)}</span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="border-border grid grid-cols-2 gap-3 rounded-md border p-4 sm:grid-cols-4">
         <Stat label="Stay" value={money(billing.base)} />

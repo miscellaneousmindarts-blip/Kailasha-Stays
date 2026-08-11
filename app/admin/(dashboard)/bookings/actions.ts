@@ -4,13 +4,15 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { requireTenant } from "@/lib/admin/auth";
+import { parseBookingPricingInput } from "@/lib/admin/booking-pricing-input";
 import {
   copyAddonsToBooking,
   createDirectBooking,
   newPortalToken,
 } from "@/lib/admin/create-booking";
+import { bookingTotal } from "@/lib/pricing";
 import type { createClient } from "@/lib/supabase/server";
-import type { BookingSource } from "@/lib/types/database";
+import type { BookingCharge, BookingSource, NightlyRateEntry } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
 
@@ -34,6 +36,10 @@ function revalidateBookingViews() {
  *   - convert_block_id set: the admin picked "Add guest details" on an
  *     existing manual block, so this converts that SAME row into the
  *     booking instead of inserting a new one.
+ *
+ * Either way the price comes from BookingPriceEditor's two hidden JSON
+ * inputs, parsed and validated by parseBookingPricingInput — there is no
+ * separate total field to read instead.
  */
 export async function createManualBooking(
   formData: FormData,
@@ -44,7 +50,6 @@ export async function createManualBooking(
   const checkIn = String(formData.get("check_in") ?? "");
   const checkOut = String(formData.get("check_out") ?? "");
   const guests = Number(formData.get("guests") ?? 1);
-  const totalAmount = Number(formData.get("total_amount") ?? 0);
   const notes = String(formData.get("notes") ?? "").trim();
   const addonIds = formData.getAll("addon_ids").map(String);
   const convertBlockId = String(formData.get("convert_block_id") ?? "").trim() || null;
@@ -61,6 +66,9 @@ export async function createManualBooking(
     };
   }
 
+  const pricing = parseBookingPricingInput(formData, checkIn, checkOut);
+  if (!pricing.ok) return { error: pricing.error };
+
   const { supabase } = await requireTenant();
 
   if (convertBlockId) {
@@ -68,10 +76,11 @@ export async function createManualBooking(
       guestName,
       phone,
       guests,
-      totalAmount,
       notes,
       source,
       addonIds,
+      nightlyRates: pricing.nightlyRates,
+      charges: pricing.charges,
     });
   }
 
@@ -84,11 +93,12 @@ export async function createManualBooking(
     guests,
     checkIn,
     checkOut,
-    totalAmount,
     notes,
     source,
     blocksCalendar,
     addonIds,
+    nightlyRates: pricing.nightlyRates,
+    charges: pricing.charges,
   });
   if (result.error) return { error: result.error };
 
@@ -116,10 +126,11 @@ async function convertBlockToBooking(
     guestName: string;
     phone: string;
     guests: number;
-    totalAmount: number;
     notes: string;
     source: BookingSource;
     addonIds: string[];
+    nightlyRates: NightlyRateEntry[];
+    charges: BookingCharge[];
   },
 ): Promise<ActionResult & { bookingId?: string }> {
   // Keyed by a unique id, so RLS alone is enough here — same convention as
@@ -148,7 +159,9 @@ async function convertBlockToBooking(
       guest_name: fields.guestName,
       phone: fields.phone,
       guests: fields.guests,
-      total_amount: Number.isFinite(fields.totalAmount) ? fields.totalAmount : 0,
+      nightly_rates: fields.nightlyRates,
+      charges: fields.charges,
+      total_amount: bookingTotal(fields.nightlyRates, fields.charges),
       notes: fields.notes || null,
       portal_token: token,
       token_expires_at: expiresAt,

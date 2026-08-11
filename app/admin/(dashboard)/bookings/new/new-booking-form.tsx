@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CalendarOff, Loader2, Sparkles } from "lucide-react";
+import { CalendarOff, Loader2 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { PriceBreakdown } from "@/components/booking/price-breakdown";
+import { BookingPriceEditor } from "@/components/admin/booking-price-editor";
 import { useSaveAction } from "@/components/admin/use-save-action";
 import { createManualBooking } from "@/app/admin/(dashboard)/bookings/actions";
 import { parseISODate } from "@/lib/date-utils";
@@ -65,7 +65,6 @@ export function NewBookingForm({
   );
   const [checkIn, setCheckIn] = useState(params.get("check_in") ?? todayISO());
   const [checkOut, setCheckOut] = useState(params.get("check_out") ?? "");
-  const [totalAmount, setTotalAmount] = useState("");
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
   const [source, setSource] = useState<BookingSource>(
     prefilledSource && SOURCES.some((s) => s.value === prefilledSource)
@@ -109,24 +108,6 @@ export function NewBookingForm({
       defaults: { base: propertyPricing.base_price },
     });
   }, [propertyPricing, datesValid, checkIn, checkOut]);
-
-  const suggested = quote && quote.direct.total !== null ? quote.direct.total : null;
-
-  // Keeps total_amount in sync with the suggested price as dates or the
-  // property change, but only while the admin hasn't typed their own number
-  // over it — same rule as convert-to-booking-form.tsx, so the two forms
-  // that create a direct booking behave identically. A management booking's
-  // agreed price is exactly as free-form as any other: this only ever
-  // proposes a starting number, never requires it.
-  const [lastSuggested, setLastSuggested] = useState<number | null>(null);
-  if (suggested !== lastSuggested) {
-    if (totalAmount === "" || totalAmount === String(lastSuggested ?? "")) {
-      setTotalAmount(suggested !== null ? String(suggested) : "");
-    }
-    setLastSuggested(suggested);
-  }
-
-  const isAutoFilled = totalAmount !== "" && totalAmount === String(suggested ?? "");
 
   function toggleAddon(id: string) {
     setSelectedAddonIds((prev) =>
@@ -285,45 +266,20 @@ export function NewBookingForm({
         <Input id="guests" name="guests" type="number" min={1} defaultValue={2} className="h-11" />
       </div>
 
-      {/* Only shown while it's still true — this is a per-night breakdown of
-          the SUGGESTED price, and the moment the admin types a different
-          total below, a breakdown that still adds up to the old number is
-          actively misleading rather than just stale. It reappears the
-          moment the typed amount matches the suggestion again. */}
-      {quote && quote.direct.total !== null && isAutoFilled ? (
-        <div className="border-border rounded-md border p-3">
-          <PriceBreakdown quote={quote} currency={currency} />
-        </div>
-      ) : null}
-
       <div className="space-y-1">
-        <Label htmlFor="total_amount">Total amount (stay only, {currency})</Label>
-        <Input
-          id="total_amount"
-          name="total_amount"
-          type="number"
-          min={0}
-          value={totalAmount}
-          onChange={(e) => setTotalAmount(e.target.value)}
-          placeholder="0"
-          className="h-11"
-        />
-        {isAutoFilled ? (
-          <p className="text-text-muted flex items-center gap-1.5 text-sm">
-            <Sparkles className="size-3.5 shrink-0" aria-hidden="true" />
-            Auto-filled from the property&apos;s rates — edit if you agreed a
-            different price.
-          </p>
-        ) : suggested !== null ? (
+        <Label>Price</Label>
+        {datesValid ? (
+          <BookingPriceEditor
+            checkIn={checkIn}
+            checkOut={checkOut}
+            currency={currency}
+            suggestedNightly={quote?.nightly ?? []}
+          />
+        ) : (
           <p className="text-text-muted text-sm">
-            Custom price — the property&apos;s rate for these dates would
-            suggest {money(suggested, currency)}.
+            Pick check-in and check-out dates to set the price.
           </p>
-        ) : propertyPricing && datesValid ? (
-          <p className="text-text-muted text-sm">
-            No rate set for these dates — enter the agreed price manually.
-          </p>
-        ) : null}
+        )}
       </div>
 
       {addons.length ? (

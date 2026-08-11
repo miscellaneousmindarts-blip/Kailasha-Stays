@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SaveBar } from "@/components/admin/save-bar";
+import { BookingPriceEditor } from "@/components/admin/booking-price-editor";
 import { useSaveAction } from "@/components/admin/use-save-action";
 import {
   addBookingAddon,
@@ -28,9 +29,11 @@ import {
   setBookingAddonStatus,
   setBookingStatus,
   updateBookingDetails,
+  updateBookingPricing,
 } from "@/app/admin/(dashboard)/bookings/[id]/actions";
 import { formatDate, money } from "@/lib/format";
 import { nightsBetween, parseISODate } from "@/lib/date-utils";
+import { quoteStay } from "@/lib/pricing";
 import { whatsAppLink } from "@/lib/whatsapp";
 import type { BookingForEdit } from "@/lib/admin/queries";
 
@@ -102,6 +105,8 @@ export function BookingDetail({
 
       <BasicsSection booking={booking} />
 
+      <PricingSection booking={booking} />
+
       {booking.source === "direct" && booking.portal_token ? (
         <PortalLinkSection booking={booking} siteUrl={siteUrl} />
       ) : null}
@@ -168,20 +173,63 @@ function BasicsSection({ booking }: { booking: BookingForEdit }) {
           </div>
         </div>
         <div className="space-y-1">
-          <Label htmlFor="total_amount">Total amount for the stay (₹)</Label>
-          <Input
-            id="total_amount"
-            name="total_amount"
-            type="number"
-            min={0}
-            defaultValue={booking.total_amount}
-            className="h-11"
-          />
-        </div>
-        <div className="space-y-1">
           <Label htmlFor="notes">Internal notes</Label>
           <Textarea id="notes" name="notes" rows={2} defaultValue={booking.notes ?? ""} />
         </div>
+        <SaveBar pending={action.pending} saved={action.saved} error={action.error} />
+      </form>
+    </section>
+  );
+}
+
+/**
+ * Rebuilds the same editor used at creation — one place the total is ever
+ * built, whether that's the first time or the fifth. The suggested per-night
+ * rate always comes from the property's CURRENT pricing, since a booking
+ * that predates itemised pricing (nightly_rates null) has no rate history of
+ * its own to seed from; one that's already itemised keeps its own stored
+ * rates instead (BookingPriceEditor prefers those when present).
+ */
+function PricingSection({ booking }: { booking: BookingForEdit }) {
+  const action = useSaveAction(updateBookingPricing);
+  const property = booking.properties;
+
+  const quote = property
+    ? quoteStay({
+        checkIn: parseISODate(booking.check_in),
+        checkOut: parseISODate(booking.check_out),
+        periods: property.rate_periods,
+        defaults: { base: property.base_price },
+      })
+    : null;
+
+  return (
+    <section>
+      <h2 className="mb-3 text-lg font-semibold">Pricing</h2>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          action.run(booking.id, new FormData(e.currentTarget));
+        }}
+        className="space-y-4"
+      >
+        {booking.nightly_rates === null ? (
+          <p className="bg-warning/10 text-warning rounded-md p-3 text-sm">
+            This booking has no itemised breakdown yet — the rates below are
+            today&apos;s suggested pricing, not necessarily what was
+            originally agreed ({money(booking.total_amount, property?.currency ?? booking.currency)}
+            ). Adjust them to match before saving, or add a charge/discount
+            line for the difference.
+          </p>
+        ) : null}
+        <BookingPriceEditor
+          checkIn={booking.check_in}
+          checkOut={booking.check_out}
+          currency={property?.currency ?? booking.currency}
+          suggestedNightly={quote?.nightly ?? []}
+          initialNightlyRates={booking.nightly_rates}
+          initialCharges={booking.charges}
+        />
         <SaveBar pending={action.pending} saved={action.saved} error={action.error} />
       </form>
     </section>

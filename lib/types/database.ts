@@ -261,6 +261,20 @@ export type Enquiry = {
   created_at: string;
 };
 
+/** One night of an itemised stay. Stored verbatim — no rate-period label kept, since a
+ *  period can be edited or deleted later and the booking's own history shouldn't move. */
+export type NightlyRateEntry = { date: string; rate: number };
+
+export type BookingChargeKind = "charge" | "discount";
+
+/** One free-form line — an extra fee or a discount — client-generated id, never reused. */
+export type BookingCharge = {
+  id: string;
+  label: string;
+  kind: BookingChargeKind;
+  amount: number;
+};
+
 export type Booking = {
   /** Owning tenant. Set by a database trigger from the parent row / caller. */
   tenant_id: string;
@@ -281,6 +295,15 @@ export type Booking = {
    * itself (0022_booking_calendar_block_flag.sql).
    */
   blocks_calendar: boolean;
+  /**
+   * Null: this booking has never been itemised — total_amount is a plain
+   * figure with no breakdown behind it. Set: one entry per night of the
+   * stay, and total_amount is computed from this plus `charges`
+   * (0023_booking_pricing_breakdown.sql).
+   */
+  nightly_rates: NightlyRateEntry[] | null;
+  /** Always an array. Independent of nightly_rates — either can be set without the other. */
+  charges: BookingCharge[];
   total_amount: number;
   currency: string;
   portal_token: string | null;
