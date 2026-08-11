@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { ExternalLink } from "lucide-react";
 
 import { BLUR_DATA_URL, imageUrl } from "@/lib/images";
 import { splitDistanceValue } from "@/lib/distance-format";
@@ -109,14 +110,12 @@ function DistanceTile({
   const modeSize = size === "sm" ? "text-xs" : "text-sm";
   const padding = size === "sm" ? "p-3" : "p-4 md:p-5";
 
-  return (
-    <div
-      className={`relative isolate flex flex-col justify-end overflow-hidden rounded-xl border ${padding} ${className} ${
-        onDark
-          ? "border-foreground bg-foreground text-background"
-          : "border-border bg-surface-subtle"
-      }`}
-    >
+  const tileClassName = `group relative isolate flex flex-col justify-end overflow-hidden rounded-xl border ${padding} ${className} ${
+    onDark ? "border-foreground bg-foreground text-background" : "border-border bg-surface-subtle"
+  } ${item.link ? "focus-visible:ring-primary focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none" : ""}`;
+
+  const inner = (
+    <>
       {photoSrc ? (
         <>
           <Image
@@ -127,7 +126,7 @@ function DistanceTile({
             loading="lazy"
             placeholder="blur"
             blurDataURL={BLUR_DATA_URL}
-            className="-z-10 object-cover"
+            className="-z-10 object-cover transition-transform duration-300 ease-out group-hover:scale-105"
           />
           {/* Two layers, not one: these tiles are wider than they are tall
               (or, for the N=5 satellites, roughly square), so a single
@@ -156,8 +155,14 @@ function DistanceTile({
         {index + 1}
       </span>
 
-      <h3 className={`relative font-medium ${labelSize} leading-snug ${onDark ? "" : "text-foreground"}`}>
+      <h3 className={`relative flex items-center gap-1.5 font-medium ${labelSize} leading-snug ${onDark ? "" : "text-foreground"}`}>
         {item.label}
+        {item.link ? (
+          <ExternalLink
+            aria-hidden="true"
+            className={`shrink-0 opacity-70 ${size === "sm" ? "size-3" : "size-3.5"}`}
+          />
+        ) : null}
       </h3>
       <p
         className={`font-display tabular relative mt-1 leading-none font-semibold ${figureSize} ${
@@ -171,6 +176,16 @@ function DistanceTile({
           {mode}
         </p>
       ) : null}
-    </div>
+    </>
   );
+
+  if (item.link) {
+    return (
+      <a href={item.link} target="_blank" rel="noopener noreferrer" className={tileClassName}>
+        {inner}
+      </a>
+    );
+  }
+
+  return <div className={tileClassName}>{inner}</div>;
 }

@@ -15,10 +15,11 @@ type Item = {
   label: string;
   value: string;
   image: { storage_path: string; alt?: string | null } | null;
+  link: string | null;
 };
 
 function emptyItem(): Item {
-  return { label: "", value: "", image: null };
+  return { label: "", value: "", image: null, link: null };
 }
 
 export function DistancesEditor({
@@ -39,7 +40,9 @@ export function DistancesEditor({
   propertyImages: PropertyImage[];
 }) {
   const [items, setItems] = useState<Item[]>(
-    content.items.length ? content.items.map((i) => ({ ...i, image: i.image ?? null })) : [emptyItem()],
+    content.items.length
+      ? content.items.map((i) => ({ ...i, image: i.image ?? null, link: i.link ?? null }))
+      : [emptyItem()],
   );
   // Own copy rather than reading propertyImages directly: a photo uploaded
   // from inside this editor should be pickable for every landmark row
@@ -62,7 +65,12 @@ export function DistancesEditor({
         onSave({
           items: items
             .filter((it) => it.label.trim() && it.value.trim())
-            .map((it) => ({ label: it.label.trim(), value: it.value.trim(), image: it.image })),
+            .map((it) => ({
+              label: it.label.trim(),
+              value: it.value.trim(),
+              image: it.image,
+              link: it.link?.trim() || null,
+            })),
         });
       }}
       className="space-y-4"
@@ -70,7 +78,9 @@ export function DistancesEditor({
       <p className="text-text-muted text-sm">
         Up to {MAX_ITEMS} landmarks, shown as a photo grid — the first one leads, so put the nearest or most
         important one there. A photo is optional per landmark, and can be uploaded right here — it doesn&apos;t
-        have to already be in the Photos tab. Without one the tile falls back to just the figure.
+        have to already be in the Photos tab. Without one the tile falls back to just the figure. A link is
+        also optional — a Google Maps link is the usual case, but any URL works — and opens in a new tab when
+        the tile is clicked.
       </p>
 
       <div className="space-y-3">
@@ -107,6 +117,15 @@ export function DistancesEditor({
                 required
               />
             </div>
+
+            <Input
+              type="url"
+              value={item.link ?? ""}
+              onChange={(e) => patch(i, { link: e.target.value || null })}
+              placeholder="https://maps.app.goo.gl/… (optional)"
+              aria-label={`Landmark ${i + 1} link`}
+              className="h-10"
+            />
 
             <PropertyMediaPicker
               propertyId={propertyId}

@@ -86,6 +86,10 @@ export const blockSchemas = {
           label: z.string().min(1),
           value: z.string().min(1),
           image: imageRef.nullish(),
+          /** Opens in a new tab when the tile is clicked — a Google Maps
+           *  link is the expected case, but any URL works (a website, a
+           *  menu, etc). Optional: a tile with no link just isn't clickable. */
+          link: z.string().url().nullish(),
         }),
       )
       .min(1)
