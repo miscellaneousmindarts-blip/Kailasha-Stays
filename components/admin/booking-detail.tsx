@@ -107,7 +107,7 @@ export function BookingDetail({
 
       <PricingSection booking={booking} />
 
-      {booking.source === "direct" && booking.portal_token ? (
+      {booking.portal_token ? (
         <PortalLinkSection booking={booking} siteUrl={siteUrl} />
       ) : null}
 
