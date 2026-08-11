@@ -17,11 +17,18 @@ import { getSiteSettings } from "@/lib/settings";
 export const dynamic = "force-dynamic";
 
 /**
- * Per-booking rather than static: without this, every tenant's guest portal
- * tab carried the root layout's "| Stays in Vrindavan" suffix — a stray
- * white-label leak on the one page an already-confirmed guest actually
- * looks at by name. Falls back to the bare title for a token that doesn't
- * resolve, since there's no tenant to name at that point.
+ * Per-booking rather than static, and `absolute` rather than a plain string —
+ * both matter. A plain string title doesn't stop an ancestor template from
+ * wrapping around it, and per Next's own docs a layout's title.template
+ * never applies to a page.js at that same route segment anyway (it only
+ * reaches child segments), so there is no template to lean on here at all:
+ * without `absolute`, the closest one that DOES apply is the root layout's
+ * hardcoded "%s | Stays in Vrindavan" — the original single-tenant app's
+ * name, wrapped around this page's title regardless of which tenant's
+ * booking it actually is. Same fix already used by the tenant homepage
+ * (app/(public)/s/[tenant]/page.tsx's PRIMARY_HOME_METADATA / absolute).
+ * Falls back to the bare title for a token that doesn't resolve, since
+ * there's no tenant to name at that point.
  */
 export async function generateMetadata(
   props: PageProps<"/stay/[token]">,
@@ -31,7 +38,7 @@ export async function generateMetadata(
   const businessName = bundle?.settings?.business_name;
 
   return {
-    title: businessName ? `Your stay | ${businessName}` : "Your stay",
+    title: { absolute: businessName ? `Your stay | ${businessName}` : "Your stay" },
     robots: { index: false, follow: false },
   };
 }
