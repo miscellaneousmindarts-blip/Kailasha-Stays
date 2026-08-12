@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "seed": "node scripts/seed.mjs"
+    "seed": "node scripts/seed.mjs",
+    "migrations:status": "node scripts/migration-status.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
