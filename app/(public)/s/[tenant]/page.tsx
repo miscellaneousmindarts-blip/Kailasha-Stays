@@ -16,7 +16,7 @@ import { Close } from "@/components/landing/close";
 import { StickyBar } from "@/components/landing/sticky-bar";
 import { CustomSection } from "@/components/landing/custom-sections";
 import { getLandingBase, finalizePropertyImages, waContext } from "@/lib/landing";
-import { getHomepageContent } from "@/lib/homepage";
+import { fetchHomepageRows, resolveHomepageContent } from "@/lib/homepage";
 import { landingJsonLd } from "@/lib/landing-schema";
 import { getTenantBySlug, tenantBasePath, tenantSiteUrl } from "@/lib/tenant";
 import { getSiteSettings } from "@/lib/settings";
@@ -98,8 +98,20 @@ export default async function Home(props: PageProps<"/s/[tenant]">) {
   if (!tenant) notFound();
   const basePath = tenantBasePath(tenant);
 
-  const base = await getLandingBase(tenant.id);
-  const content = await getHomepageContent(tenant.id, base.settings, base.properties, base.primary);
+  // Concurrent, not sequential: fetchHomepageRows() needs only the tenant id,
+  // so waiting for getLandingBase() to come back first — as this used to —
+  // spent two round trips where one would do. Only the *resolution* step
+  // needs both, and by then neither is still in flight.
+  const [base, homepageRows] = await Promise.all([
+    getLandingBase(tenant.id),
+    fetchHomepageRows(tenant.id),
+  ]);
+  const content = resolveHomepageContent(
+    homepageRows,
+    base.settings,
+    base.properties,
+    base.primary,
+  );
   const { settings, properties, addons, primary } = finalizePropertyImages(base, content.fixedImageCount);
 
   const year = new Date().getFullYear();

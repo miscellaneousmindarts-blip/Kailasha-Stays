@@ -98,6 +98,14 @@
   --surface: #ffffff;
   --surface-subtle: #f7f7f5;
 
+  /* Loading placeholders. Deliberately NOT --surface-subtle: that sits at
+     #f7f7f5 on a #ffffff page, a contrast ratio of 1.07:1, which measured as
+     effectively invisible — every skeleton in the app read as a blank screen,
+     so the routes that did have a loading state still felt frozen. These two
+     tones are the shimmer's ends; both stay visible against the page. */
+  --skeleton-base: #e8e7e3;
+  --skeleton-sheen: #f2f1ee;
+
   --card: #ffffff;
   --card-foreground: #1a1a1a;
   --popover: #ffffff;
@@ -206,7 +214,8 @@
 
   /* one shimmer for every loading placeholder — §8.2 "skeletons, not spinners" */
   .skeleton {
-    @apply bg-surface-subtle rounded-md;
+    @apply rounded-md;
+    background-color: var(--skeleton-base);
     animation: var(--animate-shimmer);
   }
 
@@ -236,13 +245,19 @@
   }
 }
 
+/* Cycles between two tones that are both visible against the page, rather
+   than fading opacity toward it. The old version pulsed opacity 1 → 0.55,
+   which on an already-near-white fill made the placeholder disappear at the
+   midpoint instead of reading as motion. Ending on --skeleton-base matters:
+   under prefers-reduced-motion the global rule collapses this to a single
+   0.01ms run, so the final keyframe is what stays on screen. */
 @keyframes shimmer {
   0%,
   100% {
-    opacity: 1;
+    background-color: var(--skeleton-base);
   }
   50% {
-    opacity: 0.55;
+    background-color: var(--skeleton-sheen);
   }
 }
 

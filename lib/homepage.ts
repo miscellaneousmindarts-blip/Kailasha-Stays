@@ -473,12 +473,21 @@ type RawSection = {
   sort_order: number;
 };
 
-export async function getHomepageContent(
-  tenantId: string,
-  settings: SiteSettings,
-  properties: LandingProperty[],
-  primary: LandingProperty | null,
-): Promise<HomepageContent> {
+/** The homepage's own rows, before any token resolution. */
+export type HomepageRows = {
+  rows: RawSection[];
+  images: Map<string, HomepageImage>;
+};
+
+/**
+ * Fetches the homepage's sections and media. Keyed on the tenant alone — it
+ * needs nothing from getLandingBase() — which is the point of it being
+ * separate: the page can run this and getLandingBase() concurrently instead
+ * of paying two sequential round trips before anything renders. Resolution,
+ * which does need settings/properties/primary, happens afterwards in
+ * resolveHomepageContent() against data that is already in hand.
+ */
+export async function fetchHomepageRows(tenantId: string): Promise<HomepageRows> {
   const supabase = createPublicClient();
 
   const [sectionsResult, imagesResult] = await Promise.all([
@@ -513,8 +522,31 @@ export async function getHomepageContent(
       : (sectionsResult.data as RawSection[]);
 
   const imageRows = (imagesResult.data ?? []) as HomepageImage[];
-  const images = new Map(imageRows.map((row) => [row.id, row]));
+  return { rows, images: new Map(imageRows.map((row) => [row.id, row])) };
+}
 
+/** Fetch + resolve in one call, for callers with nothing to parallelise. */
+export async function getHomepageContent(
+  tenantId: string,
+  settings: SiteSettings,
+  properties: LandingProperty[],
+  primary: LandingProperty | null,
+): Promise<HomepageContent> {
+  return resolveHomepageContent(
+    await fetchHomepageRows(tenantId),
+    settings,
+    properties,
+    primary,
+  );
+}
+
+/** Pure: turns fetched rows into the render-ready section order. */
+export function resolveHomepageContent(
+  { rows, images }: HomepageRows,
+  settings: SiteSettings,
+  properties: LandingProperty[],
+  primary: LandingProperty | null,
+): HomepageContent {
   const ctx = buildTokenCtx(settings, properties, primary);
   const used = new Set<string>();
   const order: HomepageSectionEntry[] = [];
