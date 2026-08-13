@@ -19,6 +19,13 @@ export type PlatformProperty = {
   /** "/s/{slug}" — always the path form; see proxy.ts, it serves unrewritten
    *  regardless of whether the tenant also has its own subdomain. */
   basePath: string;
+  /** The PERSON's name ("Kamal Kishan"), from site_settings.host_name — not
+   *  business_name ("Kailasha Stays"). "Hosted by Kailasha Stays" reads like
+   *  a company; "Hosted by Kamal Kishan" is the thing that makes this a
+   *  network of real local families rather than a listings aggregator,
+   *  which is the entire point of naming the host on each card. Falls back
+   *  to business_name only for a tenant that hasn't set host_name yet — a
+   *  business-name fallback beats no attribution at all. */
   hostName: string;
   distanceFromTemple: LandingDistance | null;
   /** Parsed minutes from distanceFromTemple's "…15 min walk" tail, when the
@@ -45,7 +52,13 @@ type Row = {
   property_sections:
     | { type: string; content: unknown; visible: boolean; audience: string }[]
     | null;
-  tenants: { slug: string; status: string; site_settings: { business_name: string } | null } | null;
+  tenants:
+    | {
+        slug: string;
+        status: string;
+        site_settings: { business_name: string; host_name: string | null } | null;
+      }
+    | null;
   // booking_channels(*) via wildcard so this query never breaks if
   // rating/review_count/ratings_checked_at (0026) haven't been applied yet —
   // those fields are simply absent from the row until the migration runs,
@@ -101,7 +114,7 @@ export const getPlatformProperties = cache(async (): Promise<PlatformProperty[]>
       `id, slug, title, max_guests, bedrooms, bathrooms, base_price, currency, amenities, sort_order,
        property_images(storage_path, alt, is_cover, sort_order),
        property_sections(type, content, visible, audience),
-       tenants!inner(slug, status, site_settings(business_name)),
+       tenants!inner(slug, status, site_settings(business_name, host_name)),
        booking_channels(*)`,
     )
     .eq("status", "published")
@@ -143,7 +156,11 @@ export const getPlatformProperties = cache(async (): Promise<PlatformProperty[]>
       amenities: row.amenities ?? [],
       images,
       basePath: `/s/${row.tenants?.slug ?? ""}`,
-      hostName: row.tenants?.site_settings?.business_name ?? row.tenants?.slug ?? "",
+      hostName:
+        row.tenants?.site_settings?.host_name ??
+        row.tenants?.site_settings?.business_name ??
+        row.tenants?.slug ??
+        "",
       distanceFromTemple: distance,
       walkMinutes: parseWalkMinutes(distance),
       airbnb,
