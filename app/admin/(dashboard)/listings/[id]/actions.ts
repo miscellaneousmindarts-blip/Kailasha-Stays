@@ -1121,6 +1121,9 @@ type ChannelFields = {
   price_mode: ChannelPriceMode;
   markup_pct: number | null;
   fixed_nightly: number | null;
+  rating: number | null;
+  review_count: number | null;
+  ratings_checked_at: string | null;
 };
 
 /** Shared by add and update: validates and shapes the public half. */
@@ -1169,6 +1172,15 @@ function readChannelFields(
     };
   }
 
+  const rating = numField(formData, "rating");
+  if (rating !== null && rating !== undefined && (rating < 0 || rating > 5)) {
+    return { ok: false, error: "Rating should be between 0 and 5." };
+  }
+  const reviewCount = numField(formData, "review_count");
+  if (reviewCount !== null && reviewCount !== undefined && reviewCount < 0) {
+    return { ok: false, error: "Review count can't be negative." };
+  }
+
   return {
     ok: true,
     fields: {
@@ -1178,6 +1190,12 @@ function readChannelFields(
       price_mode: mode,
       markup_pct: mode === "markup" ? (markup as number) : null,
       fixed_nightly: mode === "fixed" ? (fixed as number) : null,
+      // Both null or both set — a rating with no count (or vice versa) can't
+      // render the "★ 4.9 (32 reviews)" line the homes grid wants, so
+      // there's no point keeping half a pair.
+      rating: rating && reviewCount ? rating : null,
+      review_count: rating && reviewCount ? reviewCount : null,
+      ratings_checked_at: rating && reviewCount ? new Date().toISOString().slice(0, 10) : null,
     },
   };
 }

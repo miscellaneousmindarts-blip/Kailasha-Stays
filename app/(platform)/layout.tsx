@@ -1,19 +1,29 @@
 import type { Metadata } from "next";
 
+import { PLATFORM_SITE_URL } from "@/lib/platform-content";
+
 /**
  * The platform's own identity — not any tenant's. Overrides the root
  * layout's "Stays in Vrindavan" default the same way the tenant layout
  * (app/(public)/s/[tenant]/layout.tsx) overrides it per tenant; this is the
  * third identity now sharing the root layout, for the apex itself.
+ *
+ * docs/apex-page-plan.md §5: title/description are the strategy doc's
+ * proposed values, aimed at the "homestay in Deoghar" / "family flat"
+ * cluster rather than the old B2B "we build booking sites" pitch — the
+ * apex is now the guest-facing marketplace, and the host pitch moved to
+ * §S11's band further down the same page.
  */
 export const metadata: Metadata = {
   // `absolute`, not a plain string: a plain string is a %s slot the ROOT
   // layout's "%s | Stays in Vrindavan" template would still wrap around —
   // exactly the leak the tenant layout already had to guard against the
   // same way. `absolute` is the one form no ancestor template touches.
-  title: { absolute: "Deoghar BnB — direct-booking sites for homestay owners" },
+  title: { absolute: "Homestays & Family Flats in Deoghar Near Baba Baidyanath" },
   description:
-    "We build and host direct-booking websites for homestay and guesthouse owners near Baba Baidyanath Dham, Deoghar.",
+    "Verified whole-flat homestays in Deoghar, minutes from Baba Baidyanath Dham. Fixed prices in writing, free cancellation, pooja & pickup arranged.",
+  alternates: { canonical: PLATFORM_SITE_URL },
+  robots: { index: true, follow: true },
 };
 
 export default function PlatformLayout({

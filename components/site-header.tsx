@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 
 import { homepageImageUrl } from "@/lib/images";
+import { resolvePlatformLogoSrc } from "@/lib/platform-assets";
 import type { PublicSiteBranding } from "@/lib/types/database";
 
 /**
@@ -17,7 +18,11 @@ export function SiteHeader({
   /** "" for the tenant served at the bare domain, "/s/{slug}" otherwise. */
   basePath: string;
 }) {
-  const logoSrc = homepageImageUrl(settings.logo_path);
+  // A tenant's own logo always wins. Only a host with NO logo of their own
+  // falls through to the platform mark — this used to fall straight to the
+  // business name as plain text, so a host who hasn't uploaded anything got
+  // a bare wordmark-less header instead of a real mark.
+  const logoSrc = homepageImageUrl(settings.logo_path) ?? resolvePlatformLogoSrc();
 
   return (
     <header className="border-border sticky top-0 z-40 border-b bg-[rgba(255,255,255,0.85)] backdrop-blur-md">

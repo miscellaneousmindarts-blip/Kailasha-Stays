@@ -374,6 +374,10 @@ export type BookingChannel = {
   fixed_nightly: number | null;
   sort_order: number;
   active: boolean;
+  /** Admin-entered, e.g. from the Airbnb listing — never fetched automatically (0026). */
+  rating: number | null;
+  review_count: number | null;
+  ratings_checked_at: string | null;
   created_at: string;
   updated_at: string;
 };

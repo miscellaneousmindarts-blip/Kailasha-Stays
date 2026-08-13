@@ -1,0 +1,35 @@
+import { Star } from "lucide-react";
+
+import { Eyebrow, Section } from "@/components/landing/primitives";
+import { PLATFORM_REVIEWS } from "@/lib/platform-content";
+
+/**
+ * docs/apex-page-plan.md §S10. No aggregate figure ("★ 4.8 average from 56
+ * reviews") is shown — none exists anywhere in the database to back one
+ * (see lib/platform-content.ts's comment on PLATFORM_REVIEWS), and an
+ * unbacked AggregateRating claim is exactly the kind of thing this page is
+ * otherwise built to avoid. The reviews speak for themselves instead.
+ */
+export function SocialProof() {
+  if (!PLATFORM_REVIEWS.length) return null;
+
+  return (
+    <Section band="sand">
+      <Eyebrow en="What families tell us afterwards" />
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        {PLATFORM_REVIEWS.map((review) => (
+          <div key={review.name} className="bg-surface border-border rounded-xl border p-5">
+            <div className="flex items-center gap-0.5" aria-hidden="true">
+              {Array.from({ length: review.stars }).map((_, i) => (
+                <Star key={i} className="text-primary size-3.5 fill-current" />
+              ))}
+            </div>
+            <p className="mt-3 text-sm leading-relaxed">{review.quote}</p>
+            <p className="mt-3 text-sm font-medium">{review.name}</p>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}

@@ -341,6 +341,10 @@ function ChannelForm({
       ? String(channel.markup_pct)
       : "15",
   );
+  const [rating, setRating] = useState(channel?.rating != null ? String(channel.rating) : "");
+  const [reviewCount, setReviewCount] = useState(
+    channel?.review_count != null ? String(channel.review_count) : "",
+  );
 
   const markupNum = Number(markup);
   const preview =
@@ -481,6 +485,44 @@ function ChannelForm({
           </div>
         ) : null}
       </fieldset>
+
+      <div className="space-y-2">
+        <Label>Rating shown on the Deoghar BnB homepage (optional)</Label>
+        <div className="flex items-center gap-2">
+          <Input
+            name="rating"
+            type="number"
+            min={0}
+            max={5}
+            step="0.1"
+            inputMode="decimal"
+            value={rating}
+            onChange={(e) => setRating(e.target.value)}
+            placeholder="4.9"
+            className="h-11 max-w-24"
+            aria-label="Rating out of 5"
+          />
+          <span className="text-text-muted text-sm">out of 5,</span>
+          <Input
+            name="review_count"
+            type="number"
+            min={0}
+            step="1"
+            inputMode="numeric"
+            value={reviewCount}
+            onChange={(e) => setReviewCount(e.target.value)}
+            placeholder="32"
+            className="h-11 max-w-24"
+            aria-label="Number of reviews"
+          />
+          <span className="text-text-muted text-sm">reviews</span>
+        </div>
+        <p className="text-text-muted text-xs">
+          Typed in by you from the {name || "platform"} listing — we don&apos;t fetch this
+          automatically. Shows as &ldquo;Also on {name || "Airbnb"} · ★ 4.9 (32 reviews)&rdquo; on
+          the homes grid at deogharbnb.space. Leave both blank to hide the line.
+        </p>
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="channel_ical">Calendar sync link (optional)</Label>
