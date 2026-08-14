@@ -25,6 +25,7 @@ import {
 import { EditTenantModal } from "@/components/superadmin/edit-tenant-modal";
 import type { TenantRow } from "@/lib/superadmin/types";
 import { tenantSiteUrl } from "@/lib/tenant";
+import { PLATFORM_SITE_URL } from "@/lib/platform-content";
 import type { TenantStatus } from "@/lib/types/database";
 
 const STATUS_STYLES: Record<TenantStatus, string> = {
@@ -215,9 +216,13 @@ export function TenantCard({ tenant }: { tenant: TenantRow }) {
     }
   }
 
-  // Absolute, not a base path: once a tenant is on its own host, a relative
-  // link from the console would point at the console's host instead of theirs.
-  const publicHref = tenantSiteUrl(tenant) || "/";
+  // A 'listing' tenant has no site of their own to link to (their subdomain
+  // 404s by design — see getTenantBySlug's gate) — send superadmin to the
+  // apex instead, where their properties actually show up.
+  // Absolute, not a base path: once a branded tenant is on its own host, a
+  // relative link from the console would point at the console's host instead
+  // of theirs.
+  const publicHref = tenant.plan === "listing" ? PLATFORM_SITE_URL : tenantSiteUrl(tenant) || "/";
 
   return (
     <li className="border-border rounded-lg border p-4">
@@ -229,6 +234,9 @@ export function TenantCard({ tenant }: { tenant: TenantRow }) {
               className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[tenant.status]}`}
             >
               {tenant.status.replace("_", " ")}
+            </span>
+            <span className="bg-muted text-text-muted shrink-0 rounded-full px-2.5 py-1 text-xs font-medium">
+              {tenant.plan === "listing" ? "Listing" : "Branded"}
             </span>
           </div>
           <p className="text-text-muted mt-1 truncate text-sm">
@@ -259,7 +267,7 @@ export function TenantCard({ tenant }: { tenant: TenantRow }) {
             rel="noopener noreferrer"
             className="border-border hover:bg-surface-subtle pressable flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium"
           >
-            View site
+            {tenant.plan === "listing" ? "View on Deoghar BnB" : "View site"}
             <ExternalLink className="size-3.5" aria-hidden="true" />
           </a>
         ) : null}

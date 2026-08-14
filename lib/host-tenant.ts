@@ -38,3 +38,18 @@ export async function getTenantForRequestHost(): Promise<PublicTenant | null> {
 
   return getTenantBySlug(publicEnv.primaryTenantSlug);
 }
+
+/**
+ * True only when the CURRENT request's host is the platform domain itself.
+ *
+ * A separate check from getTenantForRequestHost() on purpose: that function
+ * returns null both for the platform host AND for a tenant subdomain whose
+ * slug fails to resolve (unknown or suspended) — two cases sitemap.ts (0027,
+ * docs/tenant-plans-plan.md §7.2) needs to tell apart. Serving the apex's
+ * sitemap on a bad tenant subdomain would be exactly the leak
+ * getTenantForRequestHost()'s own null already exists to prevent.
+ */
+export async function isPlatformRequestHost(): Promise<boolean> {
+  const host = (await headers()).get("host");
+  return resolveHost(host).kind === "platform";
+}

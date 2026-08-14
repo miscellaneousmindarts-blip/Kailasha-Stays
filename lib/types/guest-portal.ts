@@ -2,7 +2,7 @@
  *  supabase/migrations/0001_init.sql) — hand-maintained the same way as
  *  lib/types/database.ts. */
 
-import type { BookingCharge, NightlyRateEntry } from "@/lib/types/database";
+import type { BookingCharge, NightlyRateEntry, TenantPlan } from "@/lib/types/database";
 
 export type GuestBookingBundle = {
   booking: {
@@ -90,4 +90,8 @@ export type GuestBookingBundle = {
     legal_name: string | null;
     footer_note: string | null;
   } | null;
+  /** 'listing' (Plan A) tenants have no site or branding of their own
+   *  (0027) — app/(public)/stay/[token]/layout.tsx uses this to render
+   *  Deoghar BnB's own identity instead of `settings` for them (0028). */
+  tenant_plan: TenantPlan;
 };

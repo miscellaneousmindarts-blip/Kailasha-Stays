@@ -13,6 +13,7 @@ import { HouseRulesFooter } from "@/components/guest-portal/house-rules-footer";
 import { InvalidToken } from "@/components/guest-portal/invalid-token";
 import { getBookingBundle } from "@/lib/guest-portal";
 import { getSiteSettings } from "@/lib/settings";
+import { PLATFORM_NAME } from "@/lib/platform-content";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,11 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { token } = await props.params;
   const bundle = await getBookingBundle(token);
-  const businessName = bundle?.settings?.business_name;
+  // 'listing' (Plan A) tenants have no site or branding of their own —
+  // Deoghar BnB names itself here instead, same rule as the layout's
+  // withPlatformPortalBranding() (0027, 0028, docs/tenant-plans-plan.md §6).
+  const businessName =
+    bundle?.tenant_plan === "listing" ? PLATFORM_NAME : bundle?.settings?.business_name;
 
   return {
     title: { absolute: businessName ? `Your stay | ${businessName}` : "Your stay" },

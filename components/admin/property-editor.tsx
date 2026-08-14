@@ -39,12 +39,20 @@ export function PropertyEditor({
   property,
   addons,
   settings,
-  siteUrl,
+  liveUrl,
+  liveLabel,
 }: {
   property: PropertyForEdit;
   addons: (AddonService & { enabled: boolean })[];
   settings: SiteSettings;
-  siteUrl: string;
+  /** Where this property is actually reachable — see StatusControls. */
+  liveUrl: string;
+  /** The path shown as the "this is where it lives" label under the title —
+   *  "/properties/{slug}" for a branded tenant, "/stays/{public_slug}" for a
+   *  listing tenant. Kept separate from liveUrl since this is display text,
+   *  not a link (liveUrl is absolute; this is the path a guest actually
+   *  sees). */
+  liveLabel: string;
 }) {
   const [tab, setTab] = useState<Tab>("Basics");
 
@@ -63,15 +71,14 @@ export function PropertyEditor({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-semibold">{property.title}</h1>
-          <p className="text-text-muted text-sm">/properties/{property.slug}</p>
+          <p className="text-text-muted text-sm">{liveLabel}</p>
         </div>
       </div>
 
       <div className="mt-4">
         <StatusControls
           propertyId={property.id}
-          slug={property.slug}
-          siteUrl={siteUrl}
+          liveUrl={liveUrl}
           title={property.title}
           status={property.status}
         />

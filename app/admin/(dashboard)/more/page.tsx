@@ -3,7 +3,8 @@ import Link from "next/link";
 import { ChevronRight, LogOut } from "lucide-react";
 
 import { signOut } from "@/app/admin/(dashboard)/actions";
-import { MORE_GROUPS } from "@/lib/admin/nav";
+import { requireTenant } from "@/lib/admin/auth";
+import { moreGroupsFor } from "@/lib/admin/nav";
 
 export const metadata: Metadata = { title: "More" };
 
@@ -20,7 +21,10 @@ export const metadata: Metadata = { title: "More" };
  * but the page still renders at any width rather than hiding itself, so a
  * bookmarked or shared /admin/more never resolves to a blank screen.
  */
-export default function MorePage() {
+export default async function MorePage() {
+  const { tenant } = await requireTenant();
+  const moreGroups = moreGroupsFor(tenant.plan);
+
   return (
     <div className="max-w-2xl space-y-8">
       <div>
@@ -30,7 +34,7 @@ export default function MorePage() {
         </p>
       </div>
 
-      {MORE_GROUPS.map((group) => (
+      {moreGroups.map((group) => (
         <section key={group.label}>
           <h2 className="text-text-muted mb-2 px-1 text-[11px] font-semibold tracking-[0.08em] uppercase">
             {group.label}

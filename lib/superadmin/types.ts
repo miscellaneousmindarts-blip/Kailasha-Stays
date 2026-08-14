@@ -1,4 +1,4 @@
-import type { Tenant, TenantStatus } from "@/lib/types/database";
+import type { Tenant, TenantPlan, TenantStatus } from "@/lib/types/database";
 
 /**
  * Shapes and constants shared between the superadmin server queries and the
@@ -32,3 +32,10 @@ export const TENANT_STATUSES: TenantStatus[] = [
   "suspended",
   "cancelled",
 ];
+
+export const TENANT_PLANS: TenantPlan[] = ["listing", "branded"];
+
+export const TENANT_PLAN_LABEL: Record<TenantPlan, string> = {
+  listing: "Listing — apex only, no site of their own",
+  branded: "Branded — own subdomain + homepage",
+};

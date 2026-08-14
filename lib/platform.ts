@@ -300,3 +300,25 @@ export async function listPlatformPropertyPublicSlugs(): Promise<string[]> {
     .eq("tenants.status", "active");
   return (data ?? []).map((p) => p.public_slug);
 }
+
+/**
+ * 'listing' (Plan A) properties only, for the apex's own sitemap.xml (0027,
+ * docs/tenant-plans-plan.md §7.2). A 'branded' tenant's property already
+ * appears in THEIR OWN tenant sitemap (lib/queries.ts's
+ * listPropertiesForSitemap()) and their page stays canonical there — listing
+ * it a second time here, where /stays/[slug] itself points its canonical
+ * tag AWAY at that other page, would tell a crawler to index a URL that
+ * immediately disclaims itself.
+ */
+export async function listListingPlanPropertiesForSitemap(): Promise<
+  { public_slug: string; updated_at: string }[]
+> {
+  const supabase = createPublicClient();
+  const { data } = await supabase
+    .from("properties")
+    .select("public_slug, updated_at, tenants!inner(status, plan)")
+    .eq("status", "published")
+    .eq("tenants.status", "active")
+    .eq("tenants.plan", "listing");
+  return (data ?? []).map((p) => ({ public_slug: p.public_slug, updated_at: p.updated_at }));
+}

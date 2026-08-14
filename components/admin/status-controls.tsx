@@ -19,19 +19,22 @@ const STATUS_STYLES: Record<PropertyStatus, string> = {
 
 export function StatusControls({
   propertyId,
-  slug,
-  siteUrl,
+  liveUrl,
   title,
   status,
 }: {
   propertyId: string;
-  slug: string;
   /**
-   * Absolute root of the tenant's public site. Absolute rather than a base
-   * path because the admin panel is on a different host from the site it is
-   * editing — a relative link here would resolve against the admin host.
+   * The full absolute URL this property is actually reachable at — computed
+   * by the caller (app/admin/(dashboard)/listings/[id]/page.tsx), which
+   * knows the tenant's plan: a 'branded' tenant's own site
+   * (siteUrl/properties/{slug}), or a 'listing' tenant's apex page
+   * (deogharbnb.space/stays/{public_slug}) — the only place their property
+   * exists (0027, docs/tenant-plans-plan.md). Passed pre-built rather than
+   * assembled here so this component doesn't have to know which plan it's
+   * looking at.
    */
-  siteUrl: string;
+  liveUrl: string;
   title: string;
   status: PropertyStatus;
 }) {
@@ -62,7 +65,7 @@ export function StatusControls({
 
       {status === "published" ? (
         <a
-          href={`${siteUrl}/properties/${slug}`}
+          href={liveUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="border-border hover:bg-surface-subtle pressable flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium"

@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 
+import { requireTenant } from "@/lib/admin/auth";
 import { SettingsTabs } from "@/components/admin/settings/settings-tabs";
 import { getSiteSettingsAdmin } from "@/lib/admin/queries";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function AdminSettingsPage() {
-  const settings = await getSiteSettingsAdmin();
+  const [{ tenant }, settings] = await Promise.all([requireTenant(), getSiteSettingsAdmin()]);
 
   return (
     <div>
@@ -16,7 +17,7 @@ export default async function AdminSettingsPage() {
       </p>
 
       <div className="mt-6">
-        <SettingsTabs settings={settings} />
+        <SettingsTabs settings={settings} plan={tenant.plan} />
       </div>
     </div>
   );

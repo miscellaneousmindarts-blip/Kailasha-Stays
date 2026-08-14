@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { useSaveAction } from "@/components/admin/use-save-action";
 import { createTenant } from "@/app/superadmin/actions";
 import { publicEnv } from "@/lib/env";
+import { TENANT_PLAN_LABEL, TENANT_PLANS } from "@/lib/superadmin/types";
+import type { TenantPlan } from "@/lib/types/database";
 
 export function CreateTenantForm() {
   const action = useSaveAction(createTenant);
@@ -15,6 +17,9 @@ export function CreateTenantForm() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
+  // 'listing' default matches the column's own default (0027) — most new
+  // tenants start here; a branded site is the deliberate upgrade.
+  const [plan, setPlan] = useState<TenantPlan>("listing");
 
   // Shown as a preview only — the server derives and de-duplicates the real
   // slug, so this can be a rough guess without risking a mismatch.
@@ -35,11 +40,29 @@ export function CreateTenantForm() {
           setName("");
           setSlug("");
           setOwnerEmail("");
+          setPlan("listing");
           formRef.current?.reset();
         }
       }}
       className="max-w-xl space-y-4"
     >
+      <div className="space-y-2">
+        <Label htmlFor="tenant_plan">Plan</Label>
+        <select
+          id="tenant_plan"
+          name="plan"
+          value={plan}
+          onChange={(e) => setPlan(e.target.value as TenantPlan)}
+          className="border-border h-11 w-full rounded-md border bg-transparent px-3"
+        >
+          {TENANT_PLANS.map((p) => (
+            <option key={p} value={p}>
+              {TENANT_PLAN_LABEL[p]}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="tenant_name">Business name</Label>
@@ -84,12 +107,24 @@ export function CreateTenantForm() {
       </div>
 
       <p className="text-text-muted text-sm">
-        Their site will be at{" "}
-        <code className="bg-surface-subtle rounded px-1 py-0.5">
-          {platformDomain ? `${previewSlug}.${platformDomain}` : `/s/${previewSlug}`}
-        </code>
-        . A number is appended if that&apos;s already taken. Changeable later from Edit
-        details.
+        {plan === "branded" ? (
+          <>
+            Their site will be at{" "}
+            <code className="bg-surface-subtle rounded px-1 py-0.5">
+              {platformDomain ? `${previewSlug}.${platformDomain}` : `/s/${previewSlug}`}
+            </code>
+            . A number is appended if that&apos;s already taken. Changeable later from Edit
+            details.
+          </>
+        ) : (
+          <>
+            No site of their own — their properties list on{" "}
+            <code className="bg-surface-subtle rounded px-1 py-0.5">
+              {platformDomain ?? "the apex"}
+            </code>{" "}
+            once published. They still get a full admin login. Changeable later from Edit details.
+          </>
+        )}
       </p>
 
       {action.error ? (

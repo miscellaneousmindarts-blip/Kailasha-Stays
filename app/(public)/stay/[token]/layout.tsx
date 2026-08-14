@@ -3,6 +3,7 @@ import { SiteHeader } from "@/components/site-header";
 import { brandColorStyle } from "@/lib/brand-color";
 import { getBookingBundle } from "@/lib/guest-portal";
 import { getSiteSettings } from "@/lib/settings";
+import { withPlatformPortalBranding } from "@/lib/platform-content";
 import type { PublicSiteBranding } from "@/lib/types/database";
 
 /**
@@ -21,6 +22,14 @@ import type { PublicSiteBranding } from "@/lib/types/database";
  * Only for a token that DOESN'T resolve is there no tenant to be the booking
  *'s — that genuinely can't be known from an invalid link, so it falls back
  * to the primary tenant, same as before this phase.
+ *
+ * A 'listing' (Plan A) tenant's booking gets Deoghar BnB's own visual
+ * identity instead of theirs (0027, 0028, docs/tenant-plans-plan.md §6) —
+ * they have no site or branding anywhere else, so showing their
+ * business_name/logo here would name a business that doesn't otherwise
+ * exist. withPlatformPortalBranding() only swaps the visual fields; the
+ * WhatsApp number and phone/email stay the tenant's own real ones, since
+ * those are how the guest actually reaches the host servicing their stay.
  */
 export default async function GuestPortalLayout({
   children,
@@ -29,7 +38,9 @@ export default async function GuestPortalLayout({
   const { token } = await params;
   const bundle = await getBookingBundle(token);
 
-  const settings: PublicSiteBranding = bundle?.settings ?? (await getSiteSettings());
+  const rawSettings: PublicSiteBranding = bundle?.settings ?? (await getSiteSettings());
+  const settings =
+    bundle?.tenant_plan === "listing" ? withPlatformPortalBranding(rawSettings) : rawSettings;
 
   return (
     <div style={brandColorStyle(settings.brand_color)} className="contents">

@@ -31,6 +31,7 @@ export default async function AdminDashboardLayout({
         userEmail={user.email ?? ""}
         tenantName={tenant.name}
         isSuperadmin={isSuperadmin}
+        plan={tenant.plan}
       >
         {children}
       </AdminShell>

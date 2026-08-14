@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Inbox } from "lucide-react";
+import { AlertTriangle, ArrowRight, ExternalLink, Inbox } from "lucide-react";
 
+import { requireTenant } from "@/lib/admin/auth";
 import {
   countNewEnquiries,
   listAllProperties,
@@ -8,6 +9,7 @@ import {
   listUpcomingStays,
 } from "@/lib/admin/queries";
 import { formatDate } from "@/lib/format";
+import { PLATFORM_SITE_URL } from "@/lib/platform-content";
 
 const PLATFORM_LABEL: Record<string, string> = {
   airbnb: "Airbnb",
@@ -24,7 +26,8 @@ const SOURCE_STYLES: Record<string, string> = {
 };
 
 export default async function AdminDashboardPage() {
-  const [properties, newEnquiries, upcomingStays, syncWarnings] = await Promise.all([
+  const [{ tenant }, properties, newEnquiries, upcomingStays, syncWarnings] = await Promise.all([
+    requireTenant(),
     listAllProperties(),
     countNewEnquiries(),
     listUpcomingStays(7),
@@ -37,6 +40,23 @@ export default async function AdminDashboardPage() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-semibold">Dashboard</h1>
       <p className="text-text-muted mt-1">An overview of your listings and stays.</p>
+
+      {tenant.plan === "listing" ? (
+        <a
+          href={PLATFORM_SITE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="border-border hover:bg-surface-subtle pressable mt-4 flex items-center justify-between gap-3 rounded-lg border p-4"
+        >
+          <span className="text-sm">
+            <span className="font-medium">Your homes are listed on Deoghar BnB.</span>{" "}
+            <span className="text-text-muted">
+              No homepage of your own on this plan — guests find and book you there.
+            </span>
+          </span>
+          <ExternalLink className="text-text-muted size-4 shrink-0" aria-hidden="true" />
+        </a>
+      ) : null}
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="border-border rounded-lg border p-4">

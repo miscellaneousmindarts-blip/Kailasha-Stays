@@ -13,7 +13,7 @@ import {
 } from "@/lib/impersonation";
 import { defaultTenantHost, HOSTNAME_RE, isReservedLabel } from "@/lib/hosts";
 import { slugify } from "@/lib/slug";
-import type { TenantStatus } from "@/lib/types/database";
+import type { TenantPlan, TenantStatus } from "@/lib/types/database";
 
 export type ActionResult = { error?: string; success?: boolean };
 
@@ -70,6 +70,8 @@ const VALID_STATUSES: TenantStatus[] = [
   "cancelled",
 ];
 
+const VALID_PLANS: TenantPlan[] = ["listing", "branded"];
+
 export async function createTenant(formData: FormData): Promise<ActionResult> {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Enter a business name." };
@@ -89,6 +91,13 @@ export async function createTenant(formData: FormData): Promise<ActionResult> {
   if (isReservedLabel(base)) {
     return { error: `"${base}" is reserved for the platform — choose a different slug.` };
   }
+
+  // 'listing' if the field is missing entirely, matching the column's own
+  // default (0027) — the form always sends one, but a stale cached form or
+  // a direct POST shouldn't silently create a 'branded' tenant instead.
+  const planRaw = String(formData.get("plan") ?? "listing");
+  if (!VALID_PLANS.includes(planRaw as TenantPlan)) return { error: "Unknown plan." };
+  const plan = planRaw as TenantPlan;
 
   const { supabase } = await requireSuperadmin();
 
@@ -110,16 +119,26 @@ export async function createTenant(formData: FormData): Promise<ActionResult> {
   // shouldn't have a live public site. Manual confirmation of payment is
   // what moves it to 'active' (Edit details, or the quick Activate action).
   //
-  // canonical_host is set here, not left null — this is the actual point of
-  // phase C: a new tenant gets its own subdomain from the moment it exists,
-  // rather than sitting on the legacy /s/{slug} path until someone remembers
-  // to flip it. defaultTenantHost() returns null only when no platform
-  // domain is configured at all, which the superadmin console has no UI for
-  // fixing anyway — falling back to the old path-based site is the right
-  // behaviour for that case, not an error.
+  // canonical_host is only set for a 'branded' tenant — this is the actual
+  // point of phase C: a new BRANDED tenant gets its own subdomain from the
+  // moment it exists, rather than sitting on the legacy /s/{slug} path until
+  // someone remembers to flip it. A 'listing' (Plan A) tenant gets none at
+  // all: they have no site of their own to serve (0027,
+  // docs/tenant-plans-plan.md), and giving them a subdomain host would be a
+  // dead pointer to a page the tenant layout 404s outright.
+  // defaultTenantHost() returns null only when no platform domain is
+  // configured at all, which the superadmin console has no UI for fixing
+  // anyway — falling back to the old path-based site is the right behaviour
+  // for that case, not an error.
   const { data: tenant, error } = await supabase
     .from("tenants")
-    .insert({ name, slug, status: "invited", canonical_host: defaultTenantHost(slug) })
+    .insert({
+      name,
+      slug,
+      status: "invited",
+      plan,
+      canonical_host: plan === "branded" ? defaultTenantHost(slug) : null,
+    })
     .select("id, slug")
     .single();
 
@@ -158,8 +177,8 @@ export async function inviteOwner(tenantId: string, email: string): Promise<Acti
 }
 
 /**
- * Edit a tenant's identity: name, slug, canonical host, status. One form
- * rather than separate actions per field, because these four are edited
+ * Edit a tenant's identity: name, slug, canonical host, status, plan. One
+ * form rather than separate actions per field, because these are edited
  * together in the console (phase C5) and a single round trip means a
  * half-applied edit can't happen.
  */
@@ -178,6 +197,10 @@ export async function updateTenant(
     return { error: `"${slug}" is reserved for the platform — choose a different slug.` };
   }
 
+  const planRaw = String(formData.get("plan") ?? "listing");
+  if (!VALID_PLANS.includes(planRaw as TenantPlan)) return { error: "Unknown plan." };
+  const plan = planRaw as TenantPlan;
+
   const canonicalHostRaw = String(formData.get("canonical_host") ?? "")
     .trim()
     .toLowerCase();
@@ -194,7 +217,16 @@ export async function updateTenant(
     .update({
       name,
       slug,
-      canonical_host: canonicalHostRaw || null,
+      plan,
+      // Forced null for 'listing' regardless of what the form field holds —
+      // not just a UI nicety (edit-tenant-modal.tsx already hides this field
+      // for that plan), but enforced here too, because a listing tenant's
+      // subdomain 404s outright (0027) and a stale canonical_host left
+      // pointing at it would be a dead link with nothing to catch it later.
+      // This is also what makes downgrading branded → listing actually take
+      // the old site's host down, not just stop it from being how their
+      // property is reached going forward.
+      canonical_host: plan === "listing" ? null : canonicalHostRaw || null,
       status,
     })
     .eq("id", tenantId);

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 
+import { requireTenant } from "@/lib/admin/auth";
 import { HomepageShell } from "@/components/admin/homepage/homepage-shell";
 import { getSiteSettingsAdmin } from "@/lib/admin/queries";
 import { readHomepageSections } from "./actions";
@@ -8,7 +10,17 @@ import { readHomepageImages } from "./media-actions";
 
 export const metadata: Metadata = { title: "Homepage" };
 
+/**
+ * notFound() for a 'listing' (Plan A) tenant — they have no homepage of
+ * their own to edit (0027, docs/tenant-plans-plan.md §5). Gated here, not
+ * just by hiding the nav link: a hidden link is not access control, and a
+ * listing tenant typing this URL directly must not reach a working editor
+ * for a page that isn't actually served anywhere.
+ */
 export default async function HomepageSettingsPage() {
+  const { tenant } = await requireTenant();
+  if (tenant.plan === "listing") notFound();
+
   const [sections, images, settings] = await Promise.all([
     readHomepageSections(),
     readHomepageImages(),

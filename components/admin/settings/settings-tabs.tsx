@@ -7,10 +7,10 @@ import { ContactSettingsForm } from "@/components/admin/settings/contact-setting
 import { BookingPolicyForm } from "@/components/admin/settings/booking-policy-form";
 import { StayDefaultsForm } from "@/components/admin/settings/stay-defaults-form";
 import { BrandSettingsForm } from "@/components/admin/settings/brand-settings-form";
-import type { SiteSettings } from "@/lib/types/database";
+import type { SiteSettings, TenantPlan } from "@/lib/types/database";
 
-const TABS = ["Business details", "Brand", "Booking policy", "Stay defaults"] as const;
-type Tab = (typeof TABS)[number];
+const ALL_TABS = ["Business details", "Brand", "Booking policy", "Stay defaults"] as const;
+type Tab = (typeof ALL_TABS)[number];
 
 /**
  * Settings used to be five unrelated sections stacked into five screens of
@@ -22,12 +22,23 @@ type Tab = (typeof TABS)[number];
  * (it's calendar configuration), and the add-on catalogue became its own
  * destination (it's inventory, not a preference).
  */
-export function SettingsTabs({ settings }: { settings: SiteSettings }) {
+export function SettingsTabs({
+  settings,
+  plan,
+}: {
+  settings: SiteSettings;
+  /** A 'listing' tenant has no logo/favicon/accent colour of their own to
+   *  set — their apex property page never reads them (0027,
+   *  docs/tenant-plans-plan.md §5) — so the Brand tab is dropped entirely
+   *  rather than shown with nothing it does. */
+  plan: TenantPlan;
+}) {
+  const tabs = plan === "listing" ? ALL_TABS.filter((t) => t !== "Brand") : ALL_TABS;
   const [tab, setTab] = useState<Tab>("Business details");
 
   return (
     <div>
-      <SectionTabs tabs={TABS} active={tab} onChange={setTab} label="Settings sections" />
+      <SectionTabs tabs={tabs} active={tab} onChange={setTab} label="Settings sections" />
 
       <div className="py-6">
         {tab === "Business details" ? (

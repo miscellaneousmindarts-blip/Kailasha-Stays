@@ -8,24 +8,30 @@ import { signOut } from "@/app/admin/(dashboard)/actions";
 import {
   MOBILE_TABS,
   MORE_ITEM,
-  NAV_GROUPS,
   isActive,
   isMoreRoute,
+  navGroupsFor,
 } from "@/lib/admin/nav";
+import type { TenantPlan } from "@/lib/types/database";
 
 export function AdminShell({
   userEmail,
   tenantName,
   isSuperadmin,
+  plan,
   children,
 }: {
   userEmail: string;
   /** Which business this session is acting on — only ambiguous once there's more than one. */
   tenantName: string;
   isSuperadmin: boolean;
+  /** Drops Homepage from the Website group for a 'listing' tenant — see
+   *  lib/admin/nav.ts's navGroupsFor(). */
+  plan: TenantPlan;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const navGroups = navGroupsFor(plan);
 
   return (
     <div className="flex min-h-dvh">
@@ -35,7 +41,7 @@ export function AdminShell({
         <p className="text-text-muted truncate px-2 pb-2 text-sm">{tenantName}</p>
 
         <nav className="mt-3 flex flex-col gap-5">
-          {NAV_GROUPS.map((group) => (
+          {navGroups.map((group) => (
             <div key={group.label}>
               <p className="text-text-muted px-3 pb-1 text-[11px] font-semibold tracking-[0.08em] uppercase">
                 {group.label}

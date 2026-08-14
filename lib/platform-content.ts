@@ -11,6 +11,8 @@
  * nobody is watching. Update here if that ever changes.
  */
 
+import type { PublicSiteBranding } from "@/lib/types/database";
+
 /** Digits only, international format — for wa.me links. */
 export const PLATFORM_WHATSAPP_NUMBER = "917033332227";
 /** As displayed, for tel: links and on-page text. */
@@ -265,3 +267,37 @@ export const PLATFORM_NAP = {
   locality: "Deoghar, Jharkhand",
   phone: PLATFORM_CONTACT_PHONE,
 };
+
+/**
+ * Overrides the VISUAL identity fields of a tenant's site_settings with
+ * Deoghar BnB's own, for a 'listing' (Plan A) tenant's guest portal (0027,
+ * 0028, docs/tenant-plans-plan.md §6) — they have no site or branding of
+ * their own, so a guest seeing their business_name/logo in the portal
+ * chrome would be naming a business that exists nowhere else.
+ *
+ * Deliberately leaves whatsapp_number, contact_phone, contact_email and
+ * address untouched: those are OPERATIONAL — the actual channel a guest
+ * uses to reach the host servicing their actual stay — not branding, and
+ * swapping them for the platform's own would break the guest's ability to
+ * contact their host. Same operational-vs-branding split as
+ * lib/platform.ts's getPlatformPropertyByPublicSlug().
+ *
+ * logo_path becomes null rather than a Deoghar BnB path: components/
+ * site-header.tsx already falls back to the platform logo
+ * (resolvePlatformLogoSrc()) whenever logo_path is null, so null triggers
+ * exactly that fallback rather than hardcoding a second path to the same
+ * asset. Favicon needs no equivalent override here — the guest portal has
+ * never set its own `icons` metadata, so it already falls back to the root
+ * layout's (now Deoghar BnB's own) /favicon.ico for every booking, branded
+ * or not.
+ */
+export function withPlatformPortalBranding(settings: PublicSiteBranding): PublicSiteBranding {
+  return {
+    ...settings,
+    business_name: PLATFORM_NAME,
+    logo_path: null,
+    brand_color: null,
+    legal_name: null,
+    footer_note: null,
+  };
+}
