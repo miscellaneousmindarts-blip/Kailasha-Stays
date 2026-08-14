@@ -10,14 +10,21 @@ import type { PropertyCardData } from "@/lib/queries";
 export function PropertyCard({
   property,
   basePath,
+  href,
   priority = false,
   distance,
   hostName,
   airbnb,
 }: {
   property: PropertyCardData;
-  /** "" for the tenant served at the bare domain, "/s/{slug}" otherwise. */
-  basePath: string;
+  /** "" for the tenant served at the bare domain, "/s/{slug}" otherwise.
+   *  Ignored when `href` is given. */
+  basePath?: string;
+  /** Full override for the card's link, e.g. "/stays/{publicSlug}" on the
+   *  apex — that route has no "/properties/" segment, so it can't be built
+   *  from `basePath` the way the tenant page's cards are. Takes priority
+   *  over basePath entirely when set. */
+  href?: string;
   priority?: boolean;
   /** "1.4 km · 15 min walk" — only the apex homes grid passes this today;
    *  /properties omits it, since a tenant's own page doesn't need to repeat
@@ -36,9 +43,11 @@ export function PropertyCard({
   const src = imageUrl(cover?.storage_path);
   const price = money(property.base_price, property.currency);
 
+  const linkHref = href ?? `${basePath ?? ""}/properties/${property.slug}`;
+
   return (
     <div className="group">
-      <Link href={`${basePath}/properties/${property.slug}`} className="block">
+      <Link href={linkHref} className="block">
         {/* plain tint, not .skeleton — this is the real image's backdrop while it
             decodes, and must not shimmer indefinitely behind a loaded photo */}
         <div className="bg-surface-subtle relative aspect-[4/3] overflow-hidden rounded-lg">

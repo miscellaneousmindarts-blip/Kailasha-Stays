@@ -29,7 +29,7 @@ export function PlatformFooter({ properties }: { properties: PlatformProperty[] 
               {properties.slice(0, 8).map((p) => (
                 <li key={p.id}>
                   <Link
-                    href={`${p.basePath}/properties/${p.slug}`}
+                    href={`/stays/${p.publicSlug}`}
                     className="text-sm hover:underline"
                   >
                     {p.title}

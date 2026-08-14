@@ -6,7 +6,7 @@ import type { User } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 import { readActingTenantId } from "@/lib/impersonation";
-import type { TenantRole, TenantStatus } from "@/lib/types/database";
+import type { TenantPlan, TenantRole, TenantStatus } from "@/lib/types/database";
 
 export type AdminTenant = {
   id: string;
@@ -15,6 +15,9 @@ export type AdminTenant = {
   status: TenantStatus;
   /** Needed so the admin's "View live" link points at the tenant's real site. */
   canonical_host: string | null;
+  /** 'listing' hides Homepage/branding — see lib/admin/nav.ts and
+   *  docs/tenant-plans-plan.md. */
+  plan: TenantPlan;
 };
 
 export type AdminContext = {
@@ -77,7 +80,7 @@ export const requireTenant = cache(async (): Promise<AdminContext> => {
     if (actingTenantId) {
       const { data: acting } = await supabase
         .from("tenants")
-        .select("id, slug, name, status, canonical_host")
+        .select("id, slug, name, status, canonical_host, plan")
         .eq("id", actingTenantId)
         .maybeSingle();
 
@@ -99,7 +102,7 @@ export const requireTenant = cache(async (): Promise<AdminContext> => {
 
   const { data: membership, error } = await supabase
     .from("tenant_members")
-    .select("role, tenants(id, slug, name, status, canonical_host)")
+    .select("role, tenants(id, slug, name, status, canonical_host, plan)")
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();

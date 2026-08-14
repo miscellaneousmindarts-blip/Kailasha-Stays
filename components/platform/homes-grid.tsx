@@ -134,7 +134,7 @@ export function HomesGrid({ properties }: { properties: PlatformProperty[] }) {
                   property_type: null,
                   property_images: property.images,
                 }}
-                basePath={property.basePath}
+                href={`/stays/${property.publicSlug}`}
                 priority={i === 0}
                 distance={property.distanceFromTemple?.value ?? null}
                 hostName={property.hostName}

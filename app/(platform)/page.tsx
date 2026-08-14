@@ -1,6 +1,5 @@
 import { StickyBar } from "@/components/landing/sticky-bar";
 import { SavingsCalculator } from "@/components/landing/savings-calculator";
-import { PlatformHeader } from "@/components/platform/platform-header";
 import { PlatformHero } from "@/components/platform/platform-hero";
 import { HomesGrid } from "@/components/platform/homes-grid";
 import { LocationModule } from "@/components/platform/location-module";
@@ -10,7 +9,6 @@ import { SocialProof } from "@/components/platform/social-proof";
 import { HostBand } from "@/components/platform/host-band";
 import { PlatformFaq } from "@/components/platform/platform-faq";
 import { FinalCta } from "@/components/platform/final-cta";
-import { PlatformFooter } from "@/components/platform/platform-footer";
 import { Section } from "@/components/landing/primitives";
 import { getPlatformProperties } from "@/lib/platform";
 import { resolvePlatformHeroImage, resolvePlatformLogoSrc } from "@/lib/platform-assets";
@@ -93,7 +91,7 @@ export default async function PlatformLandingPage() {
           "@type": "ListItem",
           position: i + 1,
           name: p.title,
-          url: `${PLATFORM_SITE_URL}${p.basePath}/properties/${p.slug}`,
+          url: `${PLATFORM_SITE_URL}/stays/${p.publicSlug}`,
         })),
       },
       {
@@ -120,8 +118,6 @@ export default async function PlatformLandingPage() {
         // Server-generated from our own data — no user input reaches this.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-
-      <PlatformHeader logoSrc={logoSrc} guidesReady={false} />
 
       <main>
         <PlatformHero imageSrc={heroImageSrc} />
@@ -155,8 +151,6 @@ export default async function PlatformLandingPage() {
         <PlatformFaq />
         <FinalCta properties={properties} shareSummary={shareSummary} />
       </main>
-
-      <PlatformFooter properties={properties} />
 
       <StickyBar
         whatsappHref={platformWaLink("apex-sticky")}

@@ -98,6 +98,21 @@ function proxyTenantHost(request: NextRequest, slug: string) {
     }
   }
 
+  // /stays/* is the apex's own property page (0027, docs/tenant-plans-plan.md
+  // §2.2) — it must never also resolve on a tenant's own host. Without this,
+  // kailasha-stays.deogharbnb.space/stays/foo would fall through past
+  // isGlobalPath and isTenantPath (neither lists it) and quietly render the
+  // apex's page under the tenant's own host: duplicate content on a domain
+  // that has no business serving it. 301, not 308 — this is always a GET.
+  if (pathname === "/stays" || pathname.startsWith("/stays/")) {
+    if (publicEnv.platformDomains[0]) {
+      return NextResponse.redirect(
+        new URL(`${pathname}${search}`, `https://${publicEnv.platformDomains[0]}`),
+        301,
+      );
+    }
+  }
+
   // Infrastructure, the API and the guest portal are host-agnostic: they
   // resolve their own tenant (from a booking token, or not at all) and must
   // not be rewritten into a tenant's page tree.

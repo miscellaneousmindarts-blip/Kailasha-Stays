@@ -84,6 +84,13 @@ export type Property = {
   tenant_id: string;
   id: string;
   slug: string;
+  /**
+   * Globally unique across every tenant — the apex address at
+   * /stays/{public_slug}. Unlike `slug` (unique only per tenant since 0012),
+   * this has to address a property from a page that has no tenant in its
+   * URL. Assigned once on insert by a trigger and never rewritten (0027).
+   */
+  public_slug: string;
   title: string;
   status: PropertyStatus;
   summary: string | null;
@@ -456,9 +463,18 @@ export type Tenant = {
    */
   canonical_host: string | null;
   status: TenantStatus;
+  /**
+   * 'listing': listed on the apex only — no subdomain, no homepage, no
+   * branding, but a full admin login. 'branded': own subdomain and homepage
+   * as well. A branded tenant's properties still appear on the apex, where
+   * they behave as listings (0027, docs/tenant-plans-plan.md).
+   */
+  plan: TenantPlan;
   created_at: string;
   updated_at: string;
 };
+
+export type TenantPlan = "listing" | "branded";
 
 export type TenantRole = "owner" | "staff";
 

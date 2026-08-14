@@ -58,7 +58,7 @@ export function FinalCta({
                 property_type: null,
                 property_images: property.images,
               }}
-              basePath={property.basePath}
+              href={`/stays/${property.publicSlug}`}
               distance={property.distanceFromTemple?.value ?? null}
               hostName={property.hostName}
               airbnb={property.airbnb}

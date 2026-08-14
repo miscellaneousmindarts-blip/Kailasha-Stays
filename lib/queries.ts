@@ -23,7 +23,9 @@ export type PublicBookingChannel = Pick<
   "id" | "name" | "slug" | "booking_url" | "price_mode" | "markup_pct" | "fixed_nightly" | "sort_order"
 >;
 
-const PUBLIC_CHANNEL_COLUMNS =
+/** Exported so lib/platform.ts's apex property query selects the exact same
+ *  public columns rather than a second, driftable copy of this string. */
+export const PUBLIC_CHANNEL_COLUMNS =
   "id, name, slug, booking_url, price_mode, markup_pct, fixed_nightly, sort_order";
 
 export type PropertyCardData = Pick<
@@ -141,12 +143,17 @@ export const getAddonsForProperty = cache(
 );
 
 /**
- * Every published property across every ACTIVE tenant, as (tenant slug,
- * property slug) pairs — what generateStaticParams needs once the public
- * routes live under /s/[tenant] (phase B3b).
+ * Every published property across every ACTIVE, BRANDED tenant, as (tenant
+ * slug, property slug) pairs — what generateStaticParams needs for
+ * /s/[tenant]/properties/[slug] (phase B3b).
  *
  * Joins tenants rather than taking a tenantId because static generation has
- * to enumerate all of them at build time, not one.
+ * to enumerate all of them at build time, not one. Excludes 'listing' (Plan
+ * A) tenants for the same reason listActiveTenantSlugs() does: their
+ * /s/{slug}/** routes 404 (see the tenant layout), so there is nothing here
+ * worth prerendering. Their properties are still enumerated for
+ * /stays/[slug] by getPlatformProperties() in lib/platform.ts, which
+ * deliberately does NOT filter by plan — both plans list on the apex.
  */
 export async function listPublishedPropertyPaths(): Promise<
   { tenant: string; slug: string }[]
@@ -154,9 +161,10 @@ export async function listPublishedPropertyPaths(): Promise<
   const supabase = createPublicClient();
   const { data } = await supabase
     .from("properties")
-    .select("slug, tenants!inner(slug, status)")
+    .select("slug, tenants!inner(slug, status, plan)")
     .eq("status", "published")
-    .eq("tenants.status", "active");
+    .eq("tenants.status", "active")
+    .eq("tenants.plan", "branded");
 
   return ((data ?? []) as unknown as {
     slug: string;

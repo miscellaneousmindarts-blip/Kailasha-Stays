@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 
+import { PlatformHeader } from "@/components/platform/platform-header";
+import { PlatformFooter } from "@/components/platform/platform-footer";
+import { getPlatformProperties } from "@/lib/platform";
+import { resolvePlatformLogoSrc } from "@/lib/platform-assets";
 import { PLATFORM_SITE_URL } from "@/lib/platform-content";
 
 /**
@@ -26,10 +30,31 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-export default function PlatformLayout({
+/**
+ * Header and footer live here, not in each page, now that there are two
+ * pages under this layout (the homepage and /stays/[slug]) that both need
+ * them. getPlatformProperties() is React cache()-wrapped, so this call and
+ * the homepage's own call for its grid dedupe to one round trip per request,
+ * not two.
+ *
+ * StickyBar stays OUT of here deliberately — see app/(platform)/page.tsx.
+ * BookingCard on the property page renders its own fixed bottom bar, and a
+ * second one from this layout would stack on top of it and make the actual
+ * booking button unreachable on a phone.
+ */
+export default async function PlatformLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="flex flex-1 flex-col">{children}</div>;
+  const properties = await getPlatformProperties();
+  const logoSrc = resolvePlatformLogoSrc();
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <PlatformHeader logoSrc={logoSrc} guidesReady={false} />
+      <div className="flex flex-1 flex-col">{children}</div>
+      <PlatformFooter properties={properties} />
+    </div>
+  );
 }

@@ -6,7 +6,7 @@ import type { Tenant } from "@/lib/types/database";
 
 export type PublicTenant = Pick<
   Tenant,
-  "id" | "slug" | "name" | "status" | "canonical_host"
+  "id" | "slug" | "name" | "status" | "canonical_host" | "plan"
 >;
 
 /**
@@ -32,7 +32,7 @@ export const getTenantBySlug = cache(
     const supabase = createPublicClient();
     const { data, error } = await supabase
       .from("tenants")
-      .select("id,slug,name,status,canonical_host")
+      .select("id,slug,name,status,canonical_host,plan")
       .eq("slug", slug)
       .eq("status", "active")
       .maybeSingle();
@@ -62,18 +62,24 @@ export const getPrimaryTenantId = cache(async (): Promise<string | null> => {
 });
 
 /**
- * Every active tenant's slug, for generateStaticParams.
+ * Every active, branded tenant's slug, for generateStaticParams under
+ * /s/[tenant]/**.
  *
  * Without this the [tenant] segment has no known values at build time and
  * every page under it silently drops from static/ISR to fully dynamic — the
  * kind of regression that shows up as a hosting bill rather than an error.
+ *
+ * Excludes 'listing' (Plan A) tenants: their /s/{slug} route 404s (see
+ * app/(public)/s/[tenant]/layout.tsx), so prerendering it would build a page
+ * that only ever serves a 404.
  */
 export async function listActiveTenantSlugs(): Promise<string[]> {
   const supabase = createPublicClient();
   const { data } = await supabase
     .from("tenants")
     .select("slug")
-    .eq("status", "active");
+    .eq("status", "active")
+    .eq("plan", "branded");
   return (data ?? []).map((t) => t.slug);
 }
 

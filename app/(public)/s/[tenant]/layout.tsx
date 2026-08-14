@@ -22,7 +22,9 @@ export async function generateMetadata({
 }: LayoutProps<"/s/[tenant]">): Promise<Metadata> {
   const { tenant: slug } = await params;
   const tenant = await getTenantBySlug(slug);
-  if (!tenant) return {};
+  // A 'listing' tenant has no site here at all — see the identical check
+  // and comment on the layout component below.
+  if (!tenant || tenant.plan === "listing") return {};
 
   const settings = await getSiteSettings(tenant.id);
   const faviconUrl = homepageImageUrl(settings.favicon_path);
@@ -53,6 +55,11 @@ export async function generateMetadata({
  * non-active slug 404s once, at the boundary, instead of every route having
  * to remember to check — which is what stops a suspended tenant's site from
  * quietly staying up because one page forgot.
+ *
+ * A 'listing' (Plan A) tenant 404s here too, same as an unknown slug —
+ * they have admin access but no site of their own to serve (0027,
+ * docs/tenant-plans-plan.md). Their properties still exist and are still
+ * bookable, just at /stays/{public_slug} on the apex, never here.
  */
 export default async function TenantLayout({
   children,
@@ -60,7 +67,7 @@ export default async function TenantLayout({
 }: LayoutProps<"/s/[tenant]">) {
   const { tenant: slug } = await params;
   const tenant = await getTenantBySlug(slug);
-  if (!tenant) notFound();
+  if (!tenant || tenant.plan === "listing") notFound();
 
   const settings = await getSiteSettings(tenant.id);
   const basePath = tenantBasePath(tenant);

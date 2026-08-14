@@ -3,11 +3,20 @@ import { cache } from "react";
 
 import { createPublicClient } from "@/lib/supabase/public";
 import { templeDistance, travelTime, type LandingDistance } from "@/lib/landing";
-import type { PropertyImage } from "@/lib/types/database";
+import { PUBLIC_CHANNEL_COLUMNS, type PublicBookingChannel } from "@/lib/queries";
+import type {
+  Property,
+  PropertyImage,
+  PropertySection,
+  RatePeriod,
+} from "@/lib/types/database";
 
 export type PlatformProperty = {
   id: string;
   slug: string;
+  /** The apex address: /stays/{publicSlug}. Globally unique, unlike `slug`
+   *  (only unique per tenant) — see 0027_tenant_plans.sql. */
+  publicSlug: string;
   title: string;
   sleeps: number;
   bedrooms: number;
@@ -16,9 +25,6 @@ export type PlatformProperty = {
   currency: string;
   amenities: string[];
   images: Pick<PropertyImage, "storage_path" | "alt" | "is_cover">[];
-  /** "/s/{slug}" — always the path form; see proxy.ts, it serves unrewritten
-   *  regardless of whether the tenant also has its own subdomain. */
-  basePath: string;
   /** The PERSON's name ("Kamal Kishan"), from site_settings.host_name — not
    *  business_name ("Kailasha Stays"). "Hosted by Kailasha Stays" reads like
    *  a company; "Hosted by Kamal Kishan" is the thing that makes this a
@@ -39,6 +45,7 @@ export type PlatformProperty = {
 type Row = {
   id: string;
   slug: string;
+  public_slug: string;
   title: string;
   max_guests: number;
   bedrooms: number;
@@ -111,7 +118,7 @@ export const getPlatformProperties = cache(async (): Promise<PlatformProperty[]>
   const { data, error } = await supabase
     .from("properties")
     .select(
-      `id, slug, title, max_guests, bedrooms, bathrooms, base_price, currency, amenities, sort_order,
+      `id, slug, public_slug, title, max_guests, bedrooms, bathrooms, base_price, currency, amenities, sort_order,
        property_images(storage_path, alt, is_cover, sort_order),
        property_sections(type, content, visible, audience),
        tenants!inner(slug, status, site_settings(business_name, host_name)),
@@ -147,6 +154,7 @@ export const getPlatformProperties = cache(async (): Promise<PlatformProperty[]>
     return {
       id: row.id,
       slug: row.slug,
+      publicSlug: row.public_slug,
       title: row.title,
       sleeps: row.max_guests,
       bedrooms: row.bedrooms,
@@ -155,7 +163,6 @@ export const getPlatformProperties = cache(async (): Promise<PlatformProperty[]>
       currency: row.currency,
       amenities: row.amenities ?? [],
       images,
-      basePath: `/s/${row.tenants?.slug ?? ""}`,
       hostName:
         row.tenants?.site_settings?.host_name ??
         row.tenants?.site_settings?.business_name ??
@@ -179,3 +186,117 @@ export const getPlatformProperties = cache(async (): Promise<PlatformProperty[]>
 
   return properties;
 });
+
+/**
+ * One property's full record, addressed by its globally-unique public_slug —
+ * for /stays/[slug] (docs/tenant-plans-plan.md §3), the apex's own property
+ * page. Every field the tenant property page needs (§3 of that doc: gallery,
+ * sections, amenities, map, booking card) plus what the apex page needs that
+ * the tenant page gets from its own layout instead — host name, WhatsApp
+ * number, check-in/out defaults — since this page has no SiteHeader/
+ * SiteFooter and must not read business_name, logo_path or brand_color from
+ * site_settings (that would leak the owner's branding onto a page that is
+ * deliberately Deoghar BnB's, not theirs).
+ */
+export type PlatformPropertyDetail = Property & {
+  property_images: PropertyImage[];
+  property_sections: PropertySection[];
+  rate_periods: RatePeriod[];
+  booking_channels: PublicBookingChannel[];
+  tenant: {
+    slug: string;
+    plan: "listing" | "branded";
+    /** For the canonical tag (§7.1): a branded tenant's apex page points
+     *  its canonical at their own site instead of at itself. */
+    canonicalHost: string | null;
+  };
+  hostName: string;
+  whatsappNumber: string | null;
+  defaultCheckInTime: string;
+  defaultCheckOutTime: string;
+};
+
+type DetailRow = Property & {
+  property_images: PropertyImage[];
+  property_sections: PropertySection[];
+  rate_periods: RatePeriod[];
+  booking_channels: PublicBookingChannel[];
+  tenants: {
+    slug: string;
+    plan: "listing" | "branded";
+    canonical_host: string | null;
+    status: string;
+    site_settings: {
+      host_name: string | null;
+      business_name: string;
+      whatsapp_number: string | null;
+      default_check_in_time: string;
+      default_check_out_time: string;
+    } | null;
+  } | null;
+};
+
+export const getPlatformPropertyByPublicSlug = cache(
+  async (publicSlug: string): Promise<PlatformPropertyDetail | null> => {
+    const supabase = createPublicClient();
+    const { data, error } = await supabase
+      .from("properties")
+      .select(
+        `*, property_images(*), property_sections(*), rate_periods(*), booking_channels(${PUBLIC_CHANNEL_COLUMNS}),
+         tenants!inner(slug, plan, canonical_host, status, site_settings(host_name, business_name, whatsapp_number, default_check_in_time, default_check_out_time))`,
+      )
+      .eq("public_slug", publicSlug)
+      .eq("status", "published")
+      .eq("tenants.status", "active")
+      .maybeSingle();
+
+    if (error) throw new Error(`Could not load property "${publicSlug}": ${error.message}`);
+    if (!data) return null;
+
+    const row = data as unknown as DetailRow;
+    const settings = row.tenants?.site_settings;
+
+    return {
+      ...row,
+      property_images: [...(row.property_images ?? [])].sort(
+        (a, b) => Number(b.is_cover) - Number(a.is_cover) || a.sort_order - b.sort_order,
+      ),
+      property_sections: [...(row.property_sections ?? [])].sort(
+        (a, b) => a.sort_order - b.sort_order,
+      ),
+      rate_periods: [...(row.rate_periods ?? [])].sort((a, b) =>
+        a.start_date.localeCompare(b.start_date),
+      ),
+      booking_channels: [...(row.booking_channels ?? [])].sort(
+        (a, b) => a.sort_order - b.sort_order,
+      ),
+      tenant: {
+        slug: row.tenants?.slug ?? "",
+        plan: row.tenants?.plan ?? "listing",
+        canonicalHost: row.tenants?.canonical_host ?? null,
+      },
+      hostName: settings?.host_name ?? settings?.business_name ?? row.tenants?.slug ?? "",
+      whatsappNumber: settings?.whatsapp_number ?? null,
+      defaultCheckInTime: settings?.default_check_in_time ?? "13:00",
+      defaultCheckOutTime: settings?.default_check_out_time ?? "11:00",
+    };
+  },
+);
+
+/**
+ * Every published property's public_slug, across BOTH plans — what
+ * /stays/[slug]'s generateStaticParams needs. Unlike
+ * lib/queries.ts's listPublishedPropertyPaths() (branded tenants only, for
+ * /s/[tenant]/**), the apex property page is exactly where a 'listing'
+ * (Plan A) tenant's properties are meant to be reachable, so this
+ * deliberately does not filter by plan.
+ */
+export async function listPlatformPropertyPublicSlugs(): Promise<string[]> {
+  const supabase = createPublicClient();
+  const { data } = await supabase
+    .from("properties")
+    .select("public_slug, tenants!inner(status)")
+    .eq("status", "published")
+    .eq("tenants.status", "active");
+  return (data ?? []).map((p) => p.public_slug);
+}
