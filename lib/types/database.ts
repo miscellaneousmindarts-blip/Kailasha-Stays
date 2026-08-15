@@ -231,6 +231,39 @@ export type HomepageImage = {
   created_at: string;
 };
 
+/**
+ * The apex homepage's own section rows (0029) — same idea as HomepageSection
+ * but narrower: no tenant_id (there is one apex), no kind/type (no custom
+ * sections on the platform's own shopfront). `key` names the component that
+ * renders the row, e.g. "hero", "faq".
+ */
+export type PlatformSection = {
+  id: string;
+  key: string;
+  content: unknown;
+  visible: boolean;
+  can_hide: boolean;
+  pin: "first" | "last" | null;
+  sort_order: number;
+  updated_at: string;
+};
+
+/**
+ * Same shape as HomepageImage minus tenant_id — the apex's own media library
+ * (0029). Kept separate rather than tenant_id-nullable on homepage_images
+ * because that column is NOT NULL specifically to keep one host's library out
+ * of another's; see supabase/migrations/0029_platform_sections.sql §4.
+ */
+export type PlatformImage = {
+  id: string;
+  storage_path: string;
+  alt: string | null;
+  title: string | null;
+  is_placeholder: boolean;
+  brief: string | null;
+  created_at: string;
+};
+
 /** One shared catalog — which properties offer a given item lives in PropertyAddonService, not here. */
 export type AddonService = {
   /** Owning tenant. Set by a database trigger from the parent row / caller. */
@@ -602,6 +635,8 @@ export type Database = {
       >;
       homepage_sections: Table<HomepageSection>;
       homepage_images: Table<HomepageImage>;
+      platform_sections: Table<PlatformSection>;
+      platform_images: Table<PlatformImage>;
       addon_services: Table<AddonService>;
       property_addon_services: Table<
         PropertyAddonService,
