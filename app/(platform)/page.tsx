@@ -11,9 +11,10 @@ import { PlatformFaq } from "@/components/platform/platform-faq";
 import { FinalCta } from "@/components/platform/final-cta";
 import { Section } from "@/components/landing/primitives";
 import { getPlatformProperties } from "@/lib/platform";
-import { resolvePlatformHeroImage, resolvePlatformLogoSrc } from "@/lib/platform-assets";
+import { resolvePlatformLogoSrc } from "@/lib/platform-assets";
+import { getPlatformSectionContent, getSection } from "@/lib/platform-sections";
 import {
-  PLATFORM_FAQ,
+  LOCATION_WALK_MINUTES_FALLBACK,
   PLATFORM_HOTEL_ROOM_RATE,
   PLATFORM_HOURS_END_HOUR,
   PLATFORM_HOURS_START,
@@ -38,10 +39,12 @@ export const dynamic = "force-dynamic";
  * page.
  */
 export default async function PlatformLandingPage() {
-  const properties = await getPlatformProperties();
+  const [properties, content] = await Promise.all([
+    getPlatformProperties(),
+    getPlatformSectionContent(),
+  ]);
 
   const logoSrc = resolvePlatformLogoSrc();
-  const heroImageSrc = resolvePlatformHeroImage();
 
   // §S6a: the widest real walk-time across every published property, rounded
   // outward to a clean 5-minute bound — computed, not typed, so the promise
@@ -52,7 +55,21 @@ export default async function PlatformLandingPage() {
     .filter((m): m is number => m !== null);
   const widestWalkMinutes = walkMinutesKnown.length
     ? Math.ceil(Math.max(...walkMinutesKnown) / 5) * 5
-    : null;
+    : LOCATION_WALK_MINUTES_FALLBACK;
+
+  // hero/homes/final_cta are can_hide=false and resolvePlatformSectionContent()
+  // backfills them from schema defaults if a row is ever missing, so these
+  // three are guaranteed present — see its own comment for why.
+  const hero = getSection(content, "hero")!;
+  const homes = getSection(content, "homes")!;
+  const savings = getSection(content, "savings");
+  const location = getSection(content, "location");
+  const comparison = getSection(content, "comparison");
+  const whatWeArrange = getSection(content, "what_we_arrange");
+  const socialProof = getSection(content, "social_proof") ?? null;
+  const hostBand = getSection(content, "host_band");
+  const faq = getSection(content, "faq") ?? null;
+  const finalCta = getSection(content, "final_cta")!;
 
   const rateOptions = properties
     .filter((p): p is typeof p & { ratePerNight: number } => p.ratePerNight !== null)
@@ -96,7 +113,10 @@ export default async function PlatformLandingPage() {
       },
       {
         "@type": "FAQPage",
-        mainEntity: PLATFORM_FAQ.map((item) => ({
+        // Reads the RESOLVED faq content, not a static const — so an edit in
+        // the superadmin builder stays in sync with the structured data a
+        // crawler sees, not just the visible accordion.
+        mainEntity: (faq?.items ?? []).map((item) => ({
           "@type": "Question",
           name: item.q,
           acceptedAnswer: { "@type": "Answer", text: item.a },
@@ -120,36 +140,34 @@ export default async function PlatformLandingPage() {
       />
 
       <main>
-        <PlatformHero imageSrc={heroImageSrc} />
+        <PlatformHero content={hero} />
 
-        <HomesGrid properties={properties} />
+        <HomesGrid properties={properties} content={homes} />
 
-        <Section band="sand">
-          <div className="mx-auto max-w-[760px] text-center">
-            <h2 className="font-display text-[26px] leading-[1.15] font-semibold md:text-[34px]">
-              Why one 2BHK beats three hotel rooms
-            </h2>
-            <p className="text-text-muted mx-auto mt-4 max-w-xl">
-              Six people in a hotel means three rooms, three bills and three sets of
-              keys. One 2BHK flat means you pay less and everyone stays together.
-              Don&apos;t take our word for it — put your own numbers in.
-            </p>
-          </div>
-          <SavingsCalculator
-            options={rateOptions}
-            currency={currency}
-            shareSummary={shareSummary}
-            hotelRoomRate={PLATFORM_HOTEL_ROOM_RATE}
-          />
-        </Section>
+        {savings ? (
+          <Section band="sand">
+            <div className="mx-auto max-w-[760px] text-center">
+              <h2 className="font-display text-[26px] leading-[1.15] font-semibold md:text-[34px]">
+                {savings.heading}
+              </h2>
+              <p className="text-text-muted mx-auto mt-4 max-w-xl">{savings.lede}</p>
+            </div>
+            <SavingsCalculator
+              options={rateOptions}
+              currency={currency}
+              shareSummary={shareSummary}
+              hotelRoomRate={PLATFORM_HOTEL_ROOM_RATE}
+            />
+          </Section>
+        ) : null}
 
-        <LocationModule widestWalkMinutes={widestWalkMinutes} />
-        <ComparisonSection />
-        <WhatWeArrange />
-        <SocialProof />
-        <HostBand />
-        <PlatformFaq />
-        <FinalCta properties={properties} shareSummary={shareSummary} />
+        {location ? <LocationModule content={location} walkMinutes={widestWalkMinutes} /> : null}
+        {comparison ? <ComparisonSection content={comparison} /> : null}
+        {whatWeArrange ? <WhatWeArrange content={whatWeArrange} /> : null}
+        <SocialProof content={socialProof} />
+        {hostBand ? <HostBand content={hostBand} /> : null}
+        <PlatformFaq content={faq} />
+        <FinalCta properties={properties} shareSummary={shareSummary} content={finalCta} />
       </main>
 
       <StickyBar

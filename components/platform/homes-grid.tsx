@@ -5,6 +5,7 @@ import { useState } from "react";
 import { PropertyCard, PropertyCardSkeleton } from "@/components/property-card";
 import { Eyebrow } from "@/components/landing/primitives";
 import type { PlatformProperty } from "@/lib/platform";
+import type { ResolvedPlatformHomes } from "@/lib/platform-sections";
 
 const MAX_SHOWN = 9;
 
@@ -37,7 +38,13 @@ const CHIP_DEFS: Chip[] = [
  * filter, and this recomputes on every render so a chip that becomes
  * useless (or useful) as properties are added just appears or disappears.
  */
-export function HomesGrid({ properties }: { properties: PlatformProperty[] }) {
+export function HomesGrid({
+  properties,
+  content,
+}: {
+  properties: PlatformProperty[];
+  content: ResolvedPlatformHomes;
+}) {
   const [active, setActive] = useState<Set<string>>(new Set());
 
   const availableChips = CHIP_DEFS.filter((c) => properties.some(c.test));
@@ -68,11 +75,8 @@ export function HomesGrid({ properties }: { properties: PlatformProperty[] }) {
   return (
     <section id="homes" className="bg-background py-14 md:py-24">
       <div className="container-page">
-        <Eyebrow hi="हमारे घर" en="Our verified homes in Deoghar" />
-        <p className="text-text-muted mt-4 max-w-2xl text-lg leading-relaxed">
-          Every home is visited and verified by us. Real photos, real prices, and a
-          direct line to the family who runs it.
-        </p>
+        <Eyebrow hi={content.eyebrowHi} en={content.eyebrow} />
+        <p className="text-text-muted mt-4 max-w-2xl text-lg leading-relaxed">{content.lede}</p>
 
         {availableChips.length ? (
           <div className="mt-6 flex flex-wrap gap-2">

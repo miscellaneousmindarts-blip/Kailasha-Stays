@@ -111,15 +111,14 @@ export const platformSectionSchemas = {
   location: z.object({
     eyebrowHi: z.string().default("देवघर में आपका ठिकाना"),
     eyebrow: z.string().default("Where you'll be"),
-    // {walkMinutes} resolves against the widest real walk-time across
-    // published properties (computed in app/(platform)/page.tsx, unchanged
-    // by this migration) — not stored, so the promise can never quietly
-    // become false as homes are added.
-    promise: z
-      .string()
-      .default(
-        "Every home we list is within a {walkMinutes}-minute walk of Baba Baidyanath Dham — most are far closer.",
-      ),
+    // Split around the walk-time figure rather than one templated sentence,
+    // so "{n}-minute walk" can stay styled (text-primary span) exactly as
+    // before — see resolveLocation()'s comment. The number itself is
+    // computed from live property data (app/(platform)/page.tsx), not
+    // stored, so the promise can never quietly become false as homes are
+    // added.
+    promiseBefore: z.string().default("Every home we list is within a"),
+    promiseAfter: z.string().default("of Baba Baidyanath Dham — most are far closer."),
     items: z
       .array(
         z.object({
@@ -444,8 +443,8 @@ export type ResolvedPlatformSavings = { heading: string; lede: string };
 export type ResolvedPlatformLocation = {
   eyebrowHi: string;
   eyebrow: string;
-  /** null when {walkMinutes} had nothing to resolve against — render the code fallback sentence. */
-  promise: string | null;
+  promiseBefore: string;
+  promiseAfter: string;
   items: { label: string; range: string; note: string; icon: "landmark" | "train" | "plane" | "car" }[];
   footNote: string;
 };
@@ -564,7 +563,8 @@ function resolveLocation(
   return {
     eyebrowHi: resolveTokens(c.eyebrowHi, ctx) ?? "",
     eyebrow: resolveTokens(c.eyebrow, ctx) ?? "Where you'll be",
-    promise: resolveTokens(c.promise, ctx),
+    promiseBefore: resolveTokens(c.promiseBefore, ctx) ?? "",
+    promiseAfter: resolveTokens(c.promiseAfter, ctx) ?? "",
     items: c.items,
     footNote: resolveTokens(c.footNote, ctx) ?? "",
   };
@@ -731,20 +731,19 @@ export async function fetchPlatformSectionRows(): Promise<PlatformSectionRows> {
 }
 
 /**
- * Pure: turns fetched rows into resolved section content.
- *
- * `walkMinutes` is the one piece of derived data a section's copy can
- * reference by token today ({walkMinutes} in `location.promise`) — passed in
- * rather than computed here because it depends on live property data the
- * caller (app/(platform)/page.tsx) already fetches for HomesGrid.
+ * Pure: turns fetched rows into resolved section content. No derived data
+ * (property counts, walk times, rates) feeds token resolution today — every
+ * section that needs a live number (LocationModule's walk-time bound,
+ * SavingsCalculator's rates) takes it as a separate prop instead, so that
+ * number can never go stale relative to what's actually published. ctx is
+ * kept as a parameter, not inlined, so a future section can add a token
+ * without changing this function's shape.
  */
-export function resolvePlatformSectionContent(
-  { rows, images }: PlatformSectionRows,
-  walkMinutes: number | null,
-): PlatformHomepageContent {
-  const ctx: TokenCtx = {
-    walkMinutes: walkMinutes !== null ? String(walkMinutes) : null,
-  };
+export function resolvePlatformSectionContent({
+  rows,
+  images,
+}: PlatformSectionRows): PlatformHomepageContent {
+  const ctx: TokenCtx = {};
 
   const sections = new Map<PlatformSectionKey, PlatformSectionEntry>();
 
@@ -829,14 +828,66 @@ export function resolvePlatformSectionContent(
     }
   }
 
+  // hero/homes/final_cta are can_hide=false — the server actions that write
+  // `visible` refuse to flip them the same way updateSectionVisibility()
+  // already refuses for the tenant builder (checked at the query, not just
+  // the UI). This is the belt to that suspenders: if one is missing anyway
+  // (a manual SQL edit, a transient fetch gap), backfill it from schema
+  // defaults rather than let every caller handle a hole that should be
+  // structurally impossible.
+  for (const key of NO_HIDE) {
+    if (sections.has(key)) continue;
+    const defaults = platformSectionSchemas[key].parse({});
+    switch (key) {
+      case "hero":
+        sections.set(key, { id: key, key, resolved: resolveHero(defaults as PlatformSectionContent<"hero">, ctx, images) });
+        break;
+      case "homes":
+        sections.set(key, { id: key, key, resolved: resolveHomes(defaults as PlatformSectionContent<"homes">, ctx) });
+        break;
+      case "final_cta":
+        sections.set(key, { id: key, key, resolved: resolveFinalCta(defaults as PlatformSectionContent<"final_cta">, ctx) });
+        break;
+    }
+  }
+
   return { sections, images };
 }
 
 /** Fetch + resolve in one call, for callers with nothing to parallelise. */
-export async function getPlatformSectionContent(
-  walkMinutes: number | null,
-): Promise<PlatformHomepageContent> {
-  return resolvePlatformSectionContent(await fetchPlatformSectionRows(), walkMinutes);
+export async function getPlatformSectionContent(): Promise<PlatformHomepageContent> {
+  return resolvePlatformSectionContent(await fetchPlatformSectionRows());
+}
+
+/**
+ * Typed accessor for a single section's resolved content. Plain
+ * `content.sections.get(key)` widens to the union of every section's
+ * `resolved` type — Map#get can't narrow on a literal key — so callers
+ * (app/(platform)/page.tsx) use this instead of reaching into the map
+ * directly.
+ *
+ * Explicit overloads, not a generic `Extract<..., { key: K }>` return type:
+ * that formulation hits a real TS limitation (a distributive conditional
+ * type compared against itself reports "two different types with this name
+ * exist" — TS2719 — even though every instantiation is sound). Ten
+ * overloads is more typing but no generic-variance puzzle for the next
+ * person to debug.
+ */
+export function getSection(content: PlatformHomepageContent, key: "hero"): ResolvedPlatformHero | undefined;
+export function getSection(content: PlatformHomepageContent, key: "homes"): ResolvedPlatformHomes | undefined;
+export function getSection(content: PlatformHomepageContent, key: "savings"): ResolvedPlatformSavings | undefined;
+export function getSection(content: PlatformHomepageContent, key: "location"): ResolvedPlatformLocation | undefined;
+export function getSection(content: PlatformHomepageContent, key: "comparison"): ResolvedPlatformComparison | undefined;
+export function getSection(content: PlatformHomepageContent, key: "what_we_arrange"): ResolvedPlatformWhatWeArrange | undefined;
+export function getSection(content: PlatformHomepageContent, key: "social_proof"): ResolvedPlatformSocialProof | null | undefined;
+export function getSection(content: PlatformHomepageContent, key: "host_band"): ResolvedPlatformHostBand | undefined;
+export function getSection(content: PlatformHomepageContent, key: "faq"): ResolvedPlatformFaq | null | undefined;
+export function getSection(content: PlatformHomepageContent, key: "final_cta"): ResolvedPlatformFinalCta | undefined;
+export function getSection(
+  content: PlatformHomepageContent,
+  key: PlatformSectionKey,
+): PlatformSectionEntry["resolved"] | undefined {
+  return content.sections.get(key)?.resolved;
 }
 
 /* ------------------------------------------------------------------ */

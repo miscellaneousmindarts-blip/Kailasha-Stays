@@ -5,7 +5,8 @@ import { ChevronDown } from "lucide-react";
 import { Section } from "@/components/landing/primitives";
 import { WhatsAppLink } from "@/components/landing/actions";
 import { track } from "@/lib/track";
-import { PLATFORM_FAQ, platformWaLink } from "@/lib/platform-content";
+import { platformWaLink } from "@/lib/platform-content";
+import type { ResolvedPlatformFaq } from "@/lib/platform-sections";
 
 /**
  * docs/apex-page-plan.md §S12. Same native-<details> pattern as
@@ -20,17 +21,24 @@ import { PLATFORM_FAQ, platformWaLink } from "@/lib/platform-content";
  * only — the full comparison table already has its own standalone section
  * (§S7, rendered separately in page.tsx), so embedding it a second time
  * inside this accordion item would just repeat it on the same page.
+ *
+ * `content` is null when zero FAQ items survive resolution (no items with
+ * both a question and an answer) — see resolveFaq() in
+ * lib/platform-sections.ts. A heading over an empty accordion is worse than
+ * no section at all.
  */
-export function PlatformFaq() {
+export function PlatformFaq({ content }: { content: ResolvedPlatformFaq | null }) {
+  if (!content) return null;
+
   return (
     <Section band="canvas">
       <div className="mx-auto max-w-[760px]">
         <h2 className="font-display text-[26px] leading-[1.15] font-semibold md:text-[36px]">
-          The things families actually ask us
+          {content.heading}
         </h2>
 
         <div className="border-border mt-6 divide-y rounded-lg border">
-          {PLATFORM_FAQ.map((item) => (
+          {content.items.map((item) => (
             <details
               key={item.q}
               className="group px-4"
@@ -54,9 +62,9 @@ export function PlatformFaq() {
         </div>
 
         <p className="text-text-muted mt-6 flex flex-wrap items-center gap-3 text-sm">
-          Still have a question? Just ask — we don&apos;t mind.
+          {content.footNote}
           <WhatsAppLink href={platformWaLink("apex-faq")} context="apex-faq">
-            Ask on WhatsApp
+            {content.waLabel}
           </WhatsAppLink>
         </p>
       </div>

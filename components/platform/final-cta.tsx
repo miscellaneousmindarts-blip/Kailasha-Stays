@@ -3,6 +3,7 @@ import { PropertyCard } from "@/components/property-card";
 import { Section } from "@/components/landing/primitives";
 import { PLATFORM_CONTACT_PHONE, platformWaLink } from "@/lib/platform-content";
 import type { PlatformProperty } from "@/lib/platform";
+import type { ResolvedPlatformFinalCta } from "@/lib/platform-sections";
 
 /**
  * docs/apex-page-plan.md §S13. Repeats up to 3 of the already-fetched
@@ -13,9 +14,11 @@ import type { PlatformProperty } from "@/lib/platform";
 export function FinalCta({
   properties,
   shareSummary,
+  content,
 }: {
   properties: PlatformProperty[];
   shareSummary: string;
+  content: ResolvedPlatformFinalCta;
 }) {
   const featured = properties.slice(0, 3);
 
@@ -24,14 +27,11 @@ export function FinalCta({
       <div className="mx-auto max-w-3xl text-center">
         <h2 className="font-display text-[26px] leading-[1.15] font-semibold md:text-[34px]">
           <span lang="hi" className="block">
-            अपना घर चुनिए।
+            {content.headingHi}
           </span>
-          <span className="mt-1 block">Pick your home. We&apos;ll do the rest.</span>
+          <span className="mt-1 block">{content.heading}</span>
         </h2>
-        <p className="text-text-muted mx-auto mt-4 max-w-xl">
-          Every home has its own page with full photos, the exact price, and a
-          direct WhatsApp line to the family who runs it.
-        </p>
+        <p className="text-text-muted mx-auto mt-4 max-w-xl">{content.lede}</p>
       </div>
 
       {featured.length ? (
@@ -72,10 +72,10 @@ export function FinalCta({
           href="#homes"
           className="bg-primary text-primary-foreground hover:bg-primary-hover pressable inline-flex h-12 items-center rounded-md px-6 font-medium"
         >
-          See all stays
+          {content.primaryCtaLabel}
         </a>
         <WhatsAppLink href={platformWaLink("apex-final-cta")} context="apex-final-cta">
-          WhatsApp us
+          {content.waCtaLabel}
         </WhatsAppLink>
         <PhoneLink phone={PLATFORM_CONTACT_PHONE} context="apex-final-cta" />
         <ShareButton location="final-cta" summary={shareSummary} variant="button" />

@@ -1,20 +1,16 @@
-import { Car, CarFront, Flame, UtensilsCrossed } from "lucide-react";
-
 import { Eyebrow, Section } from "@/components/landing/primitives";
-import { WHAT_WE_ARRANGE } from "@/lib/platform-content";
-
-const ICONS = { flame: Flame, car: Car, "car-front": CarFront, utensils: UtensilsCrossed } as const;
+import { WHAT_WE_ARRANGE_ICONS, type ResolvedPlatformWhatWeArrange } from "@/lib/platform-sections";
 
 /** docs/apex-page-plan.md §S8 — the moat section. Specific prices, not a
  *  generic features grid: concrete numbers are the whole point here. */
-export function WhatWeArrange() {
+export function WhatWeArrange({ content }: { content: ResolvedPlatformWhatWeArrange }) {
   return (
     <Section band="canvas">
-      <Eyebrow hi="दर्शन, गाड़ी, पूजा — सब हम देख लेंगे" en="Darshan, car, pooja — we'll handle it" />
+      <Eyebrow hi={content.eyebrowHi} en={content.eyebrow} />
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 md:gap-6">
-        {WHAT_WE_ARRANGE.map((item) => {
-          const Icon = ICONS[item.icon];
+        {content.items.map((item) => {
+          const Icon = WHAT_WE_ARRANGE_ICONS[item.icon];
           return (
             <div key={item.title} className="border-border rounded-xl border p-6">
               <Icon className="text-primary size-6" aria-hidden="true" />
@@ -27,9 +23,7 @@ export function WhatWeArrange() {
         })}
       </div>
 
-      <p className="text-text-muted mt-6 text-center text-sm">
-        All arranged on the same WhatsApp thread as your stay.
-      </p>
+      <p className="text-text-muted mt-6 text-center text-sm">{content.footNote}</p>
     </Section>
   );
 }
