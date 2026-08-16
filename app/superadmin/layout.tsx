@@ -25,7 +25,17 @@ export default async function SuperadminLayout({
     <div className="min-h-dvh">
       <header className="border-border bg-foreground text-background border-b">
         <div className="container-page flex h-14 items-center justify-between gap-3">
-          <p className="font-semibold">Platform</p>
+          <div className="flex items-center gap-6">
+            <p className="font-semibold">Platform</p>
+            <nav className="flex items-center gap-4 text-sm">
+              <Link href="/superadmin" className="pressable font-medium opacity-80 hover:opacity-100">
+                Tenants
+              </Link>
+              <Link href="/superadmin/homepage" className="pressable font-medium opacity-80 hover:opacity-100">
+                Apex homepage
+              </Link>
+            </nav>
+          </div>
           <div className="flex items-center gap-4 text-sm">
             <span className="hidden opacity-70 sm:inline">{user.email}</span>
             <Link

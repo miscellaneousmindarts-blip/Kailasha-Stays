@@ -32,7 +32,7 @@ import {
   PLATFORM_SECTION_META,
   isPlatformSectionKey,
   type PlatformSectionKey,
-} from "@/lib/platform-sections";
+} from "@/lib/platform-sections-schema";
 import type { PlatformImage, PlatformSection } from "@/lib/types/database";
 import { PLATFORM_SITE_URL } from "@/lib/platform-content";
 
@@ -48,8 +48,8 @@ import { PLATFORM_SITE_URL } from "@/lib/platform-content";
 export type PlatformEditorProps = {
   content: unknown;
   pending: boolean;
-  error?: string;
-  saved?: boolean;
+  error: string | null;
+  saved: boolean;
   onSave: (content: unknown) => void;
 };
 
