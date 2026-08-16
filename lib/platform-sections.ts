@@ -3,15 +3,23 @@ import "server-only";
 import { z } from "zod";
 import {
   Banknote,
+  Calculator,
   Car,
   CarFront,
   Flame,
+  HandHeart,
+  Home as HomeIcon,
   LayoutTemplate,
+  MapPin,
+  MessageSquareQuote,
   MessagesSquare,
+  Sparkles,
+  Star,
   UtensilsCrossed,
   Landmark,
   PlaneTakeoff,
   TrainFront,
+  type LucideIcon,
 } from "lucide-react";
 
 import { createPublicClient } from "@/lib/supabase/public";
@@ -904,3 +912,20 @@ export const WHAT_WE_ARRANGE_ICONS = {
   utensils: UtensilsCrossed,
 } as const;
 export const HOST_BAND_ICONS = { template: LayoutTemplate, chat: MessagesSquare, money: Banknote } as const;
+
+/**
+ * Outline-list label/note/icon per section, for the superadmin builder —
+ * same purpose as BUILTIN_META in lib/homepage-blocks.ts.
+ */
+export const PLATFORM_SECTION_META: Record<PlatformSectionKey, { label: string; note: string; icon: LucideIcon }> = {
+  hero: { label: "Hero", note: "The first screen.", icon: Sparkles },
+  homes: { label: "Homes grid", note: "The property cards. Filter chips are computed, not editable.", icon: HomeIcon },
+  savings: { label: "Savings calculator", note: "Heading and lede only — the calculator itself uses live rates.", icon: Calculator },
+  location: { label: "Where you'll be", note: "The walk-time promise and the four landmark tiles.", icon: MapPin },
+  comparison: { label: "Comparison table", note: "Us vs. hotel vs. dharamshala.", icon: MessageSquareQuote },
+  what_we_arrange: { label: "What we arrange", note: "Pooja, pickup, car, food.", icon: HandHeart },
+  social_proof: { label: "Reviews", note: "Hidden entirely if you remove every review.", icon: Star },
+  host_band: { label: "For property owners", note: "The dark band pitching hosts to list with us.", icon: LayoutTemplate },
+  faq: { label: "FAQ", note: "Also feeds the page's FAQPage structured data.", icon: MessageSquareQuote },
+  final_cta: { label: "Closing CTA", note: "The last screen.", icon: Sparkles },
+};

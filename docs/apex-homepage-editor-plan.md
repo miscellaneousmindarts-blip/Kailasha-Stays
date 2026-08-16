@@ -105,15 +105,26 @@ The expensive infrastructure already exists and is plan-agnostic:
 `upload-panel.tsx`, `repeatable-list.tsx` (drives four of the ten sections),
 `use-save-action.tsx`, `save-bar.tsx`, dnd-kit reordering.
 
-**Generalised** — `homepage-shell.tsx` already has the exact seam needed: a
-`BUILTIN_EDITORS: Record<BuiltinKey, ComponentType>` registry at line 78. Extract
-the shell's chrome (outline list, drag reorder, visibility toggles, media tab)
-to take a section list + an editor registry as inputs; the tenant shell and the
-platform shell then differ only in which registry they pass.
+**Not generalised, built separate** — this was the plan going in, but reading
+`homepage-shell.tsx` in full during the build turned up more tenant-specific
+coupling than the `BUILTIN_EDITORS` registry seam suggested: custom sections
+(add/delete/layout-picker, out of scope per §2), every builtin editor also
+receiving `settings: SiteSettings` for fields that live in `site_settings`
+rather than the section row, and `MediaLibraryProvider` hardwired at both the
+type level (`HomepageImage`, which carries `tenant_id`) and the action level
+(imports `uploadHomepageImage` etc. from the tenant's own
+`media-actions.ts`) to the tenant media library. Genericising all of that
+means editing live, working, in-production admin code for a second consumer
+whose actual requirements are a strict subset. Not worth the risk. Instead:
+a new `PlatformHomepageShell` and `PlatformMediaLibraryProvider`
+(`components/superadmin/homepage/`), same visual chrome and drag-reorder UX,
+built against `platform_sections`/`platform_images` from the start.
+`homepage-shell.tsx` and `media-library-context.tsx` are not touched.
 
 **Written new** — ten zod schemas + resolvers (`lib/platform-sections.ts`,
-mirroring `lib/homepage.ts`), ten editors (`components/superadmin/homepage/`),
-server actions, and the `/superadmin/homepage` route.
+mirroring `lib/homepage.ts`, done), ten editors, a platform shell + media
+context, server actions, and the `/superadmin/homepage` route
+(`components/superadmin/homepage/` + `app/superadmin/homepage/`).
 
 **Media:** `homepage_images.tenant_id` is `NOT NULL` (0012), and that constraint
 is precisely what keeps one host's library out of another's —
