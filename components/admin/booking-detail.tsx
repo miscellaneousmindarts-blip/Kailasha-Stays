@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Loader2,
   MessageCircle,
+  Pencil,
   RefreshCw,
   Trash2,
   X,
@@ -28,8 +29,9 @@ import {
   regeneratePortalToken,
   setBookingAddonStatus,
   setBookingStatus,
+  updateBookingAddon,
+  updateBookingDatesAndPricing,
   updateBookingDetails,
-  updateBookingPricing,
 } from "@/app/admin/(dashboard)/bookings/[id]/actions";
 import { formatDate, money } from "@/lib/format";
 import { nightsBetween, parseISODate } from "@/lib/date-utils";
@@ -105,7 +107,7 @@ export function BookingDetail({
 
       <BasicsSection booking={booking} />
 
-      <PricingSection booking={booking} />
+      <DatesAndPricingSection booking={booking} />
 
       {booking.portal_token ? (
         <PortalLinkSection booking={booking} siteUrl={siteUrl} />
@@ -183,29 +185,44 @@ function BasicsSection({ booking }: { booking: BookingForEdit }) {
 }
 
 /**
- * Rebuilds the same editor used at creation — one place the total is ever
- * built, whether that's the first time or the fifth. The suggested per-night
- * rate always comes from the property's CURRENT pricing, since a booking
- * that predates itemised pricing (nightly_rates null) has no rate history of
- * its own to seed from; one that's already itemised keeps its own stored
- * rates instead (BookingPriceEditor prefers those when present).
+ * Dates and price in one form — rebuilt with the same editor used at
+ * creation, so the total is only ever built one way whether that's the first
+ * time or the fifth.
+ *
+ * They share a form because the breakdown is one row per night: changing the
+ * dates without rebuilding it would leave a total describing nights the guest
+ * isn't staying. BookingPriceEditor already regenerates its night rows when
+ * the range changes (that's what it does on the new-booking form), so moving
+ * a booking re-quotes it against the property's CURRENT pricing for the new
+ * nights, ready to adjust before saving.
+ *
+ * Changing the dates here is also what frees the old ones on the calendar and
+ * holds the new ones — availability is derived from this booking row, not
+ * stored separately, so there is no second place to keep in sync.
  */
-function PricingSection({ booking }: { booking: BookingForEdit }) {
-  const action = useSaveAction(updateBookingPricing);
+function DatesAndPricingSection({ booking }: { booking: BookingForEdit }) {
+  const action = useSaveAction(updateBookingDatesAndPricing);
   const property = booking.properties;
 
-  const quote = property
-    ? quoteStay({
-        checkIn: parseISODate(booking.check_in),
-        checkOut: parseISODate(booking.check_out),
-        periods: property.rate_periods,
-        defaults: { base: property.base_price },
-      })
-    : null;
+  const [checkIn, setCheckIn] = useState(booking.check_in);
+  const [checkOut, setCheckOut] = useState(booking.check_out);
+
+  const datesValid = Boolean(checkIn && checkOut && checkOut > checkIn);
+  const datesChanged = checkIn !== booking.check_in || checkOut !== booking.check_out;
+
+  const quote = useMemo(() => {
+    if (!property || !datesValid) return null;
+    return quoteStay({
+      checkIn: parseISODate(checkIn),
+      checkOut: parseISODate(checkOut),
+      periods: property.rate_periods,
+      defaults: { base: property.base_price },
+    });
+  }, [property, datesValid, checkIn, checkOut]);
 
   return (
     <section>
-      <h2 className="mb-3 text-lg font-semibold">Pricing</h2>
+      <h2 className="mb-3 text-lg font-semibold">Dates &amp; pricing</h2>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -213,6 +230,53 @@ function PricingSection({ booking }: { booking: BookingForEdit }) {
         }}
         className="space-y-4"
       >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label htmlFor="check_in">Check-in</Label>
+            <Input
+              id="check_in"
+              name="check_in"
+              type="date"
+              value={checkIn}
+              onChange={(e) => setCheckIn(e.target.value)}
+              required
+              className="h-11"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="check_out">Check-out</Label>
+            <Input
+              id="check_out"
+              name="check_out"
+              type="date"
+              value={checkOut}
+              onChange={(e) => setCheckOut(e.target.value)}
+              required
+              className="h-11"
+            />
+          </div>
+        </div>
+
+        {datesChanged && datesValid ? (
+          <p className="bg-warning/10 text-warning rounded-md p-3 text-sm">
+            Saving moves this booking to{" "}
+            <strong>
+              {formatDate(checkIn)} – {formatDate(checkOut)}
+            </strong>
+            {booking.blocks_calendar
+              ? " — freeing the old dates on your calendar and holding the new ones."
+              : " — this booking doesn't hold dates on your calendar, so only its own record changes."}{" "}
+            The guest sees the new dates on their portal link straight away, and
+            the nightly rates below have been re-quoted for the new nights.
+          </p>
+        ) : null}
+
+        {!datesValid ? (
+          <p role="alert" className="text-danger text-sm">
+            Check-out has to be after check-in.
+          </p>
+        ) : null}
+
         {booking.nightly_rates === null ? (
           <p className="bg-warning/10 text-warning rounded-md p-3 text-sm">
             This booking has no itemised breakdown yet — the rates below are
@@ -222,14 +286,18 @@ function PricingSection({ booking }: { booking: BookingForEdit }) {
             line for the difference.
           </p>
         ) : null}
-        <BookingPriceEditor
-          checkIn={booking.check_in}
-          checkOut={booking.check_out}
-          currency={property?.currency ?? booking.currency}
-          suggestedNightly={quote?.nightly ?? []}
-          initialNightlyRates={booking.nightly_rates}
-          initialCharges={booking.charges}
-        />
+
+        {datesValid ? (
+          <BookingPriceEditor
+            checkIn={checkIn}
+            checkOut={checkOut}
+            currency={property?.currency ?? booking.currency}
+            suggestedNightly={quote?.nightly ?? []}
+            initialNightlyRates={booking.nightly_rates}
+            initialCharges={booking.charges}
+          />
+        ) : null}
+
         <SaveBar pending={action.pending} saved={action.saved} error={action.error} />
       </form>
     </section>
@@ -390,6 +458,12 @@ function AddonsSection({ booking }: { booking: BookingForEdit }) {
   );
 }
 
+/**
+ * Editing here changes the price for THIS booking only — booking_addons
+ * carries its own price/qty, copied from the catalogue when the add-on was
+ * added and never read back from it. Same idea as the nightly rates: the
+ * catalogue is the starting point, the booking is the agreement.
+ */
 function AddonRow({
   bookingId,
   addon,
@@ -399,6 +473,75 @@ function AddonRow({
 }) {
   const status = useSaveAction(setBookingAddonStatus);
   const del = useSaveAction(deleteBookingAddon);
+  const edit = useSaveAction(updateBookingAddon);
+  const [editing, setEditing] = useState(false);
+
+  if (editing) {
+    return (
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const ok = await edit.runAndWait(bookingId, addon.id, new FormData(e.currentTarget));
+          if (ok) setEditing(false);
+        }}
+        className="space-y-3 p-3"
+      >
+        <div className="grid gap-2 sm:grid-cols-[1fr_7rem_5rem]">
+          <Input
+            name="name"
+            defaultValue={addon.name}
+            aria-label="Add-on name"
+            required
+            className="h-10"
+          />
+          <Input
+            name="price"
+            type="number"
+            min={0}
+            step="any"
+            inputMode="decimal"
+            defaultValue={addon.price}
+            aria-label="Price"
+            required
+            className="h-10 text-right"
+          />
+          <Input
+            name="qty"
+            type="number"
+            min={1}
+            max={99}
+            defaultValue={addon.qty}
+            aria-label="Quantity"
+            required
+            className="h-10 text-right"
+          />
+        </div>
+        {edit.error ? (
+          <p role="alert" className="text-danger text-sm">
+            {edit.error}
+          </p>
+        ) : null}
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={edit.pending}
+            className="bg-primary text-primary-foreground hover:bg-primary-hover pressable flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium disabled:opacity-60"
+          >
+            {edit.pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            disabled={edit.pending}
+            className="border-border hover:bg-surface-subtle pressable flex h-9 items-center rounded-md border px-3 text-sm font-medium"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    );
+  }
 
   return (
     <div className="flex items-center gap-3 p-3">
@@ -442,6 +585,14 @@ function AddonRow({
           </button>
         </>
       ) : null}
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        aria-label={`Edit ${addon.name}`}
+        className="text-text-muted hover:bg-surface-subtle pressable flex size-9 items-center justify-center rounded-full"
+      >
+        <Pencil className="size-4" aria-hidden="true" />
+      </button>
       <button
         type="button"
         onClick={() => del.run(bookingId, addon.id)}
